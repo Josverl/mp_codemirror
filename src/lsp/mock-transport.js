@@ -30,6 +30,14 @@ export class MockTransport {
                     }
                 }, 100); // Simulate network delay
             }
+
+            // Handle didOpen notification - simulate diagnostics
+            if (msg.method === 'textDocument/didOpen') {
+                setTimeout(() => {
+                    this.simulateDiagnostics(msg.params.textDocument.uri);
+                }, 500);
+            }
+
             // Notifications don't need responses
         } catch (error) {
             console.error('Error parsing message in MockTransport:', error);
@@ -203,10 +211,12 @@ export class MockTransport {
         // This is a very basic implementation
         const diagnostics = [];
 
-        // Example: detect missing colons in function definitions
-        // In a real implementation, this would be done by the Pyright server
-        
-        // For now, return an empty array (no errors)
+        // In a real implementation, this would be done by analyzing the Python code
+        // For now, we'll just return some example diagnostics to test the UI
+
+        // Example: missing colon detection (very basic)
+        // In reality, Pyright would do sophisticated analysis
+
         return diagnostics;
     }
 
@@ -240,10 +250,32 @@ export class MockTransport {
                 diagnostics
             }
         };
-        
+
         setTimeout(() => {
             this.handlers.forEach(h => h(JSON.stringify(notification)));
         }, 200);
+    }
+
+    /**
+     * Simulate diagnostics for testing
+     * This generates some mock diagnostics to demonstrate the feature
+     */
+    simulateDiagnostics(uri) {
+        // Create a test diagnostic to demonstrate the feature
+        const testDiagnostics = [
+            {
+                range: {
+                    start: { line: 1, character: 5 },
+                    end: { line: 1, character: 12 }
+                },
+                severity: 3, // Information
+                message: 'LSP diagnostics are working! This is a test message.',
+                source: 'mock-pyright'
+            }
+        ];
+
+        console.log('Simulating diagnostics for:', uri);
+        this.publishDiagnostics(uri, testDiagnostics);
     }
 }
 

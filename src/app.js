@@ -4,13 +4,19 @@
  */
 
 import { python } from '@codemirror/lang-python';
+import { Compartment } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
+import { createLSPClient, createLSPPlugin } from './lsp/client.js';
 
 // Sample Python code - will be loaded from file
 let sampleCode = '# Loading example...\n';
 
 // Available example files (will be populated dynamically)
 let exampleFiles = [];
+
+// LSP client and related state
+let lspClient = null;
+let lspTransport = null;
 
 // Fetch list of example files from the examples folder
 async function fetchExampleFiles() {
@@ -178,14 +184,46 @@ async function initializeEditor() {
     const defaultFile = exampleFiles.length > 0 ? exampleFiles[0].file : 'blink_led.py';
     await loadSampleFromFile(defaultFile);
 
+    // Initialize LSP client
+    try {
+        console.log('Initializing LSP client...');
+        const lspResult = await createLSPClient();
+        lspClient = lspResult.client;
+        lspTransport = lspResult.transport;
+        console.log('LSP client ready!');
+    } catch (error) {
+        console.error('Failed to initialize LSP client:', error);
+        console.log('Editor will continue without LSP features');
+    }
+
+    // Build editor extensions
+    const lspCompartment = new Compartment();
+    const extensions = [
+        basicSetup,
+        python(),
+        lspCompartment.of([])  // Start with empty LSP extensions
+    ];
+
+    // Create the editor view first
     view = new EditorView({
         doc: sampleCode,
-        extensions: [
-            basicSetup,
-            python()
-        ],
+        extensions,
         parent: document.getElementById('editor-container')
     });
+
+    // Add LSP plugin if client is available
+    if (lspClient) {
+        try {
+            const lspExtensions = createLSPPlugin(lspClient, view, 'file:///workspace/document.py', 'python', sampleCode);
+            // Reconfigure the LSP compartment with actual extensions
+            view.dispatch({
+                effects: lspCompartment.reconfigure(lspExtensions)
+            });
+            console.log('LSP plugin added to editor');
+        } catch (error) {
+            console.error('Failed to add LSP plugin:', error);
+        }
+    }
 
     // Populate the example selector after editor is initialized
     populateExampleSelector();

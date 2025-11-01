@@ -6,29 +6,82 @@
 import { python } from '@codemirror/lang-python';
 import { EditorView, basicSetup } from 'codemirror';
 
-// Sample Python code
-const sampleCode = `# MicroPython Example - Blink LED
-from machine import Pin
-from time import sleep
+// Sample Python code - will be loaded from file
+let sampleCode = '# Loading example...\n';
 
-# Setup LED on GPIO2 (built-in LED on ESP32)
-led = Pin(2, Pin.OUT)
+// Available example files (will be populated dynamically)
+let exampleFiles = [];
 
-def blink(times=10, delay=0.5):
-    """Blink the LED a specified number of times."""
-    for i in range(times):
-        led.on()
-        sleep(delay)
-        led.off()
-        sleep(delay)
-    print(f"Blinked {times} times!")
+// Fetch list of example files from the examples folder
+async function fetchExampleFiles() {
+    try {
+        // Fetch the manifest file that lists all available examples
+        const manifestResponse = await fetch('./examples/examples.json');
+        if (!manifestResponse.ok) {
+            throw new Error('Could not load examples manifest');
+        }
 
-# Main loop
-if __name__ == "__main__":
-    print("Starting blink sequence...")
-    blink()
-    print("Done!")
-`;
+        const filenames = await manifestResponse.json();
+
+        // Fetch each file to get its first comment line as description
+        for (const filename of filenames) {
+            try {
+                const contentResponse = await fetch(`./examples/${filename}`);
+                if (contentResponse.ok) {
+                    const content = await contentResponse.text();
+                    const firstLine = content.split('\n')[0];
+
+                    // Extract description from first comment line
+                    const description = firstLine.startsWith('#')
+                        ? firstLine.substring(1).trim()
+                        : filename.replace('.py', '').replace(/_/g, ' ');
+
+                    exampleFiles.push({ name: description, file: filename });
+                }
+            } catch (error) {
+                console.warn(`Could not load ${filename}:`, error);
+            }
+        }
+
+        if (exampleFiles.length === 0) {
+            console.error('No example files could be loaded');
+        }
+    } catch (error) {
+        console.error('Error fetching example files:', error);
+    }
+}
+
+// Populate the example selector dropdown
+function populateExampleSelector() {
+    const select = document.getElementById('sampleSelect');
+    exampleFiles.forEach(example => {
+        const option = document.createElement('option');
+        option.value = example.file;
+        option.textContent = example.name;
+        select.appendChild(option);
+    });
+
+    // Set default selection to first file if available
+    if (exampleFiles.length > 0) {
+        select.value = exampleFiles[0].file;
+    }
+}
+
+// Load sample code from file
+async function loadSampleFromFile(filename = 'blink_led.py') {
+    try {
+        const response = await fetch(`./examples/${filename}`);
+        if (response.ok) {
+            sampleCode = await response.text();
+        } else {
+            console.error('Failed to load sample file:', response.statusText);
+            sampleCode = `# Error loading ${filename}\n# Please check console for details\n`;
+        }
+    } catch (error) {
+        console.error('Error fetching sample file:', error);
+        sampleCode = `# Error loading ${filename}\n# Please check console for details\n`;
+    }
+}
 
 // Theme configuration
 let isDarkTheme = true;
@@ -114,21 +167,41 @@ const lightTheme = EditorView.theme({
 }, { dark: false });
 
 // Initialize the editor with basic setup and Python language support
-let view = new EditorView({
-    doc: sampleCode,
-    extensions: [
-        basicSetup,
-        python()
-    ],
-    parent: document.getElementById('editor-container')
-});
+let view;
+
+// Initialize editor after loading sample
+async function initializeEditor() {
+    // Fetch available examples first
+    await fetchExampleFiles();
+
+    // Load the first available example, or use default
+    const defaultFile = exampleFiles.length > 0 ? exampleFiles[0].file : 'blink_led.py';
+    await loadSampleFromFile(defaultFile);
+
+    view = new EditorView({
+        doc: sampleCode,
+        extensions: [
+            basicSetup,
+            python()
+        ],
+        parent: document.getElementById('editor-container')
+    });
+
+    // Populate the example selector after editor is initialized
+    populateExampleSelector();
+
+    console.log('CodeMirror Python Editor initialized successfully!');
+}
+
+// Start initialization
+initializeEditor();
 
 // Theme toggle functionality
 function toggleTheme() {
     isDarkTheme = !isDarkTheme;
     document.body.classList.toggle('light-theme', !isDarkTheme);
     document.body.classList.toggle('dark-theme', isDarkTheme);
-    
+
     // Note: Currently theme changes via CSS only
     // TODO: Implement proper editor theme reconfiguration with darkTheme/lightTheme extensions
 }
@@ -142,8 +215,17 @@ function clearEditor() {
     view.focus();
 }
 
-// Load sample code
-function loadSample() {
+// Load sample code from selected file
+async function loadSample() {
+    const select = document.getElementById('sampleSelect');
+    const filename = select.value;
+
+    if (!filename) {
+        alert('Please select an example file first');
+        return;
+    }
+
+    await loadSampleFromFile(filename);
     const transaction = view.state.update({
         changes: { from: 0, to: view.state.doc.length, insert: sampleCode }
     });
@@ -167,7 +249,7 @@ export function setEditorContent(content) {
 // Event listeners
 document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 document.getElementById('clearBtn').addEventListener('click', clearEditor);
-document.getElementById('getSampleBtn').addEventListener('click', loadSample);
+document.getElementById('loadSampleBtn').addEventListener('click', loadSample);
 
 // Initialize with dark theme
 document.body.classList.add('dark-theme');
@@ -175,4 +257,3 @@ document.body.classList.add('dark-theme');
 // Export the view for testing purposes
 export { view };
 
-console.log('CodeMirror Python Editor initialized successfully!');

@@ -37,14 +37,19 @@ mp_codemirror/
 ├── .github/
 │   └── copilot-instructions.md  # Agent instructions
 ├── src/
-│   ├── index.html      # Main HTML page
-│   ├── styles.css      # Custom styling
-│   └── app.js          # Application logic and CodeMirror setup
+│   ├── examples/           # Python example files
+│   │   ├── examples.json   # List of example files
+│   │   ├── blink_led.py    # LED blink example (default)
+│   │   ├── espnow.py       # ESP-NOW example
+│   │   └── temperature_sensor.py  # Temperature sensor example
+│   ├── index.html          # Main HTML page
+│   ├── styles.css          # Custom styling
+│   └── app.js              # Application logic and CodeMirror setup
 ├── tests/
-│   ├── conftest.py     # Pytest configuration
-│   ├── test_editor.py  # Editor tests with Playwright
-│   └── README.md       # Testing documentation
-└── README.md           # This file
+│   ├── conftest.py         # Pytest configuration
+│   ├── test_editor.py      # Editor tests with Playwright
+│   └── README.md           # Testing documentation
+└── README.md               # This file
 ```
 
 ## Getting Started
@@ -106,7 +111,9 @@ mp_codemirror/
 - **Write Code:** Simply start typing Python code in the editor
 - **Toggle Theme:** Click the 🌓 button to switch between dark and light themes
 - **Clear Editor:** Click "Clear" to remove all content
-- **Load Sample:** Click "Load Sample" to load a MicroPython LED blink example
+- **Load Sample:** Click "Load Sample" to load example Python code from the `src/examples/` folder
+
+The editor loads `examples/blink_led.py` by default on startup. You can add more example files to the `examples/` folder and they will be available for loading.
 
 ### Keyboard Shortcuts
 

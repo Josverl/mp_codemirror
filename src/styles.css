@@ -102,6 +102,52 @@ header h1 {
 .controls {
     display: flex;
     gap: 10px;
+    align-items: center;
+}
+
+.sample-selector {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+select {
+    padding: 8px 12px;
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    min-width: 200px;
+}
+
+body.dark-theme select {
+    background-color: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+}
+
+body.dark-theme select:hover {
+    background-color: #4a4a4a;
+}
+
+body.dark-theme select:focus {
+    outline: 2px solid #007acc;
+    outline-offset: 2px;
+}
+
+body.light-theme select {
+    background-color: #ffffff;
+    color: #000000;
+    border: 1px solid #d4d4d4;
+}
+
+body.light-theme select:hover {
+    background-color: #f3f3f3;
+}
+
+body.light-theme select:focus {
+    outline: 2px solid #007acc;
+    outline-offset: 2px;
 }
 
 button {
@@ -191,6 +237,16 @@ footer a:hover {
 
     .controls {
         justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .sample-selector {
+        width: 100%;
+    }
+
+    .sample-selector select {
+        flex: 1;
+        min-width: 0;
     }
 
     main {
@@ -218,8 +274,18 @@ footer a:hover {
         gap: 8px;
     }
 
+    .sample-selector {
+        width: 100%;
+        flex-direction: row;
+    }
+
     button {
         width: 100%;
+    }
+
+    .sample-selector button {
+        width: auto;
+        min-width: 80px;
     }
 }
 

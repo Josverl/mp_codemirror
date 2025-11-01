@@ -184,16 +184,20 @@ async function initializeEditor() {
     const defaultFile = exampleFiles.length > 0 ? exampleFiles[0].file : 'blink_led.py';
     await loadSampleFromFile(defaultFile);
 
-    // Initialize LSP client
+    // Initialize LSP client with WebSocket transport
     try {
-        console.log('Initializing LSP client...');
-        const lspResult = await createLSPClient();
+        console.log('Initializing LSP client with WebSocket transport...');
+        const lspResult = await createLSPClient({
+            useMock: false,  // Use real WebSocket transport
+            wsUrl: 'ws://localhost:8765'  // Connect to our Python bridge server
+        });
         lspClient = lspResult.client;
         lspTransport = lspResult.transport;
-        console.log('LSP client ready!');
+        console.log('LSP client ready! Connected to Pyright via WebSocket.');
     } catch (error) {
         console.error('Failed to initialize LSP client:', error);
         console.log('Editor will continue without LSP features');
+        console.log('Make sure the WebSocket bridge server is running: .venv\\Scripts\\python.exe server/lsp_bridge.py');
     }
 
     // Build editor extensions

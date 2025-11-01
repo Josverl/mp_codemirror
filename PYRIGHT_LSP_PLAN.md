@@ -1,8 +1,14 @@
 # Pyright LSP Integration Plan for CodeMirror
 
+> **⚠️ CRITICAL REQUIREMENT**: This project MUST integrate with a real Pyright/Pylance LSP server. Mock implementations are only for initial development. Sprint 2 focuses on establishing this connection - no further feature work until real Pyright diagnostics are functional.
+
+> **📌 GitHub Pages Note**: This requirement means the project can no longer be deployed as a static site. Server infrastructure is required.
+
 ## Overview
 
-This document outlines the plan to integrate Pyright LSP (Language Server Protocol) support into the CodeMirror 6 Python editor for MicroPython development.
+This document outlines the plan to integrate **Pyright/Pylance LSP Server** support into the CodeMirror 6 Python editor for MicroPython development.
+
+**CRITICAL**: This plan requires a real Pyright LSP server running. Mock-only implementations are insufficient for production use.
 
 ## Architecture
 
@@ -10,79 +16,118 @@ This document outlines the plan to integrate Pyright LSP (Language Server Protoc
 - Simple CodeMirror 6 editor with Python syntax highlighting
 - Static HTML page deployable to GitHub Pages
 - Basic editing features (line numbers, bracket matching, code folding)
+- **Mock LSP transport** for initial testing (Phase 1 complete)
 
 ### Target State
-- LSP-powered Python editor with:
-  - Real-time diagnostics (errors/warnings)
-  - Intelligent autocompletion
-  - Hover tooltips with type information
-  - Go to definition
-  - Find references
-  - Signature help
+- **Full Pyright LSP Server** connected via WebSocket
+- Real-time diagnostics from Pyright
+- Intelligent autocompletion with type information
+- Hover tooltips with documentation
+- Go to definition and find references
+- MicroPython-specific type stubs
+
+**Note**: GitHub Pages deployment may no longer be viable - will require server infrastructure for LSP server.
 
 ## Implementation Approach
 
-### Phase 1: Infrastructure Setup
-**Goal**: Install dependencies and create LSP client foundation
+### Sprint 1: Mock LSP Infrastructure (✅ COMPLETED)
+**Status**: Complete - Mock transport, diagnostics display working
+
+**Completed**:
+- ✅ Created SimpleLSPClient for LSP protocol handling
+- ✅ Created MockTransport for testing
+- ✅ Implemented diagnostics display with lintGutter
+- ✅ Fast, focused test suite (3 tests, ~8.5s)
+- ✅ Verified diagnostic icons display correctly
+
+### Sprint 2: Pyright LSP Server Integration (🚧 CURRENT)
+**Goal**: Connect to real Pyright/Pylance LSP server and get actual diagnostics
+
+**Critical Requirements**:
+- **MUST** have Pyright LSP server running
+- **MUST** establish WebSocket or stdio communication
+- **MUST** receive real diagnostics from Pyright
+- **MUST** verify with Python code containing actual errors
 
 **Tasks**:
-1. Install `@codemirror/lsp-client` via npm/CDN
-2. Create LSP client configuration
-3. Set up mock transport for testing without server
-4. Create basic LSP plugin integration
-
-**Files to Create/Modify**:
-- `src/lsp-client.js` - LSP client setup and configuration
-- `src/lsp-mock-transport.js` - Mock transport for testing
-- `src/app.js` - Integrate LSP extensions
-- `src/index.html` - Add LSP client import
-
-**Testing**:
-- Verify LSP client initializes without errors
-- Test mock transport sends/receives messages
-- Confirm editor still works with LSP extensions
-
-### Phase 2: Diagnostics (Error/Warning Highlighting)
-**Goal**: Show Python syntax errors and type errors in the editor
-
-**Tasks**:
-1. Implement diagnostic provider
-2. Add diagnostic decorations (squiggly underlines)
-3. Display diagnostic tooltips on hover
-4. Add diagnostic gutter markers
-
-**CodeMirror Extensions**:
-- `@codemirror/lint` - Already imported via LSP client
-- Custom diagnostic conversion from LSP format
-
-**LSP Messages**:
-- `textDocument/publishDiagnostics` - Receive diagnostics from server
+1. **Research & Design** (1-2 days)
+   - Research Pyright server deployment options
+   - Choose communication method (WebSocket vs stdio)
+   - Design server architecture
+   - Document hosting requirements
+   
+2. **Server Setup** (2-3 days)
+   - Install Pyright/Pylance LSP server
+   - Create WebSocket bridge (if needed)
+   - Test server responds to LSP messages
+   - Verify initialize/initialized handshake
+   
+3. **Client Integration** (2-3 days)
+   - Create WebSocketTransport class
+   - Replace MockTransport with WebSocketTransport
+   - Test connection establishment
+   - Verify LSP protocol messages flow
+   
+4. **Diagnostics Validation** (1-2 days)
+   - Send real Python code to server
+   - Receive actual Pyright diagnostics
+   - Verify diagnostic display in editor
+   - Test with multiple error types
 
 **Testing Strategy**:
 ```python
-# Test cases:
-1. Syntax error: missing colon
-   def hello()
-       print("world")
+# Real error tests with Pyright:
+1. Undefined variable
+   print(undefined_variable)  # Pyright: "undefined_variable" is not defined
 
-2. Undefined variable
-   print(undefined_var)
+2. Type mismatch
+   x: int = "string"  # Pyright: Expression of type "str" cannot be assigned to "int"
 
-3. Type error (if using type hints)
-   x: int = "string"
+3. Import error
+   import non_existent  # Pyright: Import "non_existent" could not be resolved
 
-4. Import error
-   import non_existent_module
+4. Function signature mismatch
+   def func(x: int): pass
+   func("string")  # Pyright: Argument of type "str" cannot be assigned to parameter "x"
 ```
 
 **Playwright Tests**:
-- Load editor with error code
-- Verify error underlines appear
-- Hover over error, check tooltip
-- Check gutter has error marker
-- Fix error, verify diagnostics clear
+- Load editor, verify server connection
+- Type code with error, verify Pyright diagnostic appears
+- Fix error, verify diagnostic clears
+- Test multiple simultaneous errors
+- Verify diagnostic messages match Pyright output
 
-### Phase 3: Autocompletion
+**Success Criteria**:
+- ✅ Pyright server runs and responds
+- ✅ WebSocket connection established
+- ✅ Real diagnostics received from Pyright
+- ✅ Diagnostics display correctly in editor
+- ✅ All tests pass with real server
+
+**Deliverables**:
+- `src/lsp/websocket-transport.js` - WebSocket LSP transport
+- `server/pyright-server.py` or `server/pyright-server.js` - Server wrapper
+- Updated tests using real Pyright
+- Documentation on server setup
+
+### Sprint 3: Refactoring & Optimization (After Sprint 2)
+**Goal**: Clean up code, optimize performance, improve reliability
+
+**Tasks**:
+- Refactor LSP client for better error handling
+- Optimize WebSocket reconnection logic
+- Improve diagnostic update performance
+- Add connection status UI indicator
+- Handle server disconnections gracefully
+
+**Success Criteria**:
+- Code is clean and maintainable
+- Tests remain fast (<15s total)
+- No flaky tests
+- Server connection is stable
+
+### Sprint 4: Autocompletion with Pyright
 **Goal**: Provide intelligent code suggestions as user types
 
 **Tasks**:
@@ -173,40 +218,106 @@ This document outlines the plan to integrate Pyright LSP (Language Server Protoc
 
 ## Technical Decisions
 
-### LSP Server Deployment Options
+### LSP Server Deployment - MANDATORY PYRIGHT
 
-#### Option 1: Mock/Client-Side (MVP for GitHub Pages)
+**Decision**: We MUST use a real Pyright/Pylance LSP server. Mock implementations are for initial development only.
+
+#### Chosen Approach: WebSocket Bridge to Pyright Server
+
+**Architecture**:
+```
+Browser (CodeMirror) 
+  ↕ WebSocket
+WebSocket Server (Node.js/Python)
+  ↕ stdio/IPC
+Pyright LSP Server (Node.js)
+```
+
 **Pros**:
-- Works on static GitHub Pages
-- No server infrastructure needed
-- Fast initial development
-- Good for testing UI/UX
+- Full Pyright capabilities
+- Real type checking and analysis
+- MicroPython stubs support
+- Accurate diagnostics
+- Production-ready
 
 **Cons**:
-- Limited LSP features
-- No real type checking
-- Can't handle complex imports
+- Requires server infrastructure
+- Can't run on GitHub Pages
+- Need to manage server lifecycle
+- Network latency considerations
 
-**Implementation**:
+**Implementation Options**:
+
+**Option A: Node.js WebSocket Bridge**
 ```javascript
-class MockTransport {
-  constructor() {
-    this.handlers = [];
-  }
+const WebSocket = require('ws');
+const { spawn } = require('child_process');
 
-  send(message) {
-    // Parse message and generate mock responses
-    const msg = JSON.parse(message);
-    if (msg.method === 'textDocument/completion') {
-      // Return mock completions
-      this.handlers.forEach(h => h(JSON.stringify({
-        id: msg.id,
-        result: { items: [...mockCompletions] }
-      })));
-    }
-  }
+const wss = new WebSocket.Server({ port: 8080 });
 
-  subscribe(handler) {
+wss.on('connection', (ws) => {
+  // Spawn Pyright server for this connection
+  const pyright = spawn('pyright-langserver', ['--stdio']);
+  
+  // Bridge messages
+  ws.on('message', (data) => {
+    pyright.stdin.write(data);
+  });
+  
+  pyright.stdout.on('data', (data) => {
+    ws.send(data);
+  });
+});
+```
+
+**Option B: Python WebSocket Bridge** (Recommended for MicroPython project)
+```python
+import asyncio
+import websockets
+import subprocess
+import json
+
+async def lsp_bridge(websocket):
+    # Start Pyright server
+    pyright = subprocess.Popen(
+        ['pyright-langserver', '--stdio'],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE
+    )
+    
+    async for message in websocket:
+        # Forward to Pyright
+        pyright.stdin.write(message.encode())
+        pyright.stdin.flush()
+        
+        # Read response
+        response = pyright.stdout.readline()
+        await websocket.send(response.decode())
+
+start_server = websockets.serve(lsp_bridge, "localhost", 8080)
+asyncio.get_event_loop().run_until_complete(start_server)
+```
+
+### Deployment Hosting Options
+
+**Option 1: Local Development Server**
+- Run server on localhost during development
+- User must run server manually
+- Good for initial testing
+
+**Option 2: Cloud-Hosted Server**
+- Deploy to Heroku, Railway, Fly.io, etc.
+- Always available
+- Multiple users can connect
+- Cost considerations
+
+**Option 3: Docker Container**
+- Package server + Pyright in container
+- Easy deployment
+- Consistent environment
+- User can run locally or in cloud
+
+**Recommended**: Start with Option 1 (local), then move to Option 3 (Docker)
     this.handlers.push(handler);
   }
 
@@ -380,45 +491,120 @@ mp_codemirror/
 
 ## Timeline
 
-### Week 1: Infrastructure
-- [ ] Install @codemirror/lsp-client
-- [ ] Create mock transport
-- [ ] Set up LSP client
-- [ ] Basic integration tests
+### Sprint 1: Mock LSP Infrastructure (✅ COMPLETED - 1 week)
+- ✅ Install @codemirror/lint
+- ✅ Create SimpleLSPClient
+- ✅ Create MockTransport
+- ✅ Implement diagnostics display
+- ✅ Fast test suite (3 tests, ~8.5s)
 
-### Week 2: Diagnostics
-- [ ] Implement diagnostics provider
-- [ ] Add diagnostic decorations
-- [ ] Create diagnostic tests
-- [ ] Test with various error types
+### Sprint 2: Pyright LSP Server Integration (🚧 CURRENT - 2 weeks)
+**Week 1: Research & Server Setup**
+- [ ] Research Pyright deployment options
+- [ ] Choose WebSocket vs stdio approach
+- [ ] Set up Pyright server locally
+- [ ] Create WebSocket bridge
+- [ ] Test LSP initialize handshake
 
-### Week 3: Autocompletion
+**Week 2: Client Integration & Testing**
+- [ ] Create WebSocketTransport class
+- [ ] Replace MockTransport in production
+- [ ] Send real code to Pyright
+- [ ] Receive and display real diagnostics
+- [ ] Update tests for real server
+- [ ] Document server setup
+
+**Success Gate**: Real Pyright diagnostics displaying in editor
+
+### Sprint 3: Refactoring & Optimization (1 week)
+- [ ] Refactor LSP client error handling
+- [ ] Optimize WebSocket reconnection
+- [ ] Add connection status UI
+- [ ] Handle server failures gracefully
+- [ ] Performance optimization
+- [ ] Code cleanup
+
+### Sprint 4: Autocompletion (2 weeks)
 - [ ] Implement completion provider
+- [ ] Send textDocument/completion to Pyright
+- [ ] Convert LSP completions to CodeMirror
 - [ ] Handle completion triggers
-- [ ] Create completion tests
-- [ ] Test completion scenarios
+- [ ] Test with real Pyright completions
+- [ ] Create focused test suite
 
-### Week 4: Hover & Polish
+### Sprint 5: Hover Tooltips (1 week)
 - [ ] Implement hover provider
-- [ ] Format hover content
-- [ ] Create hover tests
-- [ ] UI polish and bug fixes
+- [ ] Send textDocument/hover to Pyright
+- [ ] Format Markdown hover content
+- [ ] Style tooltips
+- [ ] Test with real Pyright hover info
+
+### Sprint 6: MicroPython Stubs Integration (2 weeks)
+- [ ] Research MicroPython type stubs
+- [ ] Configure Pyright for MicroPython
+- [ ] Add device-specific stubs (ESP32, RP2040)
+- [ ] Test MicroPython completions
+- [ ] Add device selector UI
+
+### Sprint 7+: Additional Features (Future)
+- [ ] Go to Definition
+- [ ] Find References
+- [ ] Rename Symbol
+- [ ] Signature Help
+- [ ] Document Formatting
+
+## Current Status (Updated {{date}})
+
+## Current Status (Updated November 1, 2025)
+
+### Completed ✅
+- Sprint 1: Mock LSP infrastructure with diagnostics display
+- SimpleLSPClient with full LSP protocol support
+- MockTransport for testing
+- Diagnostics display with lintGutter
+- Fast, focused test suite (3 tests, ~8.5s)
+
+### In Progress 🚧
+- **Sprint 2: Pyright LSP Server Integration**
+  - Need to research deployment options
+  - Need to set up WebSocket bridge
+  - Need to connect to real Pyright server
+  - Need to test with actual Python errors
+
+### Blocked 🚫
+- All features after Sprint 2 are blocked until real Pyright server is working
+
+### Next Steps
+1. Research Pyright server deployment
+2. Choose WebSocket bridge implementation
+3. Set up local Pyright server
+4. Create WebSocketTransport
+5. Test with real diagnostics
 
 ## Success Criteria
 
-### MVP Success
-- ✅ Diagnostics show Python syntax errors
-- ✅ Autocomplete suggests built-in functions
-- ✅ Hover shows basic type information
-- ✅ Works on GitHub Pages
-- ✅ All features tested with Playwright
+### Sprint 2 Success (Pyright Server)
+- ✅ Pyright LSP server running locally
+- ✅ WebSocket bridge functional
+- ✅ Initialize/initialized handshake works
+- ✅ Real Python code sent to server
+- ✅ Actual Pyright diagnostics received
+- ✅ Diagnostics display in editor
+- ✅ Tests updated for real server
+- ✅ Server setup documented
 
-### Production Success
-- ✅ Connected to real Pyright server
-- ✅ Full LSP features (goto definition, references)
-- ✅ MicroPython-specific completions
-- ✅ Device-specific API filtering
-- ✅ Fast, responsive UX
+### MVP Success (After Sprint 5)
+- ✅ Pyright diagnostics working
+- ✅ Autocompletion from Pyright
+- ✅ Hover tooltips from Pyright
+- ✅ All features tested with real server
+- ✅ Fast, reliable tests (<30s total)
+
+### Production Success (After Sprint 6)
+- ✅ MicroPython stubs integrated
+- ✅ Device-specific completions
+- ✅ Stable server deployment
+- ✅ Documentation complete
 
 ## Resources
 

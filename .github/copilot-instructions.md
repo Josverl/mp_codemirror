@@ -4,7 +4,9 @@ You should not be overly optimistic, use icons sparingly.
 
 ## Project Overview
 
-Build a simple, static HTML5 page hosting a CodeMirror 6 editor configured for Python syntax highlighting. The page must be deployable to GitHub Pages and serve as a foundation for future LSP integration with Pylance and MicroPython type stubs.
+Build a simple, static HTML5 page hosting a CodeMirror 6 editor configured for Python syntax highlighting. 
+It is preferable that the page can be deployed to GitHub Pages and serve as a foundation for future LSP integration with Pylance and MicroPython type stubs.
+if it is needed to change the hosting infrastructure so that it cannot be run on github pages , that is acceptable 
 
 ## TESTING GUIDELINES
 you MUST test your code thoroughly

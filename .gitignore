@@ -1,0 +1,48 @@
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Node (if used for development)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build outputs (if we ever add a build step)
+dist/
+build/
+*.bundle.js
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Backup files
+*.bak
+*.backup

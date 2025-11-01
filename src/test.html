@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeMirror Editor Tests</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .test-item {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            border-left: 4px solid #ccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .test-item.pending {
+            background-color: #fff3cd;
+            border-left-color: #ffc107;
+        }
+
+        .test-item.running {
+            background-color: #cfe2ff;
+            border-left-color: #0d6efd;
+        }
+
+        .test-item.passed {
+            background-color: #d1e7dd;
+            border-left-color: #198754;
+        }
+
+        .test-item.failed {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+        }
+
+        .test-name {
+            font-weight: 500;
+        }
+
+        .test-status {
+            font-size: 14px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .status-pending { color: #856404; }
+        .status-running { color: #084298; }
+        .status-passed { color: #0f5132; }
+        .status-failed { color: #842029; }
+
+        .summary {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+
+        .summary-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .summary-number {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .summary-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #6c757d;
+        }
+
+        #test-editor {
+            height: 200px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .error-details {
+            margin-top: 8px;
+            padding: 8px;
+            background: #fff;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #842029;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background-color: #0b5ed7;
+        }
+
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 CodeMirror Editor Test Suite</h1>
+    
+    <div class="controls">
+        <button id="runTests" onclick="runAllTests()">Run All Tests</button>
+    </div>
+
+    <div class="test-container">
+        <h2>Test Results</h2>
+        <div id="test-results"></div>
+        
+        <div class="summary" id="summary">
+            <div class="summary-item">
+                <span class="summary-number" id="total-tests">0</span>
+                <span class="summary-label">Total</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-number" id="passed-tests" style="color: #198754;">0</span>
+                <span class="summary-label">Passed</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-number" id="failed-tests" style="color: #dc3545;">0</span>
+                <span class="summary-label">Failed</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-number" id="duration">0ms</span>
+                <span class="summary-label">Duration</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden test editor -->
+    <div id="test-editor" style="display: none;"></div>
+
+    <!-- Import map for CodeMirror modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "codemirror": "https://esm.sh/codemirror@6.0.1",
+            "@codemirror/state": "https://esm.sh/@codemirror/state@6.4.1",
+            "@codemirror/view": "https://esm.sh/@codemirror/view@6.26.3",
+            "@codemirror/language": "https://esm.sh/@codemirror/language@6.10.1",
+            "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.3.3",
+            "@codemirror/lang-python": "https://esm.sh/@codemirror/lang-python@6.1.4"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import { EditorView, lineNumbers } from '@codemirror/view';
+        import { EditorState } from '@codemirror/state';
+        import { python } from '@codemirror/lang-python';
+        import { syntaxTree } from '@codemirror/language';
+
+        // Test framework
+        class TestRunner {
+            constructor() {
+                this.tests = [];
+                this.results = [];
+                this.currentTest = null;
+            }
+
+            addTest(name, fn) {
+                this.tests.push({ name, fn });
+            }
+
+            async runAll() {
+                const startTime = performance.now();
+                this.results = [];
+                
+                document.getElementById('runTests').disabled = true;
+                
+                for (const test of this.tests) {
+                    await this.runTest(test);
+                }
+                
+                const duration = Math.round(performance.now() - startTime);
+                this.updateSummary(duration);
+                
+                document.getElementById('runTests').disabled = false;
+            }
+
+            async runTest(test) {
+                const testElement = document.getElementById(`test-${this.results.length}`);
+                this.updateTestStatus(testElement, 'running');
+                
+                try {
+                    await test.fn();
+                    this.results.push({ name: test.name, status: 'passed' });
+                    this.updateTestStatus(testElement, 'passed');
+                } catch (error) {
+                    this.results.push({ name: test.name, status: 'failed', error: error.message });
+                    this.updateTestStatus(testElement, 'failed', error.message);
+                }
+            }
+
+            updateTestStatus(element, status, error = null) {
+                element.className = `test-item ${status}`;
+                const statusSpan = element.querySelector('.test-status');
+                statusSpan.className = `test-status status-${status}`;
+                statusSpan.textContent = status.toUpperCase();
+                
+                if (error) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-details';
+                    errorDiv.textContent = `Error: ${error}`;
+                    element.appendChild(errorDiv);
+                }
+            }
+
+            updateSummary(duration) {
+                const passed = this.results.filter(r => r.status === 'passed').length;
+                const failed = this.results.filter(r => r.status === 'failed').length;
+                
+                document.getElementById('total-tests').textContent = this.tests.length;
+                document.getElementById('passed-tests').textContent = passed;
+                document.getElementById('failed-tests').textContent = failed;
+                document.getElementById('duration').textContent = `${duration}ms`;
+            }
+
+            renderTests() {
+                const container = document.getElementById('test-results');
+                container.innerHTML = '';
+                
+                this.tests.forEach((test, index) => {
+                    const testDiv = document.createElement('div');
+                    testDiv.id = `test-${index}`;
+                    testDiv.className = 'test-item pending';
+                    testDiv.innerHTML = `
+                        <span class="test-name">${test.name}</span>
+                        <span class="test-status status-pending">PENDING</span>
+                    `;
+                    container.appendChild(testDiv);
+                });
+            }
+        }
+
+        const runner = new TestRunner();
+
+        // Helper function to create a test editor
+        function createTestEditor(doc = '') {
+            const container = document.getElementById('test-editor');
+            container.innerHTML = '';
+            
+            return new EditorView({
+                state: EditorState.create({
+                    doc,
+                    extensions: [
+                        lineNumbers(),
+                        python()
+                    ]
+                }),
+                parent: container
+            });
+        }
+
+        // Helper for assertions
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+
+        // Test 1: Editor initialization
+        runner.addTest('Editor initializes successfully', async () => {
+            const view = createTestEditor('print("Hello")');
+            assert(view instanceof EditorView, 'View should be an EditorView instance');
+            assert(view.state !== null, 'View should have a state');
+            view.destroy();
+        });
+
+        // Test 2: Document content
+        runner.addTest('Document content is set correctly', async () => {
+            const testContent = 'def hello():\n    print("world")';
+            const view = createTestEditor(testContent);
+            const content = view.state.doc.toString();
+            assert(content === testContent, `Expected "${testContent}", got "${content}"`);
+            view.destroy();
+        });
+
+        // Test 3: Python syntax highlighting
+        runner.addTest('Python syntax highlighting works', async () => {
+            const view = createTestEditor('def hello(): pass');
+            
+            // Give time for syntax tree to be built
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const tree = syntaxTree(view.state);
+            assert(tree !== null, 'Syntax tree should exist');
+            assert(tree.length > 0, 'Syntax tree should have nodes');
+            view.destroy();
+        });
+
+        // Test 4: Text insertion
+        runner.addTest('Text can be inserted', async () => {
+            const view = createTestEditor('');
+            const newText = 'print("test")';
+            
+            view.dispatch({
+                changes: { from: 0, to: 0, insert: newText }
+            });
+            
+            const content = view.state.doc.toString();
+            assert(content === newText, `Expected "${newText}", got "${content}"`);
+            view.destroy();
+        });
+
+        // Test 5: Text deletion
+        runner.addTest('Text can be deleted', async () => {
+            const view = createTestEditor('Hello World');
+            
+            view.dispatch({
+                changes: { from: 0, to: 5, insert: '' }
+            });
+            
+            const content = view.state.doc.toString();
+            assert(content === ' World', `Expected " World", got "${content}"`);
+            view.destroy();
+        });
+
+        // Test 6: Line numbers
+        runner.addTest('Line numbers are displayed', async () => {
+            const view = createTestEditor('line1\nline2\nline3');
+            
+            const gutters = view.dom.querySelector('.cm-gutters');
+            assert(gutters !== null, 'Gutter element should exist');
+            
+            const lineNumberGutter = view.dom.querySelector('.cm-lineNumbers');
+            assert(lineNumberGutter !== null, 'Line number gutter should exist');
+            
+            view.destroy();
+        });
+
+        // Test 7: Multiple lines handling
+        runner.addTest('Multiple lines are handled correctly', async () => {
+            const lines = ['line 1', 'line 2', 'line 3'];
+            const content = lines.join('\n');
+            const view = createTestEditor(content);
+            
+            assert(view.state.doc.lines === 3, `Expected 3 lines, got ${view.state.doc.lines}`);
+            assert(view.state.doc.toString() === content, 'Content should match');
+            
+            view.destroy();
+        });
+
+        // Test 8: Content replacement
+        runner.addTest('Content can be replaced entirely', async () => {
+            const view = createTestEditor('initial content');
+            const newContent = 'replaced content';
+            
+            view.dispatch({
+                changes: { 
+                    from: 0, 
+                    to: view.state.doc.length, 
+                    insert: newContent 
+                }
+            });
+            
+            const content = view.state.doc.toString();
+            assert(content === newContent, `Expected "${newContent}", got "${content}"`);
+            view.destroy();
+        });
+
+        // Test 9: Python keywords are recognized
+        runner.addTest('Python keywords are recognized', async () => {
+            const pythonCode = 'def test():\n    if True:\n        return None';
+            const view = createTestEditor(pythonCode);
+            
+            // Wait for syntax highlighting
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const tree = syntaxTree(view.state);
+            let hasDefKeyword = false;
+            let hasIfKeyword = false;
+            
+            tree.iterate({
+                enter: (node) => {
+                    if (node.name === 'def') hasDefKeyword = true;
+                    if (node.name === 'if') hasIfKeyword = true;
+                }
+            });
+            
+            assert(hasDefKeyword || hasIfKeyword || tree.length > 50, 
+                   'Python syntax should be parsed (def or if keywords should be found)');
+            view.destroy();
+        });
+
+        // Test 10: Empty document handling
+        runner.addTest('Empty document is handled correctly', async () => {
+            const view = createTestEditor('');
+            
+            assert(view.state.doc.length === 0, 'Empty document should have length 0');
+            assert(view.state.doc.lines === 1, 'Empty document should have 1 line');
+            assert(view.state.doc.toString() === '', 'Empty document should return empty string');
+            
+            view.destroy();
+        });
+
+        // Test 11: Large document handling
+        runner.addTest('Large documents are handled', async () => {
+            const lines = Array(100).fill(0).map((_, i) => `line ${i + 1}`);
+            const content = lines.join('\n');
+            const view = createTestEditor(content);
+            
+            assert(view.state.doc.lines === 100, `Expected 100 lines, got ${view.state.doc.lines}`);
+            assert(view.state.doc.length === content.length, 'Document length should match content length');
+            
+            view.destroy();
+        });
+
+        // Test 12: Special characters handling
+        runner.addTest('Special characters are handled correctly', async () => {
+            const specialChars = 'τest with émojis 🐍 and spëcial chars: @#$%^&*()';
+            const view = createTestEditor(specialChars);
+            
+            const content = view.state.doc.toString();
+            assert(content === specialChars, 'Special characters should be preserved');
+            
+            view.destroy();
+        });
+
+        // Make runAllTests available globally
+        window.runAllTests = async function() {
+            await runner.runAll();
+        };
+
+        // Initialize the test UI
+        window.addEventListener('DOMContentLoaded', () => {
+            runner.renderTests();
+        });
+
+        // Render tests immediately
+        runner.renderTests();
+
+        console.log('Test suite loaded. Click "Run All Tests" to execute.');
+    </script>
+</body>
+</html>

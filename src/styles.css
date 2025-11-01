@@ -1,0 +1,262 @@
+/**
+ * Styles for CodeMirror Python Editor
+ */
+
+/* CSS Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --header-height: 80px;
+    --footer-height: 40px;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Dark theme (default) */
+body.dark-theme {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+}
+
+body.dark-theme header {
+    background-color: #2d2d30;
+    border-bottom: 1px solid #3e3e42;
+}
+
+body.dark-theme footer {
+    background-color: #2d2d30;
+    border-top: 1px solid #3e3e42;
+    color: #858585;
+}
+
+body.dark-theme button {
+    background-color: #0e639c;
+    color: #ffffff;
+    border: 1px solid #0e639c;
+}
+
+body.dark-theme button:hover {
+    background-color: #1177bb;
+}
+
+body.dark-theme a {
+    color: #4daafc;
+}
+
+/* Light theme */
+body.light-theme {
+    background-color: #ffffff;
+    color: #000000;
+}
+
+body.light-theme header {
+    background-color: #f3f3f3;
+    border-bottom: 1px solid #d4d4d4;
+}
+
+body.light-theme footer {
+    background-color: #f3f3f3;
+    border-top: 1px solid #d4d4d4;
+    color: #616161;
+}
+
+body.light-theme button {
+    background-color: #007acc;
+    color: #ffffff;
+    border: 1px solid #007acc;
+}
+
+body.light-theme button:hover {
+    background-color: #005a9e;
+}
+
+body.light-theme a {
+    color: #0066cc;
+}
+
+/* Header */
+header {
+    height: var(--header-height);
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+header h1 {
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.controls {
+    display: flex;
+    gap: 10px;
+}
+
+button {
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    font-weight: 500;
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+button:focus {
+    outline: 2px solid #007acc;
+    outline-offset: 2px;
+}
+
+/* Main content area */
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0 30px 20px 30px;
+}
+
+#editor-container {
+    flex: 1;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* CodeMirror specific overrides */
+.cm-editor {
+    height: 100%;
+}
+
+.cm-scroller {
+    overflow: auto;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.cm-line {
+    padding: 0 4px;
+}
+
+/* Footer */
+footer {
+    height: var(--footer-height);
+    padding: 10px 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+footer a {
+    text-decoration: none;
+    margin-left: 5px;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    :root {
+        --header-height: 120px;
+    }
+
+    header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    header h1 {
+        font-size: 20px;
+        text-align: center;
+    }
+
+    .controls {
+        justify-content: center;
+    }
+
+    main {
+        padding: 0 15px 15px 15px;
+    }
+
+    footer {
+        padding: 10px 15px;
+        font-size: 12px;
+    }
+
+    button {
+        font-size: 13px;
+        padding: 6px 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    header h1 {
+        font-size: 18px;
+    }
+
+    .controls {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    button {
+        width: 100%;
+    }
+}
+
+/* Loading state (optional) */
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    font-size: 18px;
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Print styles */
+@media print {
+    header, footer, .controls {
+        display: none;
+    }
+
+    main {
+        padding: 0;
+    }
+
+    body {
+        height: auto;
+    }
+
+    .cm-editor {
+        border: none;
+        box-shadow: none;
+    }
+}

@@ -1,8 +1,22 @@
 # Agent Instructions: CodeMirror Python Editor for GitHub Pages
 
+You should not be overly optimistic, use icons sparingly.
+
 ## Project Overview
 
 Build a simple, static HTML5 page hosting a CodeMirror 6 editor configured for Python syntax highlighting. The page must be deployable to GitHub Pages and serve as a foundation for future LSP integration with Pylance and MicroPython type stubs.
+
+## TESTING GUIDELINES
+you MUST test your code thoroughly
+tests should reside in the tests/ folder
+Exploratory testing of web pages must be done using the Playwright MCP Server
+Unit and integration testing should be based on Pytest + Playwright - but only start creating these after exploratory testing of a feature is complete
+
+
+## python
+use `uv` for environement management
+use `uv pip` for package management
+use `pytest` as the test runner
 
 ## Project Structure
 
@@ -14,6 +28,10 @@ d:\mypython\mp_codemirror\
 │   ├── index.html      # Main HTML page
 │   ├── styles.css      # Custom styling
 │   └── app.js          # Application logic and CodeMirror setup
+├── tests/
+│   ├── conftest.py     # Pytest configuration and fixtures
+│   ├── test_editor.py  # Playwright-based editor tests
+│   └── README.md       # Testing documentation
 └── README.md           # Project documentation
 ```
 

@@ -147,6 +147,10 @@ All dependencies are loaded from CDN, no npm installation required:
 - `@codemirror/lang-python` - Python language mode
 - `@lezer/highlight` - Syntax highlighting
 
+**Important:** To avoid version conflicts when using CodeMirror packages from CDN, we use the `?deps=` parameter to explicitly pin shared dependencies to the same versions across all packages. This prevents the "multiple instances of @codemirror/state" error that occurs when different packages load incompatible versions.
+
+See `src/index.html` for the complete import map with dependency pinning.
+
 ### Browser Requirements
 
 - Chrome/Edge 89+

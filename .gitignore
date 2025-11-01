@@ -46,3 +46,6 @@ htmlcov/
 # Backup files
 *.bak
 *.backup
+
+# Playwright screenshots and reports
+.playwright-mcp

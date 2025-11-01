@@ -3,6 +3,7 @@
  * A simple Python code editor with syntax highlighting and basic features
  */
 
+import { python } from '@codemirror/lang-python';
 import { EditorView, basicSetup } from 'codemirror';
 
 // Sample Python code
@@ -112,11 +113,12 @@ const lightTheme = EditorView.theme({
     }
 }, { dark: false });
 
-// Initialize the editor with just basic setup (no python for now)
+// Initialize the editor with basic setup and Python language support
 let view = new EditorView({
     doc: sampleCode,
     extensions: [
-        basicSetup
+        basicSetup,
+        python()
     ],
     parent: document.getElementById('editor-container')
 });
@@ -127,8 +129,8 @@ function toggleTheme() {
     document.body.classList.toggle('light-theme', !isDarkTheme);
     document.body.classList.toggle('dark-theme', isDarkTheme);
     
-    // For now, theme changes via CSS only
-    // TODO: Implement proper editor theme reconfiguration when we can use python extension
+    // Note: Currently theme changes via CSS only
+    // TODO: Implement proper editor theme reconfiguration with darkTheme/lightTheme extensions
 }
 
 // Clear editor content

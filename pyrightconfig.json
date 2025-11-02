@@ -1,0 +1,17 @@
+{
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "extraPaths": [
+    "d:\mypython\mp_codemirror/src",
+    "d:\mypython\mp_codemirror/tests"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "d:\mypython\mp_codemirror",
+      "extraPaths": [
+        "d:\mypython\mp_codemirror/src",
+        "d:\mypython\mp_codemirror/tests"
+      ]
+    }
+  ]
+}

@@ -189,7 +189,7 @@ async function initializeEditor() {
         console.log('Initializing LSP client with WebSocket transport...');
         const lspResult = await createLSPClient({
             useMock: false,  // Use real WebSocket transport
-            wsUrl: 'ws://localhost:8765'  // Connect to our Python bridge server
+            wsUrl: 'ws://localhost:9011/lsp'  // Connect to jesse-ai bridge server
         });
         lspClient = lspResult.client;
         lspTransport = lspResult.transport;
@@ -197,7 +197,7 @@ async function initializeEditor() {
     } catch (error) {
         console.error('Failed to initialize LSP client:', error);
         console.log('Editor will continue without LSP features');
-        console.log('Make sure the WebSocket bridge server is running: .venv\\Scripts\\python.exe server/lsp_bridge.py');
+        console.log('Make sure the WebSocket bridge server is running: npm start in server/python-language-server');
     }
 
     // Build editor extensions

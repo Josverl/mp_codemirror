@@ -1,5 +1,36 @@
 # Sprint 2: Pyright LSP Server Integration - COMPLETED ✅
 
+## UPDATE: Migrated to jesse-ai Bridge! 🎉
+
+**Latest Status**: Successfully migrated from our Python bridge to **jesse-ai/python-language-server** built from source.
+
+### Why the Change?
+
+1. **Production Ready** - Maintained TypeScript/Node.js bridge
+2. **Latest Pyright** - v1.1.407 (newer than our v1.1.394)
+3. **Better Integration** - Native to JavaScript ecosystem
+4. **No Python Dependencies** - Just npm/node required
+
+### Setup (New Simplified Process)
+
+```powershell
+# Initialize git submodule
+git submodule update --init --recursive
+
+# Install dependencies
+cd server/pyright-lsp-bridge
+npm install
+
+# Run bridge server
+npm start -- --port 9011 --project-root d:\mypython\mp_codemirror --jesse-relative-path src --bot-relative-path tests
+```
+
+See **JESSE_AI_SUCCESS.md** for complete details.
+
+---
+
+# Original Sprint 2 Completion (Python Bridge)
+
 ## Achievement Summary
 
 **Sprint 2 is now complete!** We have successfully integrated a real Pyright LSP server with the CodeMirror editor, providing genuine Python diagnostics from Pyright 1.1.394.

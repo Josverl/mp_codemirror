@@ -2,7 +2,7 @@
  * Lightweight LSP Client for CodeMirror
  * 
  * This is a custom LSP client implementation since @codemirror/lsp-client
- * is not yet available or stable. This provides the core LSP functionality
+ * is not stable. This provides the core LSP functionality
  * needed for diagnostics, completion, and hover.
  */
 

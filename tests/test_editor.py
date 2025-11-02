@@ -43,7 +43,7 @@ def test_header_elements_present(page, live_server):
     
     # Check header
     assert page.locator("header h1").is_visible()
-    assert page.locator("header h1").inner_text() == "CodeMirror 6 Python Editor"
+    assert page.locator("header h1").inner_text() == "CodeMirror 6 MicroPython Editor"
     
     # Check buttons
     assert page.locator("#themeToggle").is_visible()

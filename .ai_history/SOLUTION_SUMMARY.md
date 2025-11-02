@@ -190,4 +190,4 @@ The solution successfully enables Python syntax highlighting in a CDN-based, zer
 
 **Date**: 2024-01-XX  
 **Author**: GitHub Copilot  
-**Project**: mp_codemirror - CodeMirror 6 Python Editor for GitHub Pages
+**Project**: mp_codemirror - CodeMirror 6 MicroPython Editor for GitHub Pages

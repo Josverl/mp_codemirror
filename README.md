@@ -1,4 +1,4 @@
-# CodeMirror 6 Python Editor
+# CodeMirror 6 MicroPython Editor
 
 A simple, static HTML5 application featuring a CodeMirror 6 editor configured for Python syntax highlighting. This project is designed to be deployed to GitHub Pages and serves as a foundation for future LSP integration with Pylance and MicroPython type stubs.
 
@@ -41,9 +41,8 @@ mp_codemirror/
 │   └── tasks.json          # VSCode tasks for starting servers
 ├── src/
 │   ├── lsp/                # LSP client implementation
-│   │   ├── client.js       # Main LSP client with dual transport
+│   │   ├── client.js       # Main LSP client setup
 │   │   ├── websocket-transport.js  # WebSocket transport for Pyright
-│   │   ├── mock-transport.js       # Mock transport for testing
 │   │   ├── diagnostics.js  # Diagnostics extension for CodeMirror
 │   │   └── simple-client.js        # Simplified LSP client wrapper
 │   ├── examples/           # Python example files

@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document outlines the plan to integrate **Pyright/Pylance LSP Server** support into the CodeMirror 6 Python editor for MicroPython development.
+This document outlines the plan to integrate **Pyright/Pylance LSP Server** support into the CodeMirror 6 MicroPython editor for MicroPython development.
 
 **CRITICAL**: This plan requires a real Pyright LSP server running. Mock-only implementations are insufficient for production use.
 

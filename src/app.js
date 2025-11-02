@@ -1,5 +1,5 @@
 /**
- * CodeMirror 6 Python Editor
+ * CodeMirror 6 MicroPython Editor
  * A simple Python code editor with syntax highlighting and basic features
  */
 
@@ -7,6 +7,7 @@ import { python } from '@codemirror/lang-python';
 import { Compartment } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
 import { createLSPClient, createLSPPlugin } from './lsp/client.js';
+import { notifyDocumentChange } from './lsp/diagnostics.js';
 
 // Sample Python code - will be loaded from file
 let sampleCode = '# Loading example...\n';
@@ -17,6 +18,8 @@ let exampleFiles = [];
 // LSP client and related state
 let lspClient = null;
 let lspTransport = null;
+const documentUri = 'file:///workspace/document.py';
+let documentVersion = 1;
 
 // Fetch list of example files from the examples folder
 async function fetchExampleFiles() {
@@ -90,7 +93,7 @@ async function loadSampleFromFile(filename = 'blink_led.py') {
 }
 
 // Theme configuration
-let isDarkTheme = true;
+let isDarkTheme = false;  // Default to light theme
 
 // Dark theme
 const darkTheme = EditorView.theme({
@@ -188,8 +191,7 @@ async function initializeEditor() {
     try {
         console.log('Initializing LSP client with WebSocket transport...');
         const lspResult = await createLSPClient({
-            useMock: false,  // Use real WebSocket transport
-            wsUrl: 'ws://localhost:9011/lsp'  // Connect to jesse-ai bridge server
+            wsUrl: 'ws://localhost:9011/lsp'  // Connect to pyright LSP WS bridge server
         });
         lspClient = lspResult.client;
         lspTransport = lspResult.transport;
@@ -218,7 +220,7 @@ async function initializeEditor() {
     // Add LSP plugin if client is available
     if (lspClient) {
         try {
-            const lspExtensions = createLSPPlugin(lspClient, view, 'file:///workspace/document.py', 'python', sampleCode);
+            const lspExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', sampleCode);
             // Reconfigure the LSP compartment with actual extensions
             view.dispatch({
                 effects: lspCompartment.reconfigure(lspExtensions)
@@ -257,6 +259,39 @@ function clearEditor() {
     view.focus();
 }
 
+// Trigger type checking with Pyright
+function triggerTypeCheck() {
+    if (!lspClient || !lspClient.connected) {
+        console.warn('LSP client not connected. Cannot run type check.');
+        alert('LSP client not connected. Make sure the Pyright server is running.');
+        return;
+    }
+
+    try {
+        const content = view.state.doc.toString();
+        documentVersion++;
+
+        console.log('Triggering type check...');
+        notifyDocumentChange(lspClient, documentUri, content, documentVersion);
+        console.log('Type check notification sent');
+
+        // Visual feedback
+        const button = document.getElementById('typeCheckBtn');
+        const originalText = button.textContent;
+        button.textContent = '⏳ Checking...';
+        button.disabled = true;
+
+        // Re-enable button after a short delay
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.disabled = false;
+        }, 200);
+    } catch (error) {
+        console.error('Error triggering type check:', error);
+        alert('Failed to run type check. Check console for details.');
+    }
+}
+
 // Load sample code from selected file
 async function loadSample() {
     const select = document.getElementById('sampleSelect');
@@ -273,6 +308,11 @@ async function loadSample() {
     });
     view.dispatch(transaction);
     view.focus();
+
+    // Automatically trigger type check after loading a new example
+    setTimeout(() => {
+        triggerTypeCheck();
+    }, 300); // Small delay to ensure editor update is complete
 }
 
 // Get editor content (useful for future integrations)
@@ -290,11 +330,12 @@ export function setEditorContent(content) {
 
 // Event listeners
 document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+document.getElementById('typeCheckBtn').addEventListener('click', triggerTypeCheck);
 document.getElementById('clearBtn').addEventListener('click', clearEditor);
 document.getElementById('loadSampleBtn').addEventListener('click', loadSample);
 
-// Initialize with dark theme
-document.body.classList.add('dark-theme');
+// Initialize with light theme
+document.body.classList.add('light-theme');
 
 // Export the view for testing purposes
 export { view };

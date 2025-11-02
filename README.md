@@ -17,8 +17,27 @@ A simple, static HTML5 application featuring a CodeMirror 6 editor configured fo
 - ✅ Tab key support for indentation
 - ✅ Responsive design (mobile-friendly)
 - ✅ **LSP Integration** - Real Pyright v1.1.407 via WebSocket
-- ✅ **Real-time Diagnostics** - Errors and warnings as you type
+- ✅ **Real-time Diagnostics** - Errors and warnings as you type (debounced 300ms)
 - ✅ **Type Checking** - Full Python type analysis
+- ✅ **Document Versioning** - Automatic version tracking for LSP updates
+
+### Real-Time Diagnostics
+
+The editor now provides **real-time feedback** on your Python code:
+
+- **Instant Error Detection:** Syntax errors, undefined variables, and import issues are highlighted as you type
+- **Smart Debouncing:** Changes are sent to the LSP server after 300ms of inactivity to prevent overwhelming the server
+- **Visual Feedback:** Errors appear with red squiggly underlines directly in the editor
+- **Performance Optimized:** Document version tracking ensures efficient updates
+- **Automatic Updates:** Diagnostics refresh automatically when you fix errors
+
+**How it works:**
+1. Type Python code in the editor
+2. After 300ms of no typing, a `textDocument/didChange` notification is sent to Pyright
+3. Pyright analyzes your code and returns diagnostics
+4. Errors and warnings are displayed inline with visual markers
+
+**Keyboard Tip:** Keep typing without interruption - diagnostics will appear shortly after you pause.
 
 ### Planned (Phase 2 - In Progress)
 - � Autocompletion with type hints (LSP infrastructure ready)

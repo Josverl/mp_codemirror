@@ -375,6 +375,34 @@ Browser                SimpleLSPClient         WebSocketTransport      Pyright S
    │<─────────────────────────│                        │                     │
 ```
 
+#### Real-Time Diagnostics Flow (Sprint 3) ✅
+```
+User types          app.js              diagnostics.js      SimpleLSPClient      Pyright
+in editor
+   │                  │                       │                   │                │
+   │  Keystroke       │ createUpdateListener()│                   │                │
+   ├─────────────────>│ (debounce 300ms)      │                   │                │
+   │  Keystroke       │  ...waiting...        │                   │                │
+   ├─────────────────>│  ...waiting...        │                   │                │
+   │  (pause 300ms)   │                       │                   │                │
+   │                  │ Trigger update        │                   │                │
+   │                  ├──────────────────────>│ notifyDocumentChange()             │
+   │                  │                       ├──────────────────>│ notify()       │
+   │                  │                       │                   ├───────────────>│
+   │                  │                       │                   │  Analyze code  │
+   │                  │                       │                   │<───────────────│
+   │                  │                       │                   │ publishDiagnostics
+   │                  │                       │<──────────────────│                │
+   │                  │                       │ Display errors    │                │
+   │                  │<──────────────────────│ (red underlines)  │                │
+```
+
+**Key Features:**
+- **300ms Debounce:** Prevents excessive updates during rapid typing
+- **Document Versioning:** Increments `documentVersion` with each change
+- **Efficient Updates:** Only sends changes after user pauses typing
+- **Automatic Clearing:** Errors disappear when fixed
+
 #### Type Check Flow (Manual Button Click)
 ```
 User clicks         app.js              diagnostics.js      SimpleLSPClient      Pyright
@@ -408,9 +436,11 @@ User clicks         app.js              diagnostics.js      SimpleLSPClient     
 **What We Implement:**
 - ✅ `initialize` / `initialized` handshake
 - ✅ `textDocument/didOpen` notification
-- ✅ `textDocument/didChange` notification
+- ✅ `textDocument/didChange` notification (with 300ms debouncing)
 - ✅ `textDocument/diagnostic` request
 - ✅ `textDocument/publishDiagnostics` notification handling
+- ✅ Real-time diagnostics with automatic updates
+- ✅ Document version tracking
 - ⏳ `textDocument/completion` (Sprint 4)
 - ⏳ `textDocument/hover` (Sprint 4)
 
@@ -464,18 +494,19 @@ lspClient.onNotification((method, params) => {
 
 ### Future Enhancements
 
-**Sprint 3: Real-Time Diagnostics**
-- Add debounced `textDocument/didChange` on every keystroke
-- Optimize message frequency (300ms debounce)
-- Implement incremental sync for large documents
+**Sprint 3: Real-Time Diagnostics** ✅ **COMPLETE**
+- ✅ Added debounced `textDocument/didChange` on every keystroke (300ms)
+- ✅ Optimized message frequency with debouncing
+- ✅ Document version tracking
+- 📝 Incremental sync for large documents (deferred to performance optimization phase)
 
-**Sprint 4: More LSP Features**
+**Sprint 4: More LSP Features** (Next)
 - Autocompletion (`textDocument/completion`)
 - Hover tooltips (`textDocument/hover`)
 - Go to definition (`textDocument/definition`)
 - Find references (`textDocument/references`)
 
-**Performance Optimizations**
+**Performance Optimizations** (Future)
 - Message batching for multiple rapid changes
 - Incremental document sync (send diffs, not full text)
 - Web Worker for message processing

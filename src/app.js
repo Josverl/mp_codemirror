@@ -21,6 +21,10 @@ let lspTransport = null;
 const documentUri = 'file:///workspace/document.py';
 let documentVersion = 1;
 
+// Debounce timer for didChange notifications
+let changeDebounceTimer = null;
+const CHANGE_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
+
 // Fetch list of example files from the examples folder
 async function fetchExampleFiles() {
     try {
@@ -202,12 +206,33 @@ async function initializeEditor() {
         console.log('Make sure the WebSocket bridge server is running: npm start in server/python-language-server');
     }
 
+    // Create update listener for real-time diagnostics
+    const createUpdateListener = () => EditorView.updateListener.of((update) => {
+        // Only send notifications if document content changed
+        if (update.docChanged && lspClient) {
+            // Clear existing debounce timer
+            if (changeDebounceTimer) {
+                clearTimeout(changeDebounceTimer);
+            }
+
+            // Debounce the change notification to avoid overwhelming the LSP server
+            changeDebounceTimer = setTimeout(() => {
+                const content = update.state.doc.toString();
+                documentVersion++;
+                
+                console.log(`Sending didChange notification (version ${documentVersion})`);
+                notifyDocumentChange(lspClient, documentUri, content, documentVersion);
+            }, CHANGE_DEBOUNCE_MS);
+        }
+    });
+
     // Build editor extensions
     const lspCompartment = new Compartment();
     const extensions = [
         basicSetup,
         python(),
-        lspCompartment.of([])  // Start with empty LSP extensions
+        createUpdateListener(),  // Add real-time diagnostics listener
+        lspCompartment.of([])    // Start with empty LSP extensions
     ];
 
     // Create the editor view first

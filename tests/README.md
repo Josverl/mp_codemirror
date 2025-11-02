@@ -4,9 +4,16 @@ This directory contains Playwright-based tests for the CodeMirror Python Editor.
 
 ## Quick Start
 
+**IMPORTANT:** Start servers before running tests:
+```powershell
+# VSCode: Run Task > "Start All Servers" (Ctrl+Shift+P)
+# Or manually: Start LSP bridge on port 9011 and HTTP server on port 8888
+```
+
+Then run tests:
 ```bash
-# Activate environment
-.venv\Scripts\Activate.ps1
+# Run real-time LSP tests
+uv run pytest tests/test_lsp_realtime.py -v
 
 # Run focused LSP tests (fast - ~9 seconds)
 pytest tests/test_lsp_diagnostics.py -v

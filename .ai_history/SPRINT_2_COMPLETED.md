@@ -22,7 +22,10 @@ cd server/pyright-lsp-bridge
 npm install
 
 # Run bridge server
-npm start -- --port 9011 --project-root d:\mypython\mp_codemirror --jesse-relative-path src --bot-relative-path tests
+```powershell
+cd server/pyright-lsp-bridge
+npm start -- --port 9011 --bot-root d:\mypython\mp_codemirror --jesse-root d:\mypython\mp_codemirror\src
+```
 ```
 
 See **JESSE_AI_SUCCESS.md** for complete details.

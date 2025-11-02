@@ -28,7 +28,10 @@ Real Python Diagnostics!
 ### Terminal 1: Start jesse-ai Bridge
 ```powershell
 cd server/pyright-lsp-bridge
-npm start -- --port 9011 --project-root d:\mypython\mp_codemirror --jesse-relative-path src --bot-relative-path tests
+```powershell
+cd server/pyright-lsp-bridge
+npm start -- --port 9011 --bot-root d:\mypython\mp_codemirror --jesse-root d:\mypython\mp_codemirror\src
+```
 ```
 
 ### Terminal 2: Start HTTP Server

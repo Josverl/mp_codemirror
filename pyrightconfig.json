@@ -1,20 +1,33 @@
 {
-  "reportMissingImports": true,
-  "reportMissingTypeStubs": false,
-  "typeCheckingMode": "standard",
-  "include": [
-      "src",
-  ],
-  "extraPaths": [
-    "src/lib"
-  ],
-
-  "executionEnvironments": [
-    {
-      "root": ".",
-      "extraPaths": [
+    "reportMissingImports": true,
+    "reportMissingTypeStubs": false,
+    // pyright options for MicroPython
+    "reportMissingModuleSource": "none",
+    "typeCheckingMode": "standard",
+    // use custom typeshed for MicroPython 
+    "typeshedPath": "./typings",
+    // and for stdlib replacement
+    "stubPath": "./typings",
+    // standard locations
+    "include": [
         "src",
-      ]
-    }
-  ]
+    ],
+    "extraPaths": [
+        "src/lib"
+        //     "D:/mypython/mp_codemirror/src",
+    ],
+    "executionEnvironments": [
+        {
+            "root": ".",
+            "extraPaths": [
+                "src",
+            ]
+        },
+        {
+            "root": "D:/mypython/mp_codemirror",
+            "extraPaths": [
+                "D:/mypython/mp_codemirror/src",
+            ]
+        }
+    ]
 }

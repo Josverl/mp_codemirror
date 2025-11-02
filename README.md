@@ -4,7 +4,7 @@ A simple, static HTML5 application featuring a CodeMirror 6 editor configured fo
 
 ## Features
 
-### Current (Phase 1)
+### Current (Phase 1 & 2)
 - ✅ Python syntax highlighting
 - ✅ Line numbers
 - ✅ Dark/Light theme toggle
@@ -16,14 +16,15 @@ A simple, static HTML5 application featuring a CodeMirror 6 editor configured fo
 - ✅ Undo/Redo history
 - ✅ Tab key support for indentation
 - ✅ Responsive design (mobile-friendly)
-- ✅ No build step required (CDN-based)
+- ✅ **LSP Integration** - Real Pyright v1.1.407 via WebSocket
+- ✅ **Real-time Diagnostics** - Errors and warnings as you type
+- ✅ **Type Checking** - Full Python type analysis
 
-### Planned (Phase 2)
-- 🔲 LSP integration (Pylance/Pyright)
-- 🔲 Autocompletion with type hints
-- 🔲 Hover tooltips with documentation
-- 🔲 Real-time diagnostics (errors/warnings)
+### Planned (Phase 2 - In Progress)
+- � Autocompletion with type hints (LSP infrastructure ready)
+- � Hover tooltips with documentation (LSP infrastructure ready)
 - 🔲 Go to definition
+- 🔲 Find references
 
 ### Planned (Phase 3)
 - 🔲 MicroPython type stubs
@@ -36,7 +37,15 @@ A simple, static HTML5 application featuring a CodeMirror 6 editor configured fo
 mp_codemirror/
 ├── .github/
 │   └── copilot-instructions.md  # Agent instructions
+├── .vscode/
+│   └── tasks.json          # VSCode tasks for starting servers
 ├── src/
+│   ├── lsp/                # LSP client implementation
+│   │   ├── client.js       # Main LSP client with dual transport
+│   │   ├── websocket-transport.js  # WebSocket transport for Pyright
+│   │   ├── mock-transport.js       # Mock transport for testing
+│   │   ├── diagnostics.js  # Diagnostics extension for CodeMirror
+│   │   └── simple-client.js        # Simplified LSP client wrapper
 │   ├── examples/           # Python example files
 │   │   ├── examples.json   # List of example files
 │   │   ├── blink_led.py    # LED blink example (default)
@@ -45,6 +54,11 @@ mp_codemirror/
 │   ├── index.html          # Main HTML page
 │   ├── styles.css          # Custom styling
 │   └── app.js              # Application logic and CodeMirror setup
+├── server/
+│   ├── pyright-lsp-bridge/ # Git submodule: jesse-ai/python-language-server
+│   │   ├── pyright-bridge.ts   # WebSocket bridge implementation
+│   │   └── pyrightconfig.json  # Pyright configuration template
+│   └── README.md           # Server documentation
 ├── tests/
 │   ├── conftest.py         # Pytest configuration
 │   ├── test_editor.py      # Editor tests with Playwright
@@ -62,32 +76,37 @@ mp_codemirror/
    cd mp_codemirror
    ```
 
-2. **Serve the files locally:**
-   
-   Since this uses ES modules, you need a local web server (file:// protocol won't work). Choose one:
-
-   **Option A: Using Python (recommended):**
+2. **Initialize the git submodule (LSP bridge):**
    ```bash
-   # Python 3
-   python -m http.server 8000
-   
-   # Navigate to http://localhost:8000/src/
+   git submodule update --init --recursive
+   cd server/pyright-lsp-bridge
+   npm install
+   cd ../..
    ```
 
-   **Option B: Using Node.js:**
-   ```bash
-   npx serve src
+3. **Start the development servers:**
+
+   **Option A: Using VSCode Tasks (Recommended):**
+   - Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
+   - Type "Tasks: Run Task"
+   - Select "Start All Servers"
+   - Both the LSP bridge and HTTP server will start automatically
    
-   # Navigate to the URL provided
+   **Option B: Manual start:**
+   
+   Terminal 1 - LSP Bridge:
+   ```bash
+   cd server/pyright-lsp-bridge
+   npm start
+   ```
+   
+   Terminal 2 - HTTP Server:
+   ```bash
+   python -m http.server 8888
    ```
 
-   **Option C: Using Live Server (VS Code extension):**
-   - Install the "Live Server" extension
-   - Right-click on `src/index.html`
-   - Select "Open with Live Server"
-
-3. **Open in browser:**
-   Navigate to `http://localhost:8000/src/` (or the URL from your server)
+4. **Open in browser:**
+   Navigate to `http://localhost:8888/src/`
 
 ### GitHub Pages Deployment
 
@@ -262,17 +281,20 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Roadmap
 
-### Phase 1: Basic Editor ✅ (Current)
+### Phase 1: Basic Editor ✅ (Complete)
 - CodeMirror 6 setup with Python support
 - Basic editing features
 - Theme support
 
-### Phase 2: LSP Integration (Next)
-- Browser-based LSP client
-- Pylance/Pyright integration
-- Autocompletion and diagnostics
+### Phase 2: LSP Integration ✅ (Complete - Basic Features)
+- Browser-based LSP client ✅
+- Pyright v1.1.407 integration via WebSocket ✅
+- Real-time diagnostics ✅
+- WebSocket transport layer ✅
+- Autocompletion (in progress)
+- Hover tooltips (in progress)
 
-### Phase 3: MicroPython Support
+### Phase 3: MicroPython Support (Next)
 - Custom type stubs for MicroPython
 - Device-specific stubs
 - Board selector UI

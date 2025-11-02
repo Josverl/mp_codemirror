@@ -2,20 +2,76 @@
 
 ## 🚀 Get Started in 3 Steps
 
-### Step 1: Start the Server
+### Step 1: Initialize the Project
 
 ```bash
-cd src
-python -m http.server 8000
+# Clone and setup
+git clone <repository-url>
+cd mp_codemirror
+
+# Initialize LSP bridge submodule
+git submodule update --init --recursive
+cd server/pyright-lsp-bridge
+npm install
+cd ../..
 ```
 
-### Step 2: Open in Browser
+### Step 2: Start the Servers
 
-Navigate to: `http://localhost:8000/`
+**Option A: Using VSCode Tasks (Recommended)**
 
-### Step 3: Start Coding!
+1. Open the project in VSCode
+2. Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
+3. Type "Tasks: Run Task"
+4. Select **"Start All Servers"**
+5. Both servers start automatically! 🎉
 
-Type Python code in the editor and see syntax highlighting in action!
+**Option B: Manual Start**
+
+Terminal 1 - LSP Bridge:
+```bash
+cd server/pyright-lsp-bridge
+npm start
+```
+
+Terminal 2 - HTTP Server:
+```bash
+python -m http.server 8888
+```
+
+### Step 3: Open in Browser
+
+Navigate to: `http://localhost:8888/src/`
+
+Start coding with real-time LSP diagnostics! 🐍✨
+
+---
+
+## 📋 VSCode Tasks
+
+### Available Tasks
+
+- **Start All Servers** - Starts both LSP and HTTP server
+- **Start LSP Bridge** - Only starts the Pyright LSP bridge (port 9011)
+- **Start HTTP Server** - Only starts the Python HTTP server (port 8888)
+
+### Task Shortcuts
+
+```
+Ctrl+Shift+P → Tasks: Run Task → Select task
+```
+
+Or configure a keyboard shortcut in VSCode:
+```json
+// .vscode/keybindings.json
+[
+    {
+        "key": "ctrl+shift+s",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Start All Servers"
+    }
+]
+```
 
 ---
 
@@ -23,15 +79,28 @@ Type Python code in the editor and see syntax highlighting in action!
 
 ### Local Development
 
+**With VSCode:**
 ```bash
-# Start Python server
-python -m http.server 8000
+# Use tasks (Ctrl+Shift+P → Tasks: Run Task → Start All Servers)
+```
 
-# Alternative: Node.js server
-npx serve src
+**Manual:**
+```bash
+# LSP Bridge
+cd server/pyright-lsp-bridge
+npm start
 
-# Alternative: PHP server
-php -S localhost:8000 -t src
+# HTTP Server (separate terminal)
+python -m http.server 8888
+```
+
+**Alternative HTTP Servers:**
+```bash
+# Node.js
+npx serve -p 8888
+
+# PHP
+php -S localhost:8888
 ```
 
 ### Testing
@@ -196,7 +265,10 @@ python -m http.server 8000
 
 Before committing changes:
 
-- [ ] Editor loads without errors
+- [ ] LSP bridge starts without errors
+- [ ] HTTP server serves files
+- [ ] Editor loads at http://localhost:8888/src/
+- [ ] Real-time diagnostics working
 - [ ] Syntax highlighting works
 - [ ] All buttons functional
 - [ ] Theme toggle works

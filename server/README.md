@@ -23,8 +23,13 @@ npm install
 
 ```powershell
 cd server/pyright-lsp-bridge
-npm start -- --port 9011 --project-root d:\mypython\mp_codemirror --jesse-relative-path src --bot-relative-path tests
+npm start -- --port 9011 --bot-root d:\mypython\mp_codemirror --jesse-root d:\mypython\mp_codemirror\src
 ```
+
+**Parameters:**
+- `--port` - WebSocket server port (default: 9011)
+- `--bot-root` - Root directory of your project (where pyrightconfig.json will be deployed)
+- `--jesse-root` - Directory containing your Python source files
 
 ### Update Submodule
 

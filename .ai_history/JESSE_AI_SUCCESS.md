@@ -35,7 +35,7 @@ npm install
 
 ```powershell
 cd server/pyright-lsp-bridge
-npm start -- --port 9011 --project-root d:\mypython\mp_codemirror --jesse-relative-path src --bot-relative-path tests
+npm start -- --port 9011 --bot-root d:\mypython\mp_codemirror --jesse-root d:\mypython\mp_codemirror\src
 ```
 
 Output:
@@ -118,7 +118,7 @@ SyntaxError: Cannot use import statement outside a module
 ```powershell
 # Start jesse-ai bridge (Terminal 1)
 cd server/pyright-lsp-bridge
-npm start -- --port 9011 --project-root d:\mypython\mp_codemirror --jesse-relative-path src --bot-relative-path tests
+npm start -- --port 9011 --bot-root d:\mypython\mp_codemirror --jesse-root d:\mypython\mp_codemirror\src
 
 # Start HTTP server (Terminal 2)  
 python -m http.server 8888

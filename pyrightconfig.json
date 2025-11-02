@@ -1,16 +1,19 @@
 {
   "reportMissingImports": true,
   "reportMissingTypeStubs": false,
-  "extraPaths": [
-    "d:\mypython\mp_codemirror/src",
-    "d:\mypython\mp_codemirror/tests"
+  "typeCheckingMode": "standard",
+  "include": [
+      "src",
   ],
+  "extraPaths": [
+    "src/lib"
+  ],
+
   "executionEnvironments": [
     {
-      "root": "d:\mypython\mp_codemirror",
+      "root": ".",
       "extraPaths": [
-        "d:\mypython\mp_codemirror/src",
-        "d:\mypython\mp_codemirror/tests"
+        "src",
       ]
     }
   ]

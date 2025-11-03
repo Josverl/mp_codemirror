@@ -1,0 +1,102 @@
+name: Setup Copilot Agent Environment
+
+on:
+    workflow_dispatch:
+
+jobs:
+    setup:
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+
+        steps:
+            # Step 1: Checkout with submodules
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  submodules: "recursive"
+                  fetch-depth: 1
+
+            # Step 2: Update submodules to latest
+            - name: Update git submodules
+              run: |
+                  echo "📦 Updating git submodules..."
+                  git submodule sync --recursive
+                  git submodule update --init --recursive --remote
+                  git submodule status
+
+            # Step 3: Install uv package manager
+            - name: Install uv
+              uses: astral-sh/setup-uv@v3
+              with:
+                  enable-cache: true
+                  cache-dependency-glob: "pyproject.toml"
+
+            # Step 4: Set up Python
+            - name: Set up Python
+              run: uv python install
+
+            # Step 5: Set up Node.js for LSP Bridge server
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 'lts/*'
+                  cache: 'npm'
+                  cache-dependency-path: 'server/pyright-lsp-bridge/package.json'
+
+            # Step 6: Install Node.js dependencies for LSP Bridge
+            - name: Install LSP Bridge dependencies
+              run: |
+                  echo "📦 Installing Node.js dependencies for LSP Bridge..."
+                  cd server/pyright-lsp-bridge
+                  npm ci
+
+            # Step 7: Create virtual environment and install dependencies
+            - name: Install project dependencies
+              run: |
+                  echo "📦 Installing dependencies with uv..."
+                  uv sync --extras test
+
+            # Step 8: Install MicroPython stubs
+            - name: Install MicroPython stubs
+              run: |
+                  echo "📦 Installing MicroPython stubs..."
+                  uv pip install -r pyproject.toml --extra stubs --target typings 
+
+            # Step 9: Verify setup
+            - name: Verify environment
+              run: |
+                  echo "✅ Environment Setup Complete"
+                  echo ""
+                  echo "📍 UV Version:"
+                  uv --version
+                  echo ""
+                  echo "📍 Python Version:"
+                  uv run python --version
+                  echo ""
+                  echo "📍 Installed Packages:"
+                  uv pip list
+                  echo ""
+                  echo "📍 Submodule Status:"
+                  git submodule status
+                  echo ""
+                  echo "📍 MicroPython Stubs:"
+                  ls -la typings/ 2>/dev/null || echo "No typings directory yet"
+                  echo ""
+                  echo "📍 Node.js Version:"
+                  node --version
+                  echo ""
+                  echo "📍 NPM Version:"
+                  npm --version
+
+            # Step 10: Cache environment for faster subsequent runs
+            - name: Cache environment
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      .venv
+                      typings
+                      ~/.cache/uv
+                      server/pyright-lsp-bridge/node_modules
+                  key: ${{ runner.os }}-env-${{ hashFiles('pyproject.toml', 'uv.lock', 'server/pyright-lsp-bridge/package.json', 'server/pyright-lsp-bridge/package-lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-env-

@@ -26,10 +26,39 @@ The development servers are defined in the .vscode/tasks.json file
 these tasks can be run concurrently for development.
 The LSP bridge server can take a while to start up, so start it first.
 
-## python
-use `uv` for environement management
+## Python Environment Setup
+
+### GitHub Copilot Agent Setup
+The repository includes automated setup workflow in `.github/workflows/`:
+- `copilot-setup-steps.yml` - Copilot agent environment setup
+
+These workflows automatically:
+1. Initialize and update git submodules recursively
+2. Install `uv` package manager using astral-sh/setup-uv@v3
+3. Install Python and project dependencies
+4. Install MicroPython stubs to `typings/` directory
+5. Cache environment for faster subsequent runs
+
+### Local Development
+use `uv` for environment management
 use `uv pip` for package management
 use `pytest` as the test runner
+
+**Setup commands:**
+```bash
+# Install uv (if not already installed)
+# Windows: irm https://astral.sh/uv/install.ps1 | iex
+# Unix: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Initialize submodules
+git submodule update --init --recursive
+
+# Install dependencies
+uv sync
+
+# Install MicroPython stubs
+uv pip install micropython-esp32-stubs --target typings
+```
 
 ## Project Structure
 

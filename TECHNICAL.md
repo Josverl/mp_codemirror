@@ -505,12 +505,19 @@ lspClient.onNotification((method, params) => {
 - ✅ Context-aware position calculation (attribute access vs word completion)
 - ✅ Type-based completion icons (function, variable, class, keyword)
 - ✅ Support for Python stdlib, imports, and MicroPython modules
-- 📝 Detailed documentation in SPRINT4_SUMMARY.md
+- ✅ Detailed documentation in .ai_history/SPRINT4_SUMMARY.md
 
-**Sprint 4: Hover Tooltips** 🚧 **IN PROGRESS**
-- 🚧 Hover tooltips (`textDocument/hover`)
+**Sprint 4: Hover Tooltips** ✅ **COMPLETE**
+- ✅ Hover tooltips (`textDocument/hover`) with rich documentation
+- ✅ Markdown rendering with code block support
+- ✅ Dual-theme CSS styling for readability
+- ✅ Position range calculation from LSP
+- ✅ Integration with @codemirror/view hoverTooltip extension
+
+**Sprint 4: Future LSP Features** (Next)
 - ⏳ Go to definition (`textDocument/definition`)
 - ⏳ Find references (`textDocument/references`)
+- ⏳ Signature help (`textDocument/signatureHelp`)
 
 **Performance Optimizations** (Future)
 - Message batching for multiple rapid changes
@@ -758,6 +765,348 @@ src/lsp/
 - [ ] `completionItem/resolve` for additional details
 - [ ] Signature help during function calls
 - [ ] Trigger character configuration
+
+## LSP Hover Tooltips Architecture (Sprint 4)
+
+### Overview
+
+Sprint 4 added LSP-powered hover tooltips using Pyright's `textDocument/hover` capability. The implementation integrates with CodeMirror's `hoverTooltip` extension to display rich documentation on mouse hover.
+
+### Component Structure
+
+```
+┌─────────────────┐
+│   client.js     │ ← Creates hover extension
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│   hover.js      │ ← LSP hover tooltip factory
+└────────┬────────┘
+         │
+         ├──────────────────┬────────────────────┐
+         │                  │                    │
+┌────────▼──────────┐  ┌───▼──────────┐  ┌─────▼──────────┐
+│ Content           │  │ Position     │  │ Markdown       │
+│ Rendering         │  │ Calculation  │  │ Parsing        │
+└───────────────────┘  └──────────────┘  └────────────────┘
+```
+
+### Hover Flow
+
+```
+User hovers     hover.js         SimpleLSPClient      Pyright
+over "Pin"
+   │
+   ├───────────► Get cursor pos
+   │             (line, char)
+   │                 │
+   │                 ├──────────► request('hover')
+   │                 │            { textDocument, position }
+   │                 │                  │
+   │                 │                  ├──────────► Analyze symbol
+   │                 │                  │            Type lookup
+   │                 │                  │            Docstring fetch
+   │                 │                  │
+   │                 │            ◄────┤ Hover result
+   │                 │            { contents, range }
+   │                 │
+   │             ◄───┤ Parse contents
+   │                 │ Render markdown
+   │                 │ Calculate range
+   │                 │
+   ├─────────────────┤ Return tooltip spec
+   │                 │ { pos, end, above, create }
+   │
+   └─────────────────► Display tooltip
+
+```
+
+### Content Format Handling
+
+**LSP Hover Response Types:**
+
+1. **String:** Plain text or markdown
+```json
+{ "contents": "This is hover text" }
+```
+
+2. **MarkupContent:** Structured content with kind
+```json
+{
+  "contents": {
+    "kind": "markdown",
+    "value": "**class** Pin\n\nDocumentation..."
+  }
+}
+```
+
+3. **MarkedString:** Legacy format
+```json
+{
+  "contents": {
+    "language": "python",
+    "value": "class Pin: ..."
+  }
+}
+```
+
+4. **Array:** Multiple content blocks
+```json
+{
+  "contents": [
+    { "language": "python", "value": "def func(): ..." },
+    "Additional documentation"
+  ]
+}
+```
+
+### Markdown Rendering
+
+**Simple Parser Strategy:**
+
+```javascript
+function renderMarkdown(container, markdown) {
+    // Split on code blocks (```)
+    const parts = markdown.split('```');
+    
+    parts.forEach((part, index) => {
+        if (index % 2 === 1) {
+            // Odd indices are code blocks
+            const pre = document.createElement('pre');
+            const code = document.createElement('code');
+            code.textContent = part.trim();
+            pre.appendChild(code);
+            container.appendChild(pre);
+        } else {
+            // Even indices are regular text
+            const paragraphs = part.trim().split('\n\n');
+            paragraphs.forEach(p => {
+                if (p.trim()) {
+                    const para = document.createElement('p');
+                    para.innerHTML = p.trim();  // Allows HTML in docs
+                    container.appendChild(para);
+                }
+            });
+        }
+    });
+}
+```
+
+**Trade-offs:**
+- ✅ Simple and fast
+- ✅ Handles code blocks correctly
+- ✅ Preserves HTML in documentation
+- ⚠️ No bold/italic/lists (sufficient for LSP hover content)
+
+### Position Range Calculation
+
+**Dual Strategy:**
+
+```javascript
+// 1. Prefer LSP-provided range (most accurate)
+if (result.range) {
+    const startLine = view.state.doc.line(result.range.start.line + 1);
+    from = startLine.from + result.range.start.character;
+    const endLine = view.state.doc.line(result.range.end.line + 1);
+    to = endLine.from + result.range.end.character;
+}
+// 2. Fallback to word boundaries
+else {
+    const word = view.state.wordAt(pos);
+    if (word) {
+        from = word.from;
+        to = word.to;
+    }
+}
+```
+
+**Why Two Strategies:**
+- LSP range is symbol-aware (e.g., includes full qualified name)
+- Word boundaries work when LSP doesn't provide range
+- Ensures tooltips always have correct positioning
+
+### CSS Styling Architecture
+
+**Theme-Aware Design:**
+
+```css
+/* Base tooltip */
+.cm-tooltip.cm-tooltip-hover {
+    background-color: #ffffff;
+    color: #1e1e1e;
+    /* ... */
+}
+
+/* Dark theme override */
+body.dark-theme .cm-tooltip.cm-tooltip-hover {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    /* ... */
+}
+```
+
+**Key Design Decisions:**
+- 98% opacity - Nearly solid for readability
+- 500px max width - Fits most documentation
+- 400px max height - Scrollable for long docs
+- Explicit colors - Better control than CSS variables
+- Strong borders - Clear visual separation
+
+### Tooltip Content Structure
+
+**DOM Hierarchy:**
+
+```html
+<div class="cm-tooltip cm-tooltip-hover">
+  <div class="cm-lsp-hover">
+    <p><strong>(class) Pin</strong></p>
+    <p>
+      <code>id: Any</code>,
+      <code>mode: int = -1</code>,
+      ...
+    </p>
+    <pre><code>Pin.IN - Input mode
+Pin.OUT - Output mode
+...</code></pre>
+    <p>Full documentation text...</p>
+    <p>
+      <a href="https://docs.micropython.org/...">
+        MicroPython module: https://...
+      </a>
+    </p>
+  </div>
+</div>
+```
+
+### Integration with CodeMirror
+
+**hoverTooltip Extension:**
+
+```javascript
+import { hoverTooltip } from '@codemirror/view';
+
+export function createHoverTooltip(lspClient, documentUri) {
+    return hoverTooltip(async (view, pos, side) => {
+        // ... LSP request ...
+        
+        return {
+            pos: from,      // Start of hover range
+            end: to,        // End of hover range
+            above: true,    // Show above code (not below)
+            create: () => ({ dom: contentElement })
+        };
+    });
+}
+```
+
+**CodeMirror Handles:**
+- Tooltip positioning (keeps on screen)
+- Dismissal on mouse move away
+- Z-index layering
+- Scroll synchronization
+
+### Performance Characteristics
+
+**Hover Request Timing:**
+- Mouse hover trigger: ~0ms (instant)
+- LSP request latency: ~50-100ms
+- Content rendering: ~5-10ms
+- **Total:** ~60-110ms (feels instant)
+
+**Optimizations:**
+- ✅ CodeMirror debounces hover naturally
+- ✅ Single tooltip at a time
+- ✅ No need for request caching (fast enough)
+- ✅ Lightweight DOM creation
+
+### Testing Results
+
+**Test Coverage:**
+
+| Test Case | LSP Response | Result |
+|-----------|--------------|--------|
+| Pin class | Full class docs | ✅ Shows constructor + methods |
+| machine module | Module info | ✅ Shows description + docs link |
+| led variable | Type: Pin | ✅ Shows Pin class documentation |
+| sleep_ms function | Function signature | ✅ Shows params + description |
+
+**Theme Testing:**
+- ✅ Light theme - White bg, dark text, excellent contrast
+- ✅ Dark theme - Dark bg, light text, excellent contrast
+- ✅ Code blocks readable in both themes
+- ✅ Links visible and clickable
+
+### Common Issues & Solutions
+
+#### Issue 1: Transparent Tooltips
+
+**Problem:** Initial implementation used CSS variables, resulting in too-transparent tooltips.
+
+**Solution:**
+- Use explicit colors (#ffffff, #2d2d2d)
+- Add 98% opacity
+- Increase shadow intensity
+- Add solid borders
+
+#### Issue 2: Long Documentation Overflow
+
+**Problem:** Some documentation is very long (Pin class = 300+ lines).
+
+**Solution:**
+- Max height: 400px
+- overflow-y: auto
+- Custom scrollbar styling
+- Top-aligned to show beginning first
+
+#### Issue 3: Hover on Wrong Position
+
+**Problem:** Hovering near a word but not on it triggered wrong or no hover.
+
+**Solution:**
+- Use LSP range when provided (most accurate)
+- Fallback to word boundaries
+- Return null when no hover data available
+
+### File Structure
+
+```
+src/lsp/
+├── hover.js              (180 lines)
+│   ├── createHoverContent()    - Renders tooltip content
+│   ├── renderMarkdown()        - Parses markdown
+│   ├── renderPlaintext()       - Renders plain text
+│   └── createHoverTooltip()    - Main factory function
+├── client.js             (modified)
+│   └── Adds hover extension
+└── simple-client.js      (existing)
+    └── Handles LSP requests
+
+src/styles.css            (modified)
+└── LSP hover tooltip styles (90+ lines)
+    ├── .cm-tooltip.cm-tooltip-hover
+    ├── .cm-lsp-hover
+    ├── Theme-specific overrides
+    └── Scrollbar styling
+```
+
+### Future Enhancements
+
+**Content Rendering:**
+- [ ] Full markdown support (bold, italic, lists, tables)
+- [ ] Syntax highlighting in code blocks
+- [ ] Image support in documentation
+- [ ] Better link rendering with icons
+
+**Interaction:**
+- [ ] Click to pin tooltip (stay open)
+- [ ] Copy content button
+- [ ] Expand/collapse long documentation
+- [ ] Navigate between multiple hover sources
+
+**Performance:**
+- [ ] Cache hover results per position
+- [ ] Preload hover for current line
+- [ ] Cancel outdated requests
 
 ## References
 

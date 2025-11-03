@@ -60,11 +60,40 @@ The editor provides **intelligent code completion** using Pyright's Language Ser
 - ✅ String methods - 85 str methods
 - ✅ MicroPython - 54 machine.Pin members
 
-**Technical Details:** See [SPRINT4_SUMMARY.md](SPRINT4_SUMMARY.md) for the complete implementation journey.
+**Technical Details:** See [SPRINT4_SUMMARY.md](.ai_history/SPRINT4_SUMMARY.md) for the complete implementation journey.
+
+### LSP-Powered Hover Tooltips
+
+The editor displays **rich documentation on hover** using Pyright's type analysis:
+
+- **Type Information:** See variable types and class definitions instantly
+- **Function Signatures:** View parameters, return types, and descriptions
+- **Comprehensive Docstrings:** Full documentation from Python and MicroPython libraries
+- **External Links:** Clickable links to official MicroPython documentation
+- **Dual Theme Support:** Readable tooltips in both light and dark modes
+
+**Examples:**
+- Hover over `Pin` → See complete class documentation with all parameters
+- Hover over `machine` → See module description with link to docs.micropython.org
+- Hover over `led` variable → See Pin class type information
+- Hover over any function → See signature and docstring
+
+**What You'll See:**
+- **(class) Pin** - Class type with full constructor documentation
+- **(module) machine** - Module info with external documentation links
+- **(function) sleep_ms** - Function signature and usage notes
+- Type annotations, parameter descriptions, and usage examples
+
+**Technical Details:**
+- Uses CodeMirror's `hoverTooltip` extension
+- LSP `textDocument/hover` requests to Pyright
+- Markdown rendering with code block support
+- Max width 500px, max height 400px, scrollable for long docs
+- 98% opacity for excellent readability
 
 ### Planned (Phase 2 - In Progress)
 - ✅ Autocompletion - Intelligent code completion powered by Pyright (COMPLETE - Sprint 4)
-- 🚧 Hover tooltips with documentation (LSP infrastructure ready)
+- ✅ Hover tooltips with documentation (COMPLETE - Sprint 4)
 - 🔲 Go to definition
 - 🔲 Find references
 

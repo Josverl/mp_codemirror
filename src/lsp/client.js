@@ -7,6 +7,7 @@
 import { autocompletion } from '@codemirror/autocomplete';
 import { createCompletionSource } from './completion.js';
 import { createLSPDiagnostics, notifyDocumentOpen } from './diagnostics.js';
+import { createHoverTooltip } from './hover.js';
 import { SimpleLSPClient } from './simple-client.js';
 import { WebSocketTransport } from './websocket-transport.js';
 
@@ -68,10 +69,14 @@ export function createLSPPlugin(client, view, fileUri = 'file:///document.py', l
         defaultKeymap: true
     });
 
+    // Create hover tooltip extension
+    const hoverExtension = createHoverTooltip(client, fileUri);
+
     // Return extensions array
     return [
         ...diagnosticsExtensions,
-        completionExtension
+        completionExtension,
+        hoverExtension
     ];
 }
 

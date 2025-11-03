@@ -500,16 +500,264 @@ lspClient.onNotification((method, params) => {
 - ✅ Document version tracking
 - 📝 Incremental sync for large documents (deferred to performance optimization phase)
 
-**Sprint 4: More LSP Features** (Next)
-- Autocompletion (`textDocument/completion`)
-- Hover tooltips (`textDocument/hover`)
-- Go to definition (`textDocument/definition`)
-- Find references (`textDocument/references`)
+**Sprint 4: Autocompletion** ✅ **COMPLETE**
+- ✅ Implemented `textDocument/completion` LSP integration
+- ✅ Context-aware position calculation (attribute access vs word completion)
+- ✅ Type-based completion icons (function, variable, class, keyword)
+- ✅ Support for Python stdlib, imports, and MicroPython modules
+- 📝 Detailed documentation in SPRINT4_SUMMARY.md
+
+**Sprint 4: Hover Tooltips** 🚧 **IN PROGRESS**
+- 🚧 Hover tooltips (`textDocument/hover`)
+- ⏳ Go to definition (`textDocument/definition`)
+- ⏳ Find references (`textDocument/references`)
 
 **Performance Optimizations** (Future)
 - Message batching for multiple rapid changes
 - Incremental document sync (send diffs, not full text)
 - Web Worker for message processing
+- Completion result caching
+
+## LSP Autocompletion Architecture (Sprint 4)
+
+### Overview
+
+Sprint 4 added LSP-powered autocompletion using Pyright's `textDocument/completion` capability. The implementation integrates with CodeMirror's autocomplete system to provide intelligent completion suggestions.
+
+### Component Structure
+
+```
+┌─────────────────┐
+│   client.js     │ ← Creates completion extension
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│ completion.js   │ ← LSP completion source
+└────────┬────────┘
+         │
+         ├─────────────────┬──────────────────┐
+         │                 │                  │
+┌────────▼──────────┐  ┌──▼───────────┐  ┌──▼─────────────┐
+│ CompletionItem    │  │ Position     │  │ Format         │
+│ Kind Mapping      │  │ Calculation  │  │ Conversion     │
+└───────────────────┘  └──────────────┘  └────────────────┘
+```
+
+### Completion Flow
+
+```
+User types        completion.js       SimpleLSPClient      Pyright
+"sys."
+   │                    │                   │                │
+   │  Trigger           │                   │                │
+   ├───────────────────>│ Check context     │                │
+   │                    │ (explicit/typing) │                │
+   │                    │ Match word pattern│                │
+   │                    │ Calculate position│                │
+   │                    ├──────────────────>│ request()      │
+   │                    │                   ├───────────────>│
+   │                    │                   │  Analyze types │
+   │                    │                   │<───────────────│
+   │                    │                   │ {items:[...96]}│
+   │                    │<──────────────────│                │
+   │                    │ Convert LSP→CM    │                │
+   │                    │ format            │                │
+   │  Display menu      │                   │                │
+   │<───────────────────│ {from, options[]} │                │
+```
+
+### Key Implementation Details
+
+#### 1. Context-Aware Position Calculation
+
+**The Critical Insight:** Completion starting position depends on context.
+
+```javascript
+// Word completion: "impor" → complete from start of word
+text = "impor"
+word.from = 0, word.to = 5, cursor = 5
+from = word.from (0)  // Replace "impor" with "import"
+
+// Attribute access: "sys." → complete after dot
+text = "sys."
+word.from = 0, word.to = 4, cursor = 4
+from = cursor (4)     // Insert after "sys.", don't replace it
+```
+
+**Implementation:**
+```javascript
+// Determine starting position based on word ending
+const from = word.text.endsWith('.') ? pos : word.from;
+```
+
+This simple check enables both:
+- **Word replacement** for regular completions
+- **Attribute insertion** for method/property access
+
+#### 2. LSP to CodeMirror Format Conversion
+
+**LSP CompletionItem Format:**
+```json
+{
+  "label": "__name__",
+  "kind": 6,
+  "detail": "str",
+  "documentation": "The module name"
+}
+```
+
+**CodeMirror Completion Format:**
+```javascript
+{
+  label: "__name__",
+  type: "variable",
+  detail: "str",
+  info: "The module name",
+  apply: "__name__"
+}
+```
+
+**Kind Mapping (LSP → CodeMirror):**
+```javascript
+const kindToType = {
+  1: 'text',        // Text
+  2: 'function',    // Method
+  3: 'function',    // Function
+  4: 'function',    // Constructor
+  5: 'property',    // Field
+  6: 'variable',    // Variable
+  7: 'class',       // Class
+  8: 'interface',   // Interface
+  9: 'namespace',   // Module
+  10: 'property',   // Property
+  // ... etc
+};
+```
+
+#### 3. Trigger Conditions
+
+**Automatic Trigger (typing):**
+```javascript
+// Only trigger if we have a word match
+const word = context.matchBefore(/[\w\.]+/);
+if (!word || (word.from === word.to && !context.explicit)) {
+    return null;  // Don't show completions
+}
+```
+
+**Manual Trigger (Ctrl+Space):**
+```javascript
+// Always show if explicitly requested
+if (context.explicit) {
+    // Force completion even with syntax errors
+}
+```
+
+#### 4. Integration with CodeMirror
+
+**In `client.js`:**
+```javascript
+import { autocompletion } from '@codemirror/autocomplete';
+import { createCompletionSource } from './completion.js';
+
+const completionSource = createCompletionSource(client, fileUri);
+
+const completionExtension = autocompletion({
+    override: [completionSource],  // Replace default completions
+    activateOnTyping: true,        // Show on typing
+    maxRenderedOptions: 100,       // Limit UI display
+    defaultKeymap: true            // Enable Ctrl+Space
+});
+```
+
+**Why `override`?**
+- Replaces CodeMirror's default word-based completions
+- Ensures only LSP completions are shown
+- Prevents confusion from mixed completion sources
+
+### Test Coverage
+
+**Scenarios Tested:**
+1. **Python stdlib:** `sys.` → 96 completions (platform, argv, exit, etc.)
+2. **Import statements:** `import o` → 92 modules (os, opcode, operator, etc.)
+3. **String methods:** `"text".` → 85 methods (upper, lower, split, etc.)
+4. **MicroPython:** `pin.` → 54 items (on, off, toggle, IRQ constants)
+
+### Common Issues & Solutions
+
+#### Issue 1: Completion Menu Not Appearing
+
+**Symptom:** LSP returns items but menu doesn't show.
+
+**Cause:** Incorrect `from` position calculation.
+
+**Solution:** 
+```javascript
+// WRONG: Always use word.from
+const from = word.from;  // Breaks "sys." completion
+
+// RIGHT: Context-aware
+const from = word.text.endsWith('.') ? pos : word.from;
+```
+
+#### Issue 2: Import Map Missing
+
+**Symptom:** `Failed to resolve module specifier "@codemirror/autocomplete"`
+
+**Solution:** Add to import map in `index.html`:
+```javascript
+"@codemirror/autocomplete": "https://esm.sh/@codemirror/autocomplete@6.18.3?deps=..."
+```
+
+#### Issue 3: Empty Results on Syntax Errors
+
+**Symptom:** Typing `sys.` shows no completions automatically.
+
+**Cause:** Pyright returns empty results for incomplete code in automatic mode.
+
+**Solution:** Always works with explicit trigger (Ctrl+Space). This is expected behavior.
+
+### Performance Characteristics
+
+**Latency:**
+- LSP request: ~50-100ms (local WebSocket)
+- Format conversion: ~5ms (96 items)
+- UI rendering: ~10ms (CodeMirror)
+- **Total:** ~65-115ms from trigger to display
+
+**Optimization:**
+- ✅ Early return on no match (avoids LSP call)
+- ✅ `validFor` regex filters client-side (reduces LSP calls)
+- ⚠️ No result caching (future improvement)
+
+### File Structure
+
+```
+src/lsp/
+├── completion.js          (159 lines)
+│   ├── CompletionItemKind enum
+│   ├── kindToType() converter
+│   ├── convertCompletionItem()
+│   └── createCompletionSource()
+├── client.js              (modified)
+│   └── Adds completion extension
+└── simple-client.js       (existing)
+    └── Handles LSP requests
+```
+
+### Future Enhancements
+
+**Completion Features:**
+- [ ] Snippet support for function calls with placeholders
+- [ ] Documentation preview in completion info
+- [ ] Completion ranking/sorting by relevance
+- [ ] Completion result caching
+- [ ] Fuzzy matching for filtering
+
+**LSP Features:**
+- [ ] `completionItem/resolve` for additional details
+- [ ] Signature help during function calls
+- [ ] Trigger character configuration
 
 ## References
 

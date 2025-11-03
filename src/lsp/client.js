@@ -4,6 +4,8 @@
  * This file sets up the LSP client with WebSocket transport
  */
 
+import { autocompletion } from '@codemirror/autocomplete';
+import { createCompletionSource } from './completion.js';
 import { createLSPDiagnostics, notifyDocumentOpen } from './diagnostics.js';
 import { SimpleLSPClient } from './simple-client.js';
 import { WebSocketTransport } from './websocket-transport.js';
@@ -15,10 +17,10 @@ import { WebSocketTransport } from './websocket-transport.js';
  */
 export async function createLSPClient(config = {}) {
     const wsUrl = config.wsUrl || 'ws://localhost:9011/lsp';
-    
+
     // Create the WebSocket transport
     const transport = new WebSocketTransport(wsUrl);
-    
+
     console.log('Creating LSP client with WebSocket transport');
 
     // Create the client
@@ -31,7 +33,7 @@ export async function createLSPClient(config = {}) {
     console.log('Connecting WebSocket transport...');
     await transport.connect();
     console.log('WebSocket transport connected');
-    
+
     // Connect the client to the transport
     await client.connect(transport);
     console.log('LSP Client initialized:', client.serverCapabilities);
@@ -55,8 +57,22 @@ export function createLSPPlugin(client, view, fileUri = 'file:///document.py', l
     // Create diagnostics extension with the view
     const diagnosticsExtensions = createLSPDiagnostics(client, fileUri, view);
 
+    // Create completion source
+    const completionSource = createCompletionSource(client, fileUri);
+
+    // Create autocompletion extension with LSP completion source
+    const completionExtension = autocompletion({
+        override: [completionSource],
+        activateOnTyping: true,
+        maxRenderedOptions: 100,
+        defaultKeymap: true
+    });
+
     // Return extensions array
-    return diagnosticsExtensions;
+    return [
+        ...diagnosticsExtensions,
+        completionExtension
+    ];
 }
 
 /**

@@ -8,12 +8,23 @@ Build a simple, static HTML5 page hosting a CodeMirror 6 editor configured for P
 It is preferable that the page can be deployed to GitHub Pages and serve as a foundation for future LSP integration with Pylance and MicroPython type stubs.
 if it is needed to change the hosting infrastructure so that it cannot be run on github pages , that is acceptable 
 
+the .ai_history folder contains previous documentation about this project, refer to them to avoid repeating work already done, or to get ideas on how to proceed.
+
+
 ## TESTING GUIDELINES
 you MUST test your code thoroughly
 tests should reside in the tests/ folder
 Exploratory testing of web pages must be done using the Playwright MCP Server
 Unit and integration testing should be based on Pytest + Playwright - but only start creating these after exploratory testing of a feature is complete
 
+
+## Development servers
+The development servers are defined in the .vscode/tasks.json file
+- "Start LSP Bridge" - port 9011 - starts the LSP bridge server (pyright-lsp-bridge)
+- "Start HTTP Server" - port 8888 - starts a simple HTTP server to serve the src/ folder
+
+these tasks can be run concurrently for development.
+The LSP bridge server can take a while to start up, so start it first.
 
 ## python
 use `uv` for environement management

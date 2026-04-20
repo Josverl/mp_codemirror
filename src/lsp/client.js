@@ -4,7 +4,7 @@
  * This file sets up the LSP client with WebSocket transport
  */
 
-import { autocompletion } from '@codemirror/autocomplete';
+import { EditorState } from '@codemirror/state';
 import { createCompletionSource } from './completion.js';
 import { createLSPDiagnostics, notifyDocumentOpen } from './diagnostics.js';
 import { createHoverTooltip } from './hover.js';
@@ -61,13 +61,12 @@ export function createLSPPlugin(client, view, fileUri = 'file:///document.py', l
     // Create completion source
     const completionSource = createCompletionSource(client, fileUri);
 
-    // Create autocompletion extension with LSP completion source
-    const completionExtension = autocompletion({
-        override: [completionSource],
-        activateOnTyping: true,
-        maxRenderedOptions: 100,
-        defaultKeymap: true
-    });
+    // Provide LSP completions through the language data facet so they
+    // integrate with the existing autocompletion() from basicSetup instead
+    // of creating a competing second autocomplete instance.
+    const completionExtension = EditorState.languageData.of(() => [{
+        autocomplete: completionSource
+    }]);
 
     // Create hover tooltip extension
     const hoverExtension = createHoverTooltip(client, fileUri);

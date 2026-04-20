@@ -191,19 +191,31 @@ async function initializeEditor() {
     const defaultFile = exampleFiles.length > 0 ? exampleFiles[0].file : 'blink_led.py';
     await loadSampleFromFile(defaultFile);
 
-    // Initialize LSP client with WebSocket transport
+    // Initialize LSP client — use in-browser Pyright worker by default
     try {
-        console.log('Initializing LSP client with WebSocket transport...');
+        // Use ?lsp=websocket in URL to fall back to the old WebSocket bridge
+        const params = new URLSearchParams(window.location.search);
+        const mode = params.get('lsp') || 'worker';
+
+        // In dev, worker.js lives at /dist/worker.js; in production (deploy)
+        // it's alongside index.html. Detect by checking if we're in /src/.
+        const workerUrl = window.location.pathname.includes('/src/')
+            ? '../dist/worker.js'
+            : './worker.js';
+
+        console.log(`Initializing LSP client (mode: ${mode})...`);
         const lspResult = await createLSPClient({
-            wsUrl: 'ws://localhost:9011/lsp'  // Connect to pyright LSP WS bridge server
+            mode,
+            workerUrl,
+            wsUrl: 'ws://localhost:9011/lsp',
+            timeout: 15000,
         });
         lspClient = lspResult.client;
         lspTransport = lspResult.transport;
-        console.log('LSP client ready! Connected to Pyright via WebSocket.');
+        console.log(`LSP client ready (${mode} transport).`);
     } catch (error) {
         console.error('Failed to initialize LSP client:', error);
         console.log('Editor will continue without LSP features');
-        console.log('Make sure the WebSocket bridge server is running: npm start in server/python-language-server');
     }
 
     // Create update listener for real-time diagnostics

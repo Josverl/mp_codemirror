@@ -76,15 +76,16 @@ def live_server():
         yield base or "http://localhost:8888"
         return
 
-    src_dir = Path(__file__).parent.parent / "src"
+    # Serve from project root so both src/ and dist/ are accessible
+    project_root = Path(__file__).parent.parent
     process = subprocess.Popen(
         ["python3", "-m", "http.server", "8888"],
-        cwd=str(src_dir),
+        cwd=str(project_root),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
     time.sleep(1)
-    yield "http://localhost:8888"
+    yield "http://localhost:8888/src"
     process.terminate()
     process.wait()
 

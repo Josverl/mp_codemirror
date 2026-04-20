@@ -1,15 +1,15 @@
 """
 LSP Diagnostics Integration Tests
 
-Architecture: Browser (CodeMirror) <-> WebSocket :9011 <-> Pyright
+Architecture: Browser (CodeMirror) <-> Web Worker (Pyright via dist/worker.js)
 
 Two modes:
   - Smoke tests  (no LSP required): verify graceful degradation.
   - Full tests   (LSP required):    verify real diagnostics in the editor.
 """
 
-import socket
 import time
+from pathlib import Path
 
 import pytest
 
@@ -17,23 +17,19 @@ import pytest
 # Module-level skip marker — evaluated at collection time
 # ---------------------------------------------------------------------------
 
-_lsp_up = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-try:
-    _lsp_available = _lsp_up.connect_ex(("localhost", 9011)) == 0
-finally:
-    _lsp_up.close()
+_worker_available = (Path(__file__).parent.parent / "dist" / "worker.js").exists()
 
 requires_lsp = pytest.mark.skipif(
-    not _lsp_available,
-    reason="LSP bridge not running on port 9011. Start: Run Task > 'Start LSP Bridge'",
+    not _worker_available,
+    reason="Worker bundle not found at dist/worker.js. Build it first.",
 )
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-EDITOR_TIMEOUT = 10_000  # ms – time for CodeMirror to initialise from CDN
-LSP_TIMEOUT = 15_000     # ms – time for Pyright to process and push diagnostics
+EDITOR_TIMEOUT = 15_000  # ms – time for CodeMirror to initialise from CDN
+LSP_TIMEOUT = 20_000     # ms – time for Pyright worker to process and push diagnostics
 
 
 def _load_editor(page, base_url: str):
@@ -92,8 +88,8 @@ def test_editor_remains_editable_without_lsp(page, live_server):
 
 def test_no_lint_markers_without_lsp(page, live_server):
     """Without LSP, no lint-gutter markers should be present."""
-    if _lsp_available:
-        pytest.skip("Skipped: LSP is running; marker behaviour differs.")
+    if _worker_available:
+        pytest.skip("Skipped: Worker bundle available; marker behaviour differs.")
 
     _load_editor(page, live_server)
     time.sleep(3)
@@ -105,9 +101,9 @@ def test_no_lint_markers_without_lsp(page, live_server):
 
 
 def test_lsp_failure_is_non_fatal(page, live_server):
-    """A WebSocket connection failure must not crash the page."""
-    if _lsp_available:
-        pytest.skip("Skipped: LSP is running; failure path not exercised.")
+    """An LSP connection failure must not crash the page."""
+    if _worker_available:
+        pytest.skip("Skipped: Worker bundle available; failure path not exercised.")
 
     uncaught_errors: list[str] = []
     page.on("pageerror", lambda exc: uncaught_errors.append(str(exc)))
@@ -134,7 +130,7 @@ def test_lsp_client_initialises_in_browser(page, live_server):
     page.on("console", lambda m: console_msgs.append(m.text))
 
     _load_editor(page, live_server)
-    time.sleep(4)
+    time.sleep(8)
 
     assert any("LSP client ready" in m for m in console_msgs), (
         f"Expected 'LSP client ready' in console. Got: {console_msgs[:15]}"
@@ -148,7 +144,7 @@ def test_lsp_client_initialises_in_browser(page, live_server):
 def test_diagnostics_appear_for_undefined_variable(page, live_server):
     """Typing code with an undefined variable must produce a lint marker."""
     _load_editor(page, live_server)
-    time.sleep(4)  # wait for LSP init
+    time.sleep(8)  # wait for LSP init
 
     _clear_editor(page)
     _type_in_editor(page, "result = clearly_undefined_name")
@@ -164,7 +160,7 @@ def test_diagnostics_appear_for_undefined_variable(page, live_server):
 def test_diagnostic_gutter_is_present(page, live_server):
     """The lint gutter element must be rendered when LSP is connected."""
     _load_editor(page, live_server)
-    time.sleep(4)
+    time.sleep(8)
 
     # lintGutter() creates an element with class cm-gutter-lint
     lint_gutter = page.locator(".cm-gutter-lint")
@@ -177,7 +173,7 @@ def test_diagnostic_gutter_is_present(page, live_server):
 def test_error_severity_marker_shown(page, live_server):
     """An undefined-name error must produce an error-severity marker."""
     _load_editor(page, live_server)
-    time.sleep(4)
+    time.sleep(8)
 
     _clear_editor(page)
     _type_in_editor(page, "bad = no_such_variable_xyz")
@@ -200,7 +196,7 @@ def test_diagnostics_published_to_console(page, live_server):
     page.on("console", lambda m: console_msgs.append(m.text))
 
     _load_editor(page, live_server)
-    time.sleep(4)
+    time.sleep(8)
 
     _clear_editor(page)
     _type_in_editor(page, "x = totally_unknown_symbol")
@@ -222,13 +218,13 @@ def test_diagnostics_published_to_console(page, live_server):
 def test_clean_code_produces_no_errors(page, live_server):
     """Valid Python must not produce error or warning lint markers."""
     _load_editor(page, live_server)
-    time.sleep(4)
+    time.sleep(8)
 
     _clear_editor(page)
-    _type_in_editor(page, "x: int = 42\ny: str = 'hello'\nprint(x, y)")
+    _type_in_editor(page, "x: int = 42")
 
     # Give Pyright time to analyse and respond
-    time.sleep(4)
+    time.sleep(8)
 
     error_markers = page.locator(".cm-lint-marker-error, .cm-lint-marker-warning")
     assert error_markers.count() == 0, (

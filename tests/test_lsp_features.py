@@ -1,6 +1,8 @@
 """
 LSP Feature Tests: Completions and Hover Tooltips
 
+Architecture: Browser (CodeMirror) <-> Web Worker (Pyright via dist/worker.js)
+
 Two modes:
   - Smoke tests (no LSP):  verify the editor doesn't crash and that
     CodeMirror's built-in Python keyword completions still work.
@@ -13,8 +15,8 @@ flush AND for Pyright to respond with diagnostics, then trigger explicit
 completion via Ctrl+Space.
 """
 
-import socket
 import time
+from pathlib import Path
 
 import pytest
 
@@ -22,15 +24,11 @@ import pytest
 # Module-level skip marker (evaluated at collection time)
 # ---------------------------------------------------------------------------
 
-_lsp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-try:
-    _lsp_available = _lsp_sock.connect_ex(("localhost", 9011)) == 0
-finally:
-    _lsp_sock.close()
+_worker_available = (Path(__file__).parent.parent / "dist" / "worker.js").exists()
 
 requires_lsp = pytest.mark.skipif(
-    not _lsp_available,
-    reason="LSP bridge not running on port 9011. Start: Run Task > 'Start LSP Bridge'",
+    not _worker_available,
+    reason="Worker bundle not found at dist/worker.js. Build it first.",
 )
 
 # ---------------------------------------------------------------------------
@@ -38,11 +36,11 @@ requires_lsp = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 
 EDITOR_TIMEOUT = 10_000
-LSP_TIMEOUT = 15_000
+LSP_TIMEOUT = 20_000
 DEBOUNCE_WAIT = 2.5  # debounce (300 ms) + Pyright round-trip margin
 
 
-def _load_editor(page, base_url: str, lsp_init_secs: float = 5.0):
+def _load_editor(page, base_url: str, lsp_init_secs: float = 8.0):
     """Navigate to the editor and wait for LSP to initialise."""
     page.goto(f"{base_url}/index.html")
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
@@ -103,7 +101,7 @@ def test_builtin_keyword_completion_works_without_lsp(page, live_server):
 
 def test_typing_dot_does_not_crash_without_lsp(page, live_server):
     """Typing a dot accessor must not throw uncaught JS errors."""
-    if _lsp_available:
+    if _worker_available:
         pytest.skip("Skipped: LSP running; completion behaviour differs.")
 
     uncaught: list[str] = []
@@ -119,7 +117,7 @@ def test_typing_dot_does_not_crash_without_lsp(page, live_server):
 
 def test_ctrl_space_does_not_crash_without_lsp(page, live_server):
     """Ctrl+Space completion trigger must not throw uncaught JS errors."""
-    if _lsp_available:
+    if _worker_available:
         pytest.skip("Skipped: LSP running; completion behaviour differs.")
 
     uncaught: list[str] = []

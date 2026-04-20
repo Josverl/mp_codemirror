@@ -1,7 +1,7 @@
 /**
  * LSP Client Setup for CodeMirror
- * 
- * This file sets up the LSP client with WebSocket transport
+ *
+ * Creates and initializes an LSP client with either Worker or WebSocket transport.
  */
 
 import { EditorState } from '@codemirror/state';
@@ -9,33 +9,33 @@ import { createCompletionSource } from './completion.js';
 import { createLSPDiagnostics, notifyDocumentOpen } from './diagnostics.js';
 import { createHoverTooltip } from './hover.js';
 import { SimpleLSPClient } from './simple-client.js';
-import { WebSocketTransport } from './websocket-transport.js';
+import { createTransport } from './transport-factory.js';
 
 /**
  * Create and initialize an LSP client
  * @param {Object} config - Configuration options
- * @param {string} config.wsUrl - WebSocket URL (default: ws://localhost:9011/lsp)
+ * @param {'worker'|'websocket'} [config.mode='worker'] - Transport mode
+ * @param {string} [config.wsUrl] - WebSocket URL (for mode='websocket')
+ * @param {string} [config.workerUrl] - Worker script URL (for mode='worker')
+ * @param {number} [config.timeout=5000] - Request timeout in ms
  */
 export async function createLSPClient(config = {}) {
-    const wsUrl = config.wsUrl || 'ws://localhost:9011/lsp';
-
-    // Create the WebSocket transport
-    const transport = new WebSocketTransport(wsUrl);
-
-    console.log('Creating LSP client with WebSocket transport');
-
-    // Create the client
-    const client = new SimpleLSPClient({
-        rootUri: 'file:///workspace',
-        timeout: 5000
+    const transport = createTransport({
+        mode: config.mode || 'worker',
+        wsUrl: config.wsUrl,
+        workerUrl: config.workerUrl,
     });
 
-    // Connect the WebSocket transport
-    console.log('Connecting WebSocket transport...');
-    await transport.connect();
-    console.log('WebSocket transport connected');
+    console.log(`Creating LSP client (mode: ${config.mode || 'worker'})`);
 
-    // Connect the client to the transport
+    const client = new SimpleLSPClient({
+        rootUri: 'file:///workspace',
+        timeout: config.timeout || 5000,
+    });
+
+    await transport.connect();
+    console.log('Transport connected');
+
     await client.connect(transport);
     console.log('LSP Client initialized:', client.serverCapabilities);
 

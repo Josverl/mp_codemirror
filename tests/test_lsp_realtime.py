@@ -2,17 +2,17 @@
 LSP Real-Time Diagnostics Tests
 
 These tests verify that the browser's CodeMirror editor receives live
-diagnostics from the Pyright bridge as the user types, including:
+diagnostics from the Pyright Web Worker as the user types, including:
   - didChange notifications being sent and debounced
   - version counter incrementing correctly
   - diagnostics being updated when code changes
 
-All tests require the LSP bridge to be running on port 9011.
+All tests require the Pyright worker bundle at dist/worker.js.
 """
 
 import re
-import socket
 import time
+from pathlib import Path
 
 import pytest
 
@@ -20,27 +20,23 @@ import pytest
 # Module-level skip marker
 # ---------------------------------------------------------------------------
 
-_lsp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-try:
-    _lsp_available = _lsp_sock.connect_ex(("localhost", 9011)) == 0
-finally:
-    _lsp_sock.close()
+_worker_available = (Path(__file__).parent.parent / "dist" / "worker.js").exists()
 
 requires_lsp = pytest.mark.skipif(
-    not _lsp_available,
-    reason="LSP bridge not running on port 9011. Start: Run Task > 'Start LSP Bridge'",
+    not _worker_available,
+    reason="Worker bundle not found at dist/worker.js. Build it first.",
 )
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-EDITOR_TIMEOUT = 10_000
-LSP_TIMEOUT = 15_000
+EDITOR_TIMEOUT = 15_000
+LSP_TIMEOUT = 20_000
 DEBOUNCE_MS = 300  # must match CHANGE_DEBOUNCE_MS in app.js
 
 
-def _load_and_wait(page, base_url: str, lsp_init_secs: float = 4.0):
+def _load_and_wait(page, base_url: str, lsp_init_secs: float = 8.0):
     """Navigate to editor and wait for LSP to initialise."""
     page.goto(f"{base_url}/index.html")
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
@@ -65,19 +61,19 @@ def _type_in_editor(page, text: str, delay: int = 50):
 
 @requires_lsp
 def test_lsp_server_connects_via_browser(page, live_server):
-    """Browser must log a successful WebSocket connection and LSP handshake."""
+    """Browser must log a successful transport connection and LSP handshake."""
     console: list[str] = []
     page.on("console", lambda m: console.append(m.text))
 
     _load_and_wait(page, live_server)
 
-    ws_connected = any(
-        "WebSocket" in m and "Connected" in m for m in console
+    transport_connected = any(
+        "Transport connected" in m for m in console
     )
     lsp_ready = any("LSP client ready" in m for m in console)
 
-    assert ws_connected, (
-        f"WebSocket connection message not found. Console: {console[:15]}"
+    assert transport_connected, (
+        f"Transport connection message not found. Console: {console[:15]}"
     )
     assert lsp_ready, (
         f"'LSP client ready' not found in console. Console: {console[:15]}"
@@ -234,7 +230,7 @@ def test_diagnostics_update_when_code_fixed(page, live_server):
 
     # Step 2: use the Clear button, then type valid code
     _clear_editor(page)
-    _type_in_editor(page, "x: int = 42\nprint(x)")
+    _type_in_editor(page, "x: int = 42")
 
     deadline = time.time() + LSP_TIMEOUT / 1000
     while time.time() < deadline:

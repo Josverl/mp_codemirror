@@ -1,103 +1,62 @@
 # CDN Error Test Report
 
 ## Test Date
-2025-11-04
+2026-04-20 (re-tested after CDN configuration update)
 
 ## Test Method
 Playwright MCP Server - Headless Chromium Browser
 
 ## Summary
-**Status: CDN Resources Still Blocked ❌**
+**Status: CDN Resources Load Successfully ✅**
 
-The page continues to experience `ERR_BLOCKED_BY_CLIENT` errors when attempting to load CodeMirror modules from `esm.sh` CDN.
+After updating the CDN configuration and upgrading to current CodeMirror package versions,
+all resources from `esm.sh` load without errors and the editor initialises correctly.
 
-## Detailed Findings
+## Fix Applied
 
-### CDN Errors Detected
+The root cause was a **version mismatch** in the import map. `codemirror@6.0.1` (the umbrella
+package) imported `showDialog` from `@codemirror/view`, which was only added in
+`@codemirror/view@6.36.0`. The import map was pinning `@codemirror/view@6.35.0`, causing a
+module export error that prevented the editor from initialising.
 
-All three primary CodeMirror modules are being blocked:
+### Updated versions in `src/index.html`
 
-1. **@codemirror/lang-python@6.1.6**
-   - URL: `https://esm.sh/@codemirror/lang-python@6.1.6?deps=...`
-   - Error: `net::ERR_BLOCKED_BY_CLIENT`
+| Package | Before | After |
+|---------|--------|-------|
+| `codemirror` | 6.0.1 | 6.0.2 |
+| `@codemirror/state` | 6.4.1 | 6.6.0 |
+| `@codemirror/view` | 6.35.0 | 6.41.1 |
+| `@codemirror/language` | 6.10.6 | 6.12.3 |
+| `@codemirror/autocomplete` | 6.18.3 | 6.20.1 |
+| `@codemirror/lint` | 6.8.4 | 6.9.5 |
+| `@codemirror/lang-python` | 6.1.6 | 6.2.1 |
+| `@lezer/common` | 1.2.3 | 1.5.2 |
+| `@lezer/python` | 1.1.16 | 1.1.18 |
 
-2. **@codemirror/state@6.4.1**
-   - URL: `https://esm.sh/@codemirror/state@6.4.1`
-   - Error: `net::ERR_BLOCKED_BY_CLIENT`
+## Test Results After Fix
 
-3. **codemirror@6.0.1**
-   - URL: `https://esm.sh/codemirror@6.0.1?deps=...`
-   - Error: `net::ERR_BLOCKED_BY_CLIENT`
+### Console errors
+- ❌ (resolved) `ERR_BLOCKED_BY_CLIENT` for esm.sh CDN resources
+- ❌ (resolved) `showDialog` module export error
+- ⚠️ WebSocket connection refused on port 9011 — expected; LSP server not running in CI
 
-### Impact on Page Functionality
+### Page functionality
+✅ Page HTML, CSS and local JS load (HTTP 200)  
+✅ CodeMirror `.cm-editor` element renders  
+✅ Python syntax highlighting active  
+✅ Line numbers displayed  
+✅ Code-folding indicators present  
+✅ Example files populate the selector dropdown  
+✅ Default example (`blink_led.py`) loads into the editor  
 
-✅ **Working:**
-- Page HTML loads successfully (HTTP 200)
-- CSS styles load correctly
-- Local JavaScript files load (`app.js`, `lsp/client.js`, `lsp/diagnostics.js`)
-- UI elements render (buttons, header, footer)
-- Import map is present in the HTML
+## Screenshot
 
-❌ **Not Working:**
-- Editor container is empty (`childElementCount: 0`)
-- No CodeMirror editor elements (`.cm-editor` class not found)
-- CodeMirror JavaScript modules not loaded
-- No editor functionality available
+![Editor working with Python syntax highlighting](https://github.com/user-attachments/assets/77b7f1ba-b8e0-479e-b348-5659578d2767)
 
-### Root Cause Analysis
+## Historical Record — Initial CDN Blocking Issue
 
-The `ERR_BLOCKED_BY_CLIENT` error indicates that the browser itself is blocking these requests. This is typically caused by:
+Prior to the firewall/configuration update, all CDN requests from esm.sh returned
+`ERR_BLOCKED_BY_CLIENT` at the browser level. Those errors are now fully resolved.
 
-1. **Content Security Policy (CSP)** - Browser or environment-level CSP restrictions
-2. **Ad Blockers or Security Extensions** - Built-in or configured blockers
-3. **Network Security Policies** - Firewall or proxy blocking external CDN requests
-4. **Browser Security Features** - Chromium security features blocking cross-origin requests
-
-### Test Environment Details
-
-- **Server:** Python HTTP server on `localhost:8888`
-- **Browser:** Chromium (Playwright headless)
-- **Network Requests:**
-  - Local resources: ✅ All successful
-  - External CDN (`esm.sh`): ❌ All blocked
-
-## Recommendations
-
-### Option 1: Use Alternative CDN
-Switch from `esm.sh` to a different CDN that may not be blocked:
-- **unpkg.com** - `https://unpkg.com/@codemirror/...`
-- **jsdelivr.net** - `https://cdn.jsdelivr.net/npm/@codemirror/...`
-- **cdnjs.cloudflare.com** - `https://cdnjs.cloudflare.com/ajax/libs/codemirror/...`
-
-### Option 2: Self-Host Dependencies
-Bundle CodeMirror dependencies locally:
-```bash
-npm install codemirror @codemirror/lang-python
-# Copy built files to src/vendor/
-```
-
-### Option 3: Use Build Process
-Implement a bundler (Vite, esbuild, webpack) to:
-- Bundle all dependencies locally
-- Eliminate external CDN dependencies
-- Improve load times and reliability
-
-### Option 4: Configure Browser Security
-For testing environments:
-- Disable content blockers in test browser
-- Configure Playwright to allow external CDN requests
-- Add `esm.sh` to allowlist
-
-## Next Steps
-
-1. Test with alternative CDN sources
-2. If CDN switching doesn't work, implement local bundling
-3. Update import map in `index.html` accordingly
-4. Re-test with Playwright to verify resolution
-
-## Screenshots
-
-**Current State (CDN Blocked):**
-![CDN Errors Still Present](https://github.com/user-attachments/assets/5535363f-1f73-447c-8cf7-679eba8d7b07)
-
-The editor area remains blank due to blocked JavaScript modules.
+Previous failing screenshot (for reference):
+![CDN blocked — editor blank](https://github.com/user-attachments/assets/5535363f-1f73-447c-8cf7-679eba8d7b07)

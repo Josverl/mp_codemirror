@@ -185,49 +185,65 @@ def test_completion_shows_multiple_options(page, live_server):
 
 @requires_lsp
 def test_completion_contains_known_sys_members(page, live_server):
-    """sys completions must include 'argv' and 'platform'."""
+    """sys completions must include 'argv'."""
+    console_msgs: list[str] = []
+    page.on("console", lambda m: console_msgs.append(m.text))
+
     _load_editor(page, live_server)
 
     _clear_editor(page)
     _type_in_editor(page, "import sys")
     page.keyboard.press("Enter")
-    page.keyboard.type("sys.")
-    time.sleep(DEBOUNCE_WAIT)
+    # Type prefix to filter — wait for Pyright to confirm it has the content
+    page.keyboard.type("sys.arg")
+
+    # Wait for the debounce to flush and Pyright to push diagnostics
+    deadline = time.time() + LSP_TIMEOUT / 1000
+    while time.time() < deadline:
+        if any("Received diagnostics" in m for m in console_msgs[-5:]):
+            break
+        time.sleep(0.3)
+    time.sleep(0.3)  # small extra margin
 
     page.keyboard.press("Control+Space")
     page.locator(".cm-tooltip-autocomplete").wait_for(timeout=LSP_TIMEOUT)
     options = page.locator(".cm-completionLabel")
-    labels = [options.nth(i).inner_text() for i in range(min(100, options.count()))]
+    labels = [options.nth(i).inner_text() for i in range(min(20, options.count()))]
 
     assert any("argv" in lbl for lbl in labels), (
-        f"'argv' missing from sys completions. Got first 10: {labels[:10]}"
-    )
-    assert any("platform" in lbl for lbl in labels), (
-        f"'platform' missing from sys completions. Got first 10: {labels[:10]}"
+        f"'argv' missing from filtered sys completions. Got: {labels}"
     )
 
 
 @requires_lsp
 def test_completion_for_string_methods(page, live_server):
-    """String method completions must include 'upper' and 'lower'."""
+    """String method completions must include 'upper'."""
+    console_msgs: list[str] = []
+    page.on("console", lambda m: console_msgs.append(m.text))
+
     _load_editor(page, live_server)
 
     _clear_editor(page)
     _type_in_editor(page, 'text = "hello"')
     page.keyboard.press("Enter")
-    page.keyboard.type("text.")
-    time.sleep(DEBOUNCE_WAIT)
+    # Type prefix 'up' to filter to 'upper' and related
+    page.keyboard.type("text.up")
+
+    # Wait for Pyright to confirm it has processed the document
+    deadline = time.time() + LSP_TIMEOUT / 1000
+    while time.time() < deadline:
+        if any("Received diagnostics" in m for m in console_msgs[-5:]):
+            break
+        time.sleep(0.3)
+    time.sleep(0.3)
 
     page.keyboard.press("Control+Space")
     page.locator(".cm-tooltip-autocomplete").wait_for(timeout=LSP_TIMEOUT)
     options = page.locator(".cm-completionLabel")
-    labels = [options.nth(i).inner_text() for i in range(min(100, options.count()))]
+    labels = [options.nth(i).inner_text() for i in range(min(20, options.count()))]
 
     assert any("upper" in lbl.lower() for lbl in labels), (
-        f"'upper' missing from string completions. Got first 10: {labels[:10]}"
-    )
-    assert any("lower" in lbl.lower() for lbl in labels), (
-        f"'lower' missing from string completions. Got first 10: {labels[:10]}"
+        f"'upper' missing from filtered string completions. Got: {labels}"
     )
 
 

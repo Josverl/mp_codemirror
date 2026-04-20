@@ -227,13 +227,13 @@ def test_diagnostics_update_when_code_fixed(page, live_server):
             break
         time.sleep(0.5)
 
-    first_diag_count = sum(1 for m in console if "Received diagnostics" in m)
+    assert any("Received diagnostics" in m for m in console), (
+        "Should receive diagnostics for invalid code first"
+    )
     console.clear()
 
-    # Step 2: replace with valid code
-    page.keyboard.press("Control+A")
-    page.keyboard.press("Delete")
-    time.sleep(0.2)
+    # Step 2: use the Clear button, then type valid code
+    _clear_editor(page)
     _type_in_editor(page, "x: int = 42\nprint(x)")
 
     deadline = time.time() + LSP_TIMEOUT / 1000
@@ -242,8 +242,6 @@ def test_diagnostics_update_when_code_fixed(page, live_server):
             break
         time.sleep(0.5)
 
-    second_diag_count = sum(1 for m in console if "Received diagnostics" in m)
-    assert second_diag_count > 0, (
+    assert any("Received diagnostics" in m for m in console), (
         "Pyright must push updated diagnostics after fixing the code"
     )
-    _ = first_diag_count  # referenced to avoid unused-variable warnings

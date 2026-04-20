@@ -46,5 +46,6 @@ How to decide who handles what.
 | CodeMirror, Playwright, UI | Basher | — |
 | LSP bridge, pytest, server | Rusty | — |
 | End-to-end, LSP+editor flows | Linus | — |
+| JS unit tests, Web Workers, webpack, MSW | Turk | — |
 | CI, environment, tooling | Livingston | — |
 

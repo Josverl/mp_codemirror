@@ -22,6 +22,9 @@ import * as path from "path";
 // ZenFS configure and InMemory are available through the fs alias
 const { configure, InMemory } = fs as any;
 
+// Bundled typeshed (inlined as ArrayBuffer by arraybuffer-loader)
+import typeshedFallbackZip from "../../assets/typeshed-fallback.zip";
+
 import {
     BrowserMessageReader,
     BrowserMessageWriter,
@@ -41,19 +44,26 @@ const ctx = self as unknown as DedicatedWorkerGlobalScope;
  * Initialize ZenFS virtual filesystem
  */
 async function initFs(typeshedData?: ArrayBuffer | false) {
+    // Use bundled typeshed unless explicitly overridden
+    const typeshed = typeshedData === false
+        ? undefined
+        : (typeshedData || typeshedFallbackZip);
+
     const mounts: Record<string, any> = {
         "/tmp": { backend: InMemory, name: "tmp" },
         "/workspace": { backend: InMemory, name: "workspace" },
         "/typings": { backend: InMemory, name: "typings" },
     };
 
-    if (typeshedData && typeshedData instanceof ArrayBuffer) {
+    if (typeshed && typeshed instanceof ArrayBuffer && typeshed.byteLength > 0) {
         mounts["/typeshed-fallback"] = {
             backend: Zip,
-            data: typeshedData,
+            data: typeshed,
         };
+        console.log(`[pyright-worker] Mounting typeshed (${(typeshed.byteLength / 1024 / 1024).toFixed(1)}MB)`);
     } else {
         mounts["/typeshed-fallback"] = { backend: InMemory, name: "typeshed" };
+        console.warn("[pyright-worker] No typeshed data — builtins will not be resolved");
     }
 
     await configure({ mounts });

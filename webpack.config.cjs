@@ -61,10 +61,7 @@ module.exports = {
             },
             {
                 test: /\.(zip|egg)$/,
-                type: "asset/resource",
-                generator: {
-                    filename: "assets/[name][ext]",
-                },
+                use: ["arraybuffer-loader"],
             },
         ],
     },

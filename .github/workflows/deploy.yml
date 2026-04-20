@@ -23,15 +23,38 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Pack typeshed
+        run: node scripts/pack-typeshed.mjs
+
+      - name: Build worker
+        run: npx webpack --mode production
+
+      - name: Prepare deploy directory
+        run: |
+          mkdir -p deploy
+          cp -r src/* deploy/
+          cp dist/worker.js deploy/
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
-      
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './src'
-      
+          path: './deploy'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

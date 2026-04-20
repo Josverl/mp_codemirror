@@ -2,14 +2,61 @@
 Spike test: Verify Pyright runs in a Web Worker and produces diagnostics.
 Tests the worker loading, initialization, and LSP protocol from a static build.
 """
+import socket
+import subprocess
+import time
+
 import pytest
 import json
 
 
+def _is_port_open(host: str, port: int) -> bool:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(1)
+    try:
+        return sock.connect_ex((host, port)) == 0
+    except Exception:
+        return False
+    finally:
+        sock.close()
+
+
 @pytest.fixture(scope="module")
-def spike_url():
-    """URL for the spike test page served from src/."""
-    return "http://localhost:8889/spike-test.html"
+def spike_server():
+    """Start an HTTP server on port 8889 from project root (serves src/ and dist/)."""
+    from pathlib import Path
+
+    project_root = Path(__file__).parent.parent
+    port = 8889
+
+    if _is_port_open("localhost", port):
+        yield f"http://localhost:{port}"
+        return
+
+    process = subprocess.Popen(
+        ["python3", "-m", "http.server", str(port)],
+        cwd=str(project_root),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    # Wait for server to be ready
+    for _ in range(30):
+        if _is_port_open("localhost", port):
+            break
+        time.sleep(0.2)
+    else:
+        process.terminate()
+        pytest.fail(f"HTTP server failed to start on port {port}")
+
+    yield f"http://localhost:{port}"
+    process.terminate()
+    process.wait(timeout=5)
+
+
+@pytest.fixture(scope="module")
+def spike_url(spike_server):
+    """URL for the spike test page."""
+    return f"{spike_server}/src/spike-test.html"
 
 
 def test_worker_loads_and_signals_ready(page, spike_url):
@@ -25,7 +72,7 @@ def test_worker_loads_and_signals_ready(page, spike_url):
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Worker load timeout (15s)')), 15000);
             try {
-                const worker = new Worker('./dist/worker.js');
+                const worker = new Worker('../dist/worker.js');
                 worker.onmessage = (e) => {
                     if (e.data.type === 'serverLoaded') {
                         clearTimeout(timeout);
@@ -54,7 +101,7 @@ def test_worker_initializes_pyright(page, spike_url):
 
     result = page.evaluate("""() => {
         return new Promise((resolve, reject) => {
-            const worker = new Worker('./dist/worker.js');
+            const worker = new Worker('../dist/worker.js');
             let phase = 'loading';
 
             const timeout = setTimeout(() => {
@@ -99,7 +146,7 @@ def test_lsp_initialize_handshake(page, spike_url):
 
     result = page.evaluate("""() => {
         return new Promise((resolve, reject) => {
-            const worker = new Worker('./dist/worker.js');
+            const worker = new Worker('../dist/worker.js');
             let phase = 'loading';
 
             const timeout = setTimeout(() => {
@@ -169,7 +216,7 @@ def test_diagnostics_for_type_error(page, spike_url):
 
     result = page.evaluate("""() => {
         return new Promise((resolve, reject) => {
-            const worker = new Worker('./dist/worker.js');
+            const worker = new Worker('../dist/worker.js');
             let phase = 'loading';
             const t0 = performance.now();
             const times = {};

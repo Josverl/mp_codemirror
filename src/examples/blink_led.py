@@ -6,6 +6,7 @@ from machine import Pin
 # Setup LED on GPIO2 (built-in LED on ESP32)
 led = Pin(2, Pin.OUT, value=0)
 
+
 def blink(times=10, delay=500):
     """Blink the LED a specified number of times."""
     for i in range(times):
@@ -14,6 +15,7 @@ def blink(times=10, delay=500):
         led.off()
         sleep_ms(delay)
     print(f"Blinked {times} times!")
+
 
 # Main loop
 if __name__ == "__main__":

@@ -95,6 +95,19 @@ def live_server():
 
 
 @pytest.fixture(scope="session")
+def project_server(live_server):
+    """Base URL serving the project root (for tests that need both src/ and dist/).
+
+    If live_server already points to root, returns it as-is.
+    If it points to /src, returns the parent.
+    """
+    if live_server.endswith("/src"):
+        yield live_server.removesuffix("/src")
+    else:
+        yield live_server
+
+
+@pytest.fixture(scope="session")
 def browser():
     """Single browser instance shared across the test session."""
     with sync_playwright() as p:
@@ -107,6 +120,16 @@ def browser():
 def page(browser):
     """Fresh page (and context) for every test function."""
     # ignore_https_errors lets CDN resources load behind TLS interception proxies
+    context = browser.new_context(ignore_https_errors=True)
+    page = context.new_page()
+    yield page
+    page.close()
+    context.close()
+
+
+@pytest.fixture(scope="module")
+def shared_page(browser):
+    """Module-scoped page for read-only tests. Avoids CDN re-downloads."""
     context = browser.new_context(ignore_https_errors=True)
     page = context.new_page()
     yield page

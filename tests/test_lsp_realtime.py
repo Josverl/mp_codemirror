@@ -43,8 +43,7 @@ def _load_and_wait(page, base_url: str):
     page.goto(f"{base_url}/index.html")
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
     page.wait_for_function(
-        "() => window.__lspReady === true || window.__lspFailed === true",
-        timeout=15000
+        "() => window.__lspReady === true || window.__lspFailed === true", timeout=15000
     )
 
 
@@ -72,9 +71,7 @@ def test_lsp_server_connects_via_browser(page, live_server):
 
     _load_and_wait(page, live_server)
 
-    transport_connected = any(
-        "Transport connected" in m for m in console
-    )
+    transport_connected = any("Transport connected" in m for m in console)
     lsp_ready = any("LSP client ready" in m for m in console)
 
     assert transport_connected, (
@@ -204,9 +201,7 @@ def test_document_version_increments(page, live_server):
         f"{[m for m in console if 'didChange' in m]}"
     )
     if len(versions) > 1:
-        assert versions[-1] > versions[0], (
-            f"Version must strictly increase: {versions}"
-        )
+        assert versions[-1] > versions[0], f"Version must strictly increase: {versions}"
 
 
 @requires_lsp

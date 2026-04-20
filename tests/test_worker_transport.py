@@ -3,9 +3,7 @@ Tests for the Worker Transport Layer (Phase 3).
 Verifies that the WorkerTransport correctly wraps the Pyright Web Worker
 and provides the same interface as WebSocketTransport.
 """
-import socket
-import subprocess
-import time
+
 from pathlib import Path
 
 import pytest
@@ -13,53 +11,16 @@ import pytest
 _worker_js = Path(__file__).parent.parent / "dist" / "worker.js"
 pytestmark = [
     pytest.mark.worker,
-    pytest.mark.skipif(not _worker_js.exists(), reason="dist/worker.js not found. Run: npm run build:worker"),
+    pytest.mark.skipif(
+        not _worker_js.exists(),
+        reason="dist/worker.js not found. Run: npm run build:worker",
+    ),
 ]
 
 
-def _is_port_open(host: str, port: int) -> bool:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(1)
-    try:
-        return sock.connect_ex((host, port)) == 0
-    except Exception:
-        return False
-    finally:
-        sock.close()
-
-
 @pytest.fixture(scope="module")
-def transport_server():
-    """Start HTTP server on port 8890 from project root."""
-    project_root = Path(__file__).parent.parent
-    port = 8890
-
-    if _is_port_open("localhost", port):
-        yield f"http://localhost:{port}"
-        return
-
-    process = subprocess.Popen(
-        ["python3", "-m", "http.server", str(port)],
-        cwd=str(project_root),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    for _ in range(30):
-        if _is_port_open("localhost", port):
-            break
-        time.sleep(0.2)
-    else:
-        process.terminate()
-        pytest.fail(f"HTTP server failed to start on port {port}")
-
-    yield f"http://localhost:{port}"
-    process.terminate()
-    process.wait(timeout=5)
-
-
-@pytest.fixture(scope="module")
-def test_page_url(transport_server):
-    return f"{transport_server}/src/tests/worker-transport-test.html"
+def test_page_url(project_server):
+    return f"{project_server}/src/tests/worker-transport-test.html"
 
 
 @pytest.fixture(autouse=True)

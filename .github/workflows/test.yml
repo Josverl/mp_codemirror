@@ -1,0 +1,92 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, "feat/*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    # Tier 0: Pure Python, no browser, no server. Fast.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync --extra test
+
+      - name: Run unit tests
+        run: uv run pytest -m unit -v
+
+  editor-tests:
+    # Tier 1: Playwright + HTTP server. Needs browser.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync --extra test
+
+      - name: Install Playwright browsers
+        run: uv run playwright install chromium --with-deps
+
+      - name: Run editor tests
+        run: uv run pytest -m editor -v
+
+  worker-tests:
+    # Tier 2: Needs dist/worker.js built.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Node.js dependencies
+        run: npm install --ignore-scripts
+
+      - name: Build worker
+        run: npx webpack --mode production
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync --extra test
+
+      - name: Install Playwright browsers
+        run: uv run playwright install chromium --with-deps
+
+      - name: Run worker tests
+        run: uv run pytest -m worker -v

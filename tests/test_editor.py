@@ -24,6 +24,7 @@ def _goto_editor(page, live_server):
 # Page structure
 # ---------------------------------------------------------------------------
 
+
 def test_page_loads(page, live_server):
     """Page loads and has the correct title."""
     page.goto(f"{live_server}/index.html")
@@ -62,6 +63,7 @@ def test_footer_displays(page, live_server):
 # CodeMirror initialisation
 # ---------------------------------------------------------------------------
 
+
 def test_codemirror_editor_initializes(page, live_server):
     """CodeMirror editor, content area, and gutters are all rendered."""
     _goto_editor(page, live_server)
@@ -76,8 +78,9 @@ def test_line_numbers_displayed(page, live_server):
     _goto_editor(page, live_server)
 
     expect(page.locator(".cm-lineNumbers")).to_be_visible()
-    assert page.locator(".cm-gutterElement").count() > 0, \
+    assert page.locator(".cm-gutterElement").count() > 0, (
         "Line number elements should exist"
+    )
 
 
 def test_sample_code_loads(page, live_server):
@@ -104,13 +107,15 @@ def test_python_syntax_highlighting(page, live_server):
         timeout=CDN_TIMEOUT,
     )
     expect(page.locator(".cm-line").first).to_be_visible()
-    assert page.locator(".cm-line").count() > 5, \
+    assert page.locator(".cm-line").count() > 5, (
         "Sample code should produce multiple highlighted lines"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Theme toggle
 # ---------------------------------------------------------------------------
+
 
 def test_initial_theme_is_light(page, live_server):
     """Page starts with the light theme applied."""
@@ -155,6 +160,7 @@ def test_theme_toggle_cycles_back_to_light(page, live_server):
 # Editor interactions
 # ---------------------------------------------------------------------------
 
+
 def test_clear_button_empties_editor(page, live_server):
     """Clear button removes all content from the editor."""
     _goto_editor(page, live_server)
@@ -171,8 +177,9 @@ def test_clear_button_empties_editor(page, live_server):
         "() => document.querySelector('.cm-content').innerText.trim() === ''",
         timeout=5000,
     )
-    assert page.locator(".cm-content").inner_text().strip() == "", \
+    assert page.locator(".cm-content").inner_text().strip() == "", (
         "Editor should be empty after clear"
+    )
 
 
 def test_editor_accepts_keyboard_input(page, live_server):
@@ -208,7 +215,9 @@ def test_sample_selector_populated(page, live_server):
     option_count = page.evaluate(
         "() => document.getElementById('sampleSelect').options.length"
     )
-    assert option_count > 1, "sampleSelect should have example options beyond the placeholder"
+    assert option_count > 1, (
+        "sampleSelect should have example options beyond the placeholder"
+    )
 
 
 def test_load_sample_button_loads_code(page, live_server):
@@ -241,13 +250,15 @@ def test_load_sample_button_loads_code(page, live_server):
     )
     content = page.locator(".cm-content").inner_text()
     assert len(content.strip()) > 0, "Editor should contain code after loading sample"
-    assert any(kw in content for kw in ("def", "import", "from", "#")), \
+    assert any(kw in content for kw in ("def", "import", "from", "#")), (
         "Loaded sample should contain Python code"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Responsive layout
 # ---------------------------------------------------------------------------
+
 
 def test_responsive_layout_desktop(page, live_server):
     """Editor container is visible at desktop resolution."""

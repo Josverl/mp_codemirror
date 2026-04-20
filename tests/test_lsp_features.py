@@ -49,7 +49,7 @@ def _load_editor(page, base_url: str, wait_for_lsp: bool = True):
     if wait_for_lsp:
         page.wait_for_function(
             "() => window.__lspReady === true || window.__lspFailed === true",
-            timeout=15000
+            timeout=15000,
         )
 
 

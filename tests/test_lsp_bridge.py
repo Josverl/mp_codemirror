@@ -56,7 +56,9 @@ requires_server = pytest.mark.skipif(
 
 # ── unit tests ────────────────────────────────────────────────────────────────
 
-@pytest.mark.unitclass TestPyrightBridgeUnit:
+
+@pytest.mark.unit
+class TestPyrightBridgeUnit:
     """Unit tests for the Python lsp_bridge.PyrightBridge class."""
 
     def test_instantiation(self):
@@ -169,9 +171,7 @@ def _initialize(conn) -> list[dict]:
             "params": {
                 "processId": None,
                 "capabilities": {
-                    "textDocument": {
-                        "publishDiagnostics": {"relatedInformation": True}
-                    }
+                    "textDocument": {"publishDiagnostics": {"relatedInformation": True}}
                 },
                 "rootUri": None,
             },
@@ -279,11 +279,16 @@ class TestNodeBridgeLSPProtocol:
         with ws_client.connect(BRIDGE_URL, open_timeout=5) as conn:
             _initialize(conn)
             _send(conn, {"jsonrpc": "2.0", "method": "initialized", "params": {}})
-            _send(conn, {"jsonrpc": "2.0", "id": 99, "method": "shutdown", "params": None})
+            _send(
+                conn, {"jsonrpc": "2.0", "id": 99, "method": "shutdown", "params": None}
+            )
             msgs = _collect_until(conn, lambda m: m.get("id") == 99, max_msgs=10)
             shutdown_resp = [m for m in msgs if m.get("id") == 99]
             assert shutdown_resp, "No response to shutdown request"
-            assert shutdown_resp[0].get("result") is None or "error" not in shutdown_resp[0]
+            assert (
+                shutdown_resp[0].get("result") is None
+                or "error" not in shutdown_resp[0]
+            )
 
 
 @requires_server
@@ -383,9 +388,7 @@ class TestNodeBridgeDiagnostics:
                     diags = msg.get("params", {}).get("diagnostics", [])
                     # Filter out info-level diagnostics (severity 3/4)
                     errors = [d for d in diags if d.get("severity", 1) <= 2]
-                    assert not errors, (
-                        f"Unexpected errors in clean code: {errors}"
-                    )
+                    assert not errors, f"Unexpected errors in clean code: {errors}"
 
     def test_did_change_updates_diagnostics(self):
         """Changing a document with didChange must trigger fresh diagnostics."""

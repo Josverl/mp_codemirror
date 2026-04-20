@@ -2,9 +2,7 @@
 Spike test: Verify Pyright runs in a Web Worker and produces diagnostics.
 Tests the worker loading, initialization, and LSP protocol from a static build.
 """
-import socket
-import subprocess
-import time
+
 from pathlib import Path
 
 import pytest
@@ -13,57 +11,17 @@ import json
 _worker_js = Path(__file__).parent.parent / "dist" / "worker.js"
 pytestmark = [
     pytest.mark.worker,
-    pytest.mark.skipif(not _worker_js.exists(), reason="dist/worker.js not found. Run: npm run build:worker"),
+    pytest.mark.skipif(
+        not _worker_js.exists(),
+        reason="dist/worker.js not found. Run: npm run build:worker",
+    ),
 ]
 
 
-def _is_port_open(host: str, port: int) -> bool:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(1)
-    try:
-        return sock.connect_ex((host, port)) == 0
-    except Exception:
-        return False
-    finally:
-        sock.close()
-
-
 @pytest.fixture(scope="module")
-def spike_server():
-    """Start an HTTP server on port 8889 from project root (serves src/ and dist/)."""
-    from pathlib import Path
-
-    project_root = Path(__file__).parent.parent
-    port = 8889
-
-    if _is_port_open("localhost", port):
-        yield f"http://localhost:{port}"
-        return
-
-    process = subprocess.Popen(
-        ["python3", "-m", "http.server", str(port)],
-        cwd=str(project_root),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    # Wait for server to be ready
-    for _ in range(30):
-        if _is_port_open("localhost", port):
-            break
-        time.sleep(0.2)
-    else:
-        process.terminate()
-        pytest.fail(f"HTTP server failed to start on port {port}")
-
-    yield f"http://localhost:{port}"
-    process.terminate()
-    process.wait(timeout=5)
-
-
-@pytest.fixture(scope="module")
-def spike_url(spike_server):
+def spike_url(project_server):
     """URL for the spike test page."""
-    return f"{spike_server}/src/spike-test.html"
+    return f"{project_server}/src/spike-test.html"
 
 
 def test_worker_loads_and_signals_ready(page, spike_url):

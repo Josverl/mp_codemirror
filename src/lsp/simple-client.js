@@ -28,6 +28,9 @@ export class SimpleLSPClient {
                     analysis: {
                         typeshedPaths: ['/typeshed-fallback'],
                         stubPath: '/typings',
+                        diagnosticSeverityOverrides: {
+                            reportMissingModuleSource: 'none',
+                        },
                     },
                     pythonVersion: '3.11',
                     pythonPlatform: 'Linux',
@@ -102,6 +105,9 @@ export class SimpleLSPClient {
                     analysis: {
                         typeshedPaths: ['/typeshed-fallback'],
                         stubPath: '/typings',
+                        diagnosticSeverityOverrides: {
+                            reportMissingModuleSource: 'none',
+                        },
                     },
                     pythonVersion: '3.11',
                     pythonPlatform: 'Linux',

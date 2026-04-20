@@ -7,7 +7,7 @@
  */
 
 export class WorkerTransport {
-    constructor(workerUrl = '../dist/worker.js') {
+    constructor(workerUrl = '../dist/worker.js', options = {}) {
         this.workerUrl = workerUrl;
         this.worker = null;
         this.messageHandlers = [];
@@ -15,6 +15,7 @@ export class WorkerTransport {
         this.connected = false;
         this._messageQueue = [];
         this._connectReject = null;
+        this._boardStubs = options.boardStubs; // ArrayBuffer | false | undefined
     }
 
     /**
@@ -54,6 +55,7 @@ export class WorkerTransport {
                         type: 'initServer',
                         userFiles: {},
                         typeshedFallback: undefined, // use bundled typeshed
+                        boardStubs: this._boardStubs, // use bundled default or override
                     });
                     return;
                 }

@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@zenfs/archives": "^0.1.0",
     "@zenfs/core": "1.6.4",
+    "archiver": "^7.0.1",
     "arraybuffer-loader": "^1.0.8",
     "assert": "^2.1.0",
     "browserify-zlib": "^0.2.0",

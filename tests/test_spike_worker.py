@@ -5,9 +5,16 @@ Tests the worker loading, initialization, and LSP protocol from a static build.
 import socket
 import subprocess
 import time
+from pathlib import Path
 
 import pytest
 import json
+
+_worker_js = Path(__file__).parent.parent / "dist" / "worker.js"
+pytestmark = [
+    pytest.mark.worker,
+    pytest.mark.skipif(not _worker_js.exists(), reason="dist/worker.js not found. Run: npm run build:worker"),
+]
 
 
 def _is_port_open(host: str, port: int) -> bool:
@@ -70,7 +77,7 @@ def test_worker_loads_and_signals_ready(page, spike_url):
     # Create worker and wait for serverLoaded
     result = page.evaluate("""() => {
         return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('Worker load timeout (15s)')), 15000);
+            const timeout = setTimeout(() => reject(new Error('Worker load timeout (10s)')), 10000);
             try {
                 const worker = new Worker('../dist/worker.js');
                 worker.onmessage = (e) => {
@@ -107,7 +114,7 @@ def test_worker_initializes_pyright(page, spike_url):
             const timeout = setTimeout(() => {
                 worker.terminate();
                 reject(new Error(`Timeout in phase: ${phase}`));
-            }, 30000);
+            }, 10000);
 
             worker.onmessage = (e) => {
                 const msg = e.data;
@@ -152,7 +159,7 @@ def test_lsp_initialize_handshake(page, spike_url):
             const timeout = setTimeout(() => {
                 worker.terminate();
                 reject(new Error(`Timeout in phase: ${phase}`));
-            }, 30000);
+            }, 10000);
 
             worker.onmessage = (e) => {
                 const msg = e.data;
@@ -223,8 +230,8 @@ def test_diagnostics_for_type_error(page, spike_url):
 
             const timeout = setTimeout(() => {
                 worker.terminate();
-                reject(new Error(`Timeout in phase: ${phase} after 45s`));
-            }, 45000);
+                reject(new Error(`Timeout in phase: ${phase} after 10s`));
+            }, 10000);
 
             worker.onmessage = (e) => {
                 const msg = e.data;

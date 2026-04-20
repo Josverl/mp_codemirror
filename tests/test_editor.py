@@ -8,8 +8,10 @@ LSP-dependent tests are in test_lsp.py — this file only tests the editor UI.
 import pytest
 from playwright.sync_api import expect
 
+pytestmark = pytest.mark.editor
+
 # Timeout for CDN-loaded resources (CodeMirror modules from esm.sh)
-CDN_TIMEOUT = 30_000
+CDN_TIMEOUT = 15_000
 
 
 def _goto_editor(page, live_server):

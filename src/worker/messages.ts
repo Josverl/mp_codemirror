@@ -14,6 +14,8 @@ export interface MsgInitServer {
     userFiles: UserFolder;
     /** Custom typeshed override (zip ArrayBuffer), or false to use bundled */
     typeshedFallback: ArrayBuffer | false | undefined;
+    /** Board stubs zip (ArrayBuffer), or false to skip, or undefined to use bundled default */
+    boardStubs: ArrayBuffer | false | undefined;
 }
 
 export interface MsgServerInitialized {

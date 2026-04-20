@@ -28,7 +28,7 @@ export function createTransport(options = {}) {
     if (mode === 'worker') {
         const url = options.workerUrl || './worker.js';
         console.log(`Creating Worker transport → ${url}`);
-        return new WorkerTransport(url);
+        return new WorkerTransport(url, { boardStubs: options.boardStubs });
     }
 
     throw new Error(`Unknown transport mode: "${mode}". Use 'worker' or 'websocket'.`);

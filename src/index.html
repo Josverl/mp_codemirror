@@ -12,6 +12,13 @@
     <header>
         <h1>CodeMirror 6 MicroPython Editor</h1>
         <div class="controls">
+            <div class="board-selector">
+                <label for="boardSelect">Board:</label>
+                <select id="boardSelect" aria-label="Select MicroPython board">
+                    <option value="">Loading...</option>
+                </select>
+                <span id="boardLoading" class="loading-indicator" hidden>⏳</span>
+            </div>
             <button id="themeToggle" aria-label="Toggle dark/light theme">🌓 Toggle Theme</button>
             <button id="typeCheckBtn" aria-label="Run type checking with Pyright">🔍 Type Check</button>
             <button id="clearBtn" aria-label="Clear editor content">Clear</button>

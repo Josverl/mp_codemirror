@@ -2,6 +2,7 @@
  * LSP Client Setup for CodeMirror
  *
  * Creates and initializes an LSP client with either Worker or WebSocket transport.
+ * Supports board switching by tearing down and rebuilding the worker.
  */
 
 import { EditorState } from '@codemirror/state';
@@ -18,12 +19,14 @@ import { createTransport } from './transport-factory.js';
  * @param {string} [config.wsUrl] - WebSocket URL (for mode='websocket')
  * @param {string} [config.workerUrl] - Worker script URL (for mode='worker')
  * @param {number} [config.timeout=5000] - Request timeout in ms
+ * @param {ArrayBuffer} [config.boardStubs] - Board stubs zip (undefined = use bundled default)
  */
 export async function createLSPClient(config = {}) {
     const transport = createTransport({
         mode: config.mode || 'worker',
         wsUrl: config.wsUrl,
         workerUrl: config.workerUrl,
+        boardStubs: config.boardStubs,
     });
 
     console.log(`Creating LSP client (mode: ${config.mode || 'worker'})`);
@@ -45,7 +48,7 @@ export async function createLSPClient(config = {}) {
 /**
  * Create an LSP plugin extension for an editor
  */
-export function createLSPPlugin(client, view, fileUri = 'file:///document.py', languageId = 'python', initialContent = '') {
+export function createLSPPlugin(client, view, fileUri = 'file:///workspace/document.py', languageId = 'python', initialContent = '') {
     // Store client reference for later use
     if (!window.lspClients) {
         window.lspClients = new Map();
@@ -77,6 +80,43 @@ export function createLSPPlugin(client, view, fileUri = 'file:///document.py', l
         completionExtension,
         hoverExtension
     ];
+}
+
+/**
+ * Switch board stubs by tearing down and rebuilding the LSP worker.
+ * Re-opens all tracked documents with fresh diagnostics.
+ *
+ * @param {Object} current - Current { client, transport } from createLSPClient
+ * @param {Object} config - Same config as createLSPClient, with new boardStubs
+ * @returns {Object} New { client, transport }
+ */
+export async function switchBoard(current, config) {
+    // Collect open documents before teardown
+    const openDocs = [];
+    if (window.lspClients) {
+        for (const [uri, info] of window.lspClients.entries()) {
+            openDocs.push({ uri, languageId: info.languageId });
+        }
+    }
+
+    // Tear down old client and transport
+    try {
+        current.client.disconnect();
+    } catch (e) { /* ignore shutdown errors */ }
+    try {
+        current.transport.close();
+    } catch (e) { /* ignore close errors */ }
+
+    // Create new client with new board stubs
+    const { client, transport } = await createLSPClient(config);
+
+    // Re-open all previously open documents
+    // (The editor content will be re-sent via didChange from the CodeMirror plugin)
+    for (const doc of openDocs) {
+        notifyDocumentOpen(client, doc.uri, doc.languageId, '', 1);
+    }
+
+    return { client, transport };
 }
 
 /**

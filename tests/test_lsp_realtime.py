@@ -27,6 +27,8 @@ requires_lsp = pytest.mark.skipif(
     reason="Worker bundle not found at dist/worker.js. Build it first.",
 )
 
+pytestmark = pytest.mark.worker
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -36,11 +38,14 @@ LSP_TIMEOUT = 20_000
 DEBOUNCE_MS = 300  # must match CHANGE_DEBOUNCE_MS in app.js
 
 
-def _load_and_wait(page, base_url: str, lsp_init_secs: float = 8.0):
+def _load_and_wait(page, base_url: str):
     """Navigate to editor and wait for LSP to initialise."""
     page.goto(f"{base_url}/index.html")
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
-    time.sleep(lsp_init_secs)
+    page.wait_for_function(
+        "() => window.__lspReady === true || window.__lspFailed === true",
+        timeout=15000
+    )
 
 
 def _clear_editor(page):

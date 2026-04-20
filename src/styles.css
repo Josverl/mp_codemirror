@@ -111,6 +111,31 @@ header h1 {
     align-items: center;
 }
 
+.board-selector {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.board-selector label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.board-selector select {
+    min-width: 160px;
+}
+
+.loading-indicator {
+    font-size: 14px;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
 select {
     padding: 8px 12px;
     font-size: 14px;

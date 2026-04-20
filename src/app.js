@@ -6,7 +6,7 @@
 import { python } from '@codemirror/lang-python';
 import { Compartment } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
-import { createLSPClient, createLSPPlugin } from './lsp/client.js';
+import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
 import { notifyDocumentChange } from './lsp/diagnostics.js';
 
 // Sample Python code - will be loaded from file
@@ -21,9 +21,123 @@ let lspTransport = null;
 const documentUri = 'file:///workspace/document.py';
 let documentVersion = 1;
 
+// Board stub state
+let currentBoardId = null;
+let boardManifest = null;
+let stubsCache = new Map(); // boardId → ArrayBuffer
+
 // Debounce timer for didChange notifications
 let changeDebounceTimer = null;
 const CHANGE_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
+
+// Resolve base path for assets (stubs, manifest)
+function getAssetsBase() {
+    return window.location.pathname.includes('/src/') ? '../assets' : './stubs';
+}
+
+// Fetch board stubs manifest and populate the board selector
+async function initBoardSelector() {
+    const select = document.getElementById('boardSelect');
+    try {
+        const base = getAssetsBase();
+        const resp = await fetch(`${base}/stubs-manifest.json`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        boardManifest = await resp.json();
+
+        select.innerHTML = '';
+        for (const board of boardManifest.boards) {
+            const opt = document.createElement('option');
+            opt.value = board.id;
+            opt.textContent = board.name;
+            select.appendChild(opt);
+        }
+
+        // Restore saved selection or use manifest default
+        const saved = localStorage.getItem('mp_board');
+        currentBoardId = saved && boardManifest.boards.some(b => b.id === saved)
+            ? saved
+            : boardManifest.default;
+        select.value = currentBoardId;
+
+        select.addEventListener('change', handleBoardChange);
+    } catch (err) {
+        console.warn('Could not load board manifest:', err);
+        select.innerHTML = '<option value="">Default (bundled)</option>';
+    }
+}
+
+// Fetch board stub zip, using cache
+async function fetchBoardStubs(boardId) {
+    if (stubsCache.has(boardId)) return stubsCache.get(boardId);
+
+    const board = boardManifest?.boards.find(b => b.id === boardId);
+    if (!board) throw new Error(`Unknown board: ${boardId}`);
+
+    // Bundled board doesn't need fetching — pass undefined to use worker's default
+    if (board.bundled) {
+        stubsCache.set(boardId, undefined);
+        return undefined;
+    }
+
+    const base = getAssetsBase();
+    const resp = await fetch(`${base}/${board.file}`);
+    if (!resp.ok) throw new Error(`Failed to fetch stubs for ${boardId}: HTTP ${resp.status}`);
+    const data = await resp.arrayBuffer();
+    stubsCache.set(boardId, data);
+    return data;
+}
+
+// Handle board selector change
+async function handleBoardChange(event) {
+    const newBoardId = event.target.value;
+    if (newBoardId === currentBoardId) return;
+
+    const loading = document.getElementById('boardLoading');
+    const select = document.getElementById('boardSelect');
+
+    try {
+        loading.hidden = false;
+        select.disabled = true;
+
+        const stubs = await fetchBoardStubs(newBoardId);
+
+        // Determine worker URL
+        const workerUrl = window.location.pathname.includes('/src/')
+            ? '../dist/worker.js'
+            : './worker.js';
+
+        const result = await switchBoard(
+            { client: lspClient, transport: lspTransport },
+            {
+                mode: 'worker',
+                workerUrl,
+                timeout: 15000,
+                boardStubs: stubs,
+            }
+        );
+
+        lspClient = result.client;
+        lspTransport = result.transport;
+        currentBoardId = newBoardId;
+        localStorage.setItem('mp_board', newBoardId);
+
+        // Re-send current editor content to the new LSP
+        if (view) {
+            const content = view.state.doc.toString();
+            documentVersion++;
+            notifyDocumentChange(lspClient, documentUri, content, documentVersion);
+        }
+
+        console.log(`Switched to board: ${newBoardId}`);
+    } catch (err) {
+        console.error(`Board switch failed:`, err);
+        // Revert UI to current board
+        select.value = currentBoardId;
+    } finally {
+        loading.hidden = true;
+        select.disabled = false;
+    }
+}
 
 // Fetch list of example files from the examples folder
 async function fetchExampleFiles() {
@@ -184,8 +298,11 @@ let view;
 
 // Initialize editor after loading sample
 async function initializeEditor() {
-    // Fetch available examples first
-    await fetchExampleFiles();
+    // Fetch available examples and board manifest in parallel
+    await Promise.all([
+        fetchExampleFiles(),
+        initBoardSelector(),
+    ]);
 
     // Load the first available example, or use default
     const defaultFile = exampleFiles.length > 0 ? exampleFiles[0].file : 'blink_led.py';
@@ -203,6 +320,8 @@ async function initializeEditor() {
             ? '../dist/worker.js'
             : './worker.js';
 
+        window.__lspReady = false;
+        window.__lspFailed = false;
         console.log(`Initializing LSP client (mode: ${mode})...`);
         const lspResult = await createLSPClient({
             mode,
@@ -213,9 +332,11 @@ async function initializeEditor() {
         lspClient = lspResult.client;
         lspTransport = lspResult.transport;
         console.log(`LSP client ready (${mode} transport).`);
+        window.__lspReady = true;
     } catch (error) {
         console.error('Failed to initialize LSP client:', error);
         console.log('Editor will continue without LSP features');
+        window.__lspFailed = true;
     }
 
     // Create update listener for real-time diagnostics

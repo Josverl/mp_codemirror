@@ -31,6 +31,8 @@ requires_lsp = pytest.mark.skipif(
     reason="Worker bundle not found at dist/worker.js. Build it first.",
 )
 
+pytestmark = pytest.mark.worker
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -40,11 +42,15 @@ LSP_TIMEOUT = 20_000
 DEBOUNCE_WAIT = 2.5  # debounce (300 ms) + Pyright round-trip margin
 
 
-def _load_editor(page, base_url: str, lsp_init_secs: float = 8.0):
-    """Navigate to the editor and wait for LSP to initialise."""
+def _load_editor(page, base_url: str, wait_for_lsp: bool = True):
+    """Navigate to the editor and wait for CodeMirror + optionally LSP."""
     page.goto(f"{base_url}/index.html")
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
-    time.sleep(lsp_init_secs)
+    if wait_for_lsp:
+        page.wait_for_function(
+            "() => window.__lspReady === true || window.__lspFailed === true",
+            timeout=15000
+        )
 
 
 def _clear_editor(page):
@@ -71,7 +77,7 @@ def _type_and_flush(page, text: str, extra_wait: float = DEBOUNCE_WAIT):
 
 def test_editor_loads_with_completions_infrastructure(page, live_server):
     """Autocomplete infrastructure must load even without LSP."""
-    _load_editor(page, live_server, lsp_init_secs=2)
+    _load_editor(page, live_server, wait_for_lsp=False)
 
     assert page.locator(".cm-editor").is_visible()
     assert page.locator(".cm-content").is_visible()
@@ -79,7 +85,7 @@ def test_editor_loads_with_completions_infrastructure(page, live_server):
 
 def test_builtin_keyword_completion_works_without_lsp(page, live_server):
     """CodeMirror's built-in Python completer offers keywords without LSP."""
-    _load_editor(page, live_server, lsp_init_secs=2)
+    _load_editor(page, live_server, wait_for_lsp=False)
 
     _clear_editor(page)
     _type_in_editor(page, "imp")
@@ -107,7 +113,7 @@ def test_typing_dot_does_not_crash_without_lsp(page, live_server):
     uncaught: list[str] = []
     page.on("pageerror", lambda e: uncaught.append(str(e)))
 
-    _load_editor(page, live_server, lsp_init_secs=2)
+    _load_editor(page, live_server, wait_for_lsp=False)
     _clear_editor(page)
     _type_in_editor(page, "import sys\nsys.")
     time.sleep(1)
@@ -123,7 +129,7 @@ def test_ctrl_space_does_not_crash_without_lsp(page, live_server):
     uncaught: list[str] = []
     page.on("pageerror", lambda e: uncaught.append(str(e)))
 
-    _load_editor(page, live_server, lsp_init_secs=2)
+    _load_editor(page, live_server, wait_for_lsp=False)
     _clear_editor(page)
     page.locator(".cm-content").click()
     page.keyboard.type("x = ")

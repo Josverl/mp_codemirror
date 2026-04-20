@@ -56,8 +56,7 @@ requires_server = pytest.mark.skipif(
 
 # ── unit tests ────────────────────────────────────────────────────────────────
 
-
-class TestPyrightBridgeUnit:
+@pytest.mark.unitclass TestPyrightBridgeUnit:
     """Unit tests for the Python lsp_bridge.PyrightBridge class."""
 
     def test_instantiation(self):
@@ -182,6 +181,7 @@ def _initialize(conn) -> list[dict]:
 
 
 @requires_server
+@pytest.mark.lsp
 class TestNodeBridgeConnection:
     """Basic connectivity checks against the live Node.js bridge."""
 
@@ -209,6 +209,7 @@ class TestNodeBridgeConnection:
 
 
 @requires_server
+@pytest.mark.lsp
 class TestNodeBridgeLSPProtocol:
     """LSP JSON-RPC protocol tests against the live bridge."""
 
@@ -286,6 +287,7 @@ class TestNodeBridgeLSPProtocol:
 
 
 @requires_server
+@pytest.mark.lsp
 class TestNodeBridgeDiagnostics:
     """End-to-end diagnostic flow through the bridge."""
 

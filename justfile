@@ -24,28 +24,28 @@ setup:
 # build the Pyright web worker (production)
 build:
     just pack-typeshed
+    just pack-stubs
     npx webpack --mode production
 
 # build the Pyright web worker (development, with source maps)
 build-dev:
     just pack-typeshed
+    just pack-stubs
     npx webpack --mode development
 
 # pack Pyright's typeshed-fallback into a zip for browser use
 pack-typeshed:
     node scripts/pack-typeshed.mjs
 
-# pack MicroPython board stubs into zip files (future: per-board zips)
+# pack MicroPython board stubs into zip files for each board
 pack-stubs:
-    @echo "TODO: pack board-specific stubs into assets/*.zip"
-    @echo "Current stubs in typings/:"
-    @ls typings/*.pyi 2>/dev/null | wc -l
-    @echo ".pyi files"
+    node scripts/pack-stubs.mjs
 
 # rebuild everything from scratch
 rebuild:
     npm install --ignore-scripts
     just pack-typeshed
+    just pack-stubs
     npx webpack --mode production
 
 # --- Server recipes ---

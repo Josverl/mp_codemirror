@@ -25,6 +25,9 @@ const { configure, InMemory } = fs as any;
 // Bundled typeshed (inlined as ArrayBuffer by arraybuffer-loader)
 import typeshedFallbackZip from "../../assets/typeshed-fallback.zip";
 
+// Bundled default board stubs (ESP32)
+import defaultBoardStubsZip from "../../assets/stubs-esp32.zip";
+
 import {
     BrowserMessageReader,
     BrowserMessageWriter,
@@ -35,24 +38,28 @@ import { PyrightServer } from "pyright/packages/pyright-internal/src/server";
 
 import type { MsgInitServer, UserFolder, WorkerMessage } from "./messages";
 
-// Bundled typeshed (loaded as asset URL — we'll fetch it)
-// For the spike, we'll load it dynamically
-
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
 /**
  * Initialize ZenFS virtual filesystem
  */
-async function initFs(typeshedData?: ArrayBuffer | false) {
+async function initFs(
+    typeshedData?: ArrayBuffer | false,
+    boardStubsData?: ArrayBuffer | false
+) {
     // Use bundled typeshed unless explicitly overridden
     const typeshed = typeshedData === false
         ? undefined
         : (typeshedData || typeshedFallbackZip);
 
+    // Use bundled default board stubs unless explicitly overridden
+    const boardStubs = boardStubsData === false
+        ? undefined
+        : (boardStubsData || defaultBoardStubsZip);
+
     const mounts: Record<string, any> = {
         "/tmp": { backend: InMemory, name: "tmp" },
         "/workspace": { backend: InMemory, name: "workspace" },
-        "/typings": { backend: InMemory, name: "typings" },
     };
 
     if (typeshed && typeshed instanceof ArrayBuffer && typeshed.byteLength > 0) {
@@ -64,6 +71,17 @@ async function initFs(typeshedData?: ArrayBuffer | false) {
     } else {
         mounts["/typeshed-fallback"] = { backend: InMemory, name: "typeshed" };
         console.warn("[pyright-worker] No typeshed data — builtins will not be resolved");
+    }
+
+    if (boardStubs && boardStubs instanceof ArrayBuffer && boardStubs.byteLength > 0) {
+        mounts["/typings"] = {
+            backend: Zip,
+            data: boardStubs,
+        };
+        console.log(`[pyright-worker] Mounting board stubs (${(boardStubs.byteLength / 1024).toFixed(0)}KB)`);
+    } else {
+        mounts["/typings"] = { backend: InMemory, name: "typings" };
+        console.log("[pyright-worker] No board stubs — MicroPython modules will not resolve");
     }
 
     await configure({ mounts });
@@ -117,7 +135,7 @@ function writePyrightConfig() {
 async function handleInitServer(msg: MsgInitServer) {
     try {
         console.log("[pyright-worker] Initializing filesystem...");
-        await initFs(msg.typeshedFallback);
+        await initFs(msg.typeshedFallback, msg.boardStubs);
 
         // Write user type stubs
         if (msg.userFiles && Object.keys(msg.userFiles).length > 0) {

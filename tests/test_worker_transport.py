@@ -10,6 +10,12 @@ from pathlib import Path
 
 import pytest
 
+_worker_js = Path(__file__).parent.parent / "dist" / "worker.js"
+pytestmark = [
+    pytest.mark.worker,
+    pytest.mark.skipif(not _worker_js.exists(), reason="dist/worker.js not found. Run: npm run build:worker"),
+]
+
 
 def _is_port_open(host: str, port: int) -> bool:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -59,7 +65,7 @@ def test_page_url(transport_server):
 @pytest.fixture(autouse=True)
 def _set_page_timeout(page):
     """Worker tests need longer timeouts for init + diagnostics."""
-    page.set_default_timeout(45000)
+    page.set_default_timeout(15000)
 
 
 def test_worker_transport_connects(page, test_page_url):

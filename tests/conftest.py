@@ -8,6 +8,10 @@ import time
 import urllib.request
 from pathlib import Path
 
+# Build artifact detection
+WORKER_JS = Path(__file__).parent.parent / "dist" / "worker.js"
+worker_available = WORKER_JS.exists()
+
 import pytest
 from playwright.sync_api import sync_playwright
 

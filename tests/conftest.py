@@ -5,81 +5,93 @@ Pytest configuration for CodeMirror Editor tests
 import socket
 import subprocess
 import time
+import urllib.request
 from pathlib import Path
 
 import pytest
 from playwright.sync_api import sync_playwright
 
 
-def is_port_open(host, port):
-    """Check if a port is open"""
+def is_port_open(host: str, port: int) -> bool:
+    """Check if a TCP port is accepting connections."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(1)
     try:
-        result = sock.connect_ex((host, port))
-        sock.close()
-        return result == 0
+        return sock.connect_ex((host, port)) == 0
     except Exception:
         return False
+    finally:
+        sock.close()
+
+
+def _detect_server_base_url() -> str | None:
+    """Return the base URL of the HTTP server on :8888 by probing known paths."""
+    for candidate in (
+        "http://localhost:8888/index.html",
+        "http://localhost:8888/src/index.html",
+    ):
+        try:
+            resp = urllib.request.urlopen(candidate, timeout=2)
+            if resp.status == 200:
+                return candidate.removesuffix("/index.html")
+        except Exception:
+            pass
+    return None
+
+
+# Evaluate at collection time so skipif decorators work correctly.
+_lsp_available = is_port_open("localhost", 9011)
 
 
 @pytest.fixture(scope="session")
-def lsp_server():
+def lsp_available() -> bool:
+    """Return True when the Pyright LSP bridge is reachable on port 9011."""
+    return _lsp_available
+
+
+@pytest.fixture(scope="session")
+def lsp_server(lsp_available):
     """
-    Verify the Pyright LSP bridge server is running.
-    Note: The server should be started manually via VSCode tasks or 'npm start' 
-    before running tests.
+    Skip (not fail) when the LSP bridge is not running.
+    Start the bridge with: Run Task > 'Start LSP Bridge'
     """
-    # Check if LSP server is running on port 9011
-    if not is_port_open("localhost", 9011):
-        pytest.fail(
-            "LSP server is not running on port 9011. "
-            "Start it with: Run Task > 'Start All Servers' or 'npm start' in server/pyright-lsp-bridge"
+    if not lsp_available:
+        pytest.skip(
+            "LSP bridge not running on port 9011. "
+            "Start with: Run Task > 'Start LSP Bridge' or "
+            "'npm start' in server/pyright-lsp-bridge/"
         )
-    
     yield "ws://localhost:9011/lsp"
 
 
 @pytest.fixture(scope="session")
 def live_server():
     """
-    Start or verify HTTP server is running.
-    If port 8888 is already in use, assume server is running and use it.
-    Otherwise, start a new server.
+    Provide the base URL for the editor.  Reuses an already-running server on
+    :8888 (detecting whether it serves from the project root or src/), and
+    starts a fresh one only when the port is free.
     """
-    server_url = "http://localhost:8888"
-    
-    # Check if server is already running
     if is_port_open("localhost", 8888):
-        # Server already running, use it
-        yield server_url
+        base = _detect_server_base_url()
+        yield base or "http://localhost:8888"
         return
-    
-    # Get the src directory path
-    src_dir = Path(__file__).parent.parent / "src"
 
-    # Start the HTTP server in the background
+    src_dir = Path(__file__).parent.parent / "src"
     process = subprocess.Popen(
-        ["python", "-m", "http.server", "8888"],
+        ["python3", "-m", "http.server", "8888"],
         cwd=str(src_dir),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-
-    # Wait for server to start
     time.sleep(1)
-
-    # Yield the server URL
-    yield server_url
-
-    # Cleanup: terminate the server
+    yield "http://localhost:8888"
     process.terminate()
     process.wait()
 
 
 @pytest.fixture(scope="session")
 def browser():
-    """Create a browser instance for the entire test session"""
+    """Single browser instance shared across the test session."""
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         yield browser
@@ -88,14 +100,10 @@ def browser():
 
 @pytest.fixture(scope="function")
 def page(browser):
-    """Create a new page for each test (reusing the browser)"""
-    # ignore_https_errors allows CDN resources to load in environments
-    # where a TLS interception proxy is in use (e.g. CI/CD sandboxes)
+    """Fresh page (and context) for every test function."""
+    # ignore_https_errors lets CDN resources load behind TLS interception proxies
     context = browser.new_context(ignore_https_errors=True)
     page = context.new_page()
-    
     yield page
-    
-    # Cleanup
     page.close()
     context.close()

@@ -10,6 +10,8 @@ Tests are split into:
   (skipped when server is not running)
 """
 
+import asyncio
+import concurrent.futures
 import json
 import socket
 import sys
@@ -27,6 +29,12 @@ import websockets.sync.client as ws_client
 
 BRIDGE_URL = "ws://localhost:9011/lsp"
 BRIDGE_PORT = 9011
+
+
+def _run_async(coro):
+    """Run a coroutine safely, even when Playwright's event loop is active."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
 
 
 def _port_open(host: str, port: int) -> bool:
@@ -75,9 +83,7 @@ class TestPyrightBridgeUnit:
 
         message = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize"})
 
-        import asyncio
-
-        asyncio.run(bridge.write_to_pyright(message))
+        _run_async(bridge.write_to_pyright(message))
 
         assert len(written_bytes) == 1
         raw = written_bytes[0]
@@ -94,10 +100,9 @@ class TestPyrightBridgeUnit:
     def test_write_to_pyright_no_process(self):
         """write_to_pyright with no process should not raise."""
         bridge = lsp_bridge.PyrightBridge()
-        import asyncio
 
         # Should log an error but not raise
-        asyncio.run(bridge.write_to_pyright('{"jsonrpc":"2.0"}'))
+        _run_async(bridge.write_to_pyright('{"jsonrpc":"2.0"}'))
 
     def test_write_to_pyright_unicode_content_length(self):
         """Content-Length must reflect the UTF-8 byte count, not character count."""
@@ -118,9 +123,7 @@ class TestPyrightBridgeUnit:
         # Unicode characters that encode to more than 1 byte each
         message = json.dumps({"msg": "héllo wörld"})
 
-        import asyncio
-
-        asyncio.run(bridge.write_to_pyright(message))
+        _run_async(bridge.write_to_pyright(message))
 
         raw = written_bytes[0]
         body_bytes = message.encode("utf-8")
@@ -130,9 +133,8 @@ class TestPyrightBridgeUnit:
     def test_stop_pyright_no_process(self):
         """stop_pyright should be safe when no process is running."""
         bridge = lsp_bridge.PyrightBridge()
-        import asyncio
 
-        asyncio.run(bridge.stop_pyright())  # Should not raise
+        _run_async(bridge.stop_pyright())  # Should not raise
 
 
 # ── integration tests ─────────────────────────────────────────────────────────

@@ -49,5 +49,6 @@ htmlcov/
 
 # Playwright screenshots and reports
 .playwright-mcp
+*.png
 # type stubs for MicroPython 
 typings/

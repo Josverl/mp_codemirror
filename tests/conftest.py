@@ -89,7 +89,9 @@ def browser():
 @pytest.fixture(scope="function")
 def page(browser):
     """Create a new page for each test (reusing the browser)"""
-    context = browser.new_context()
+    # ignore_https_errors allows CDN resources to load in environments
+    # where a TLS interception proxy is in use (e.g. CI/CD sandboxes)
+    context = browser.new_context(ignore_https_errors=True)
     page = context.new_page()
     
     yield page

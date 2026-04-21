@@ -8,7 +8,7 @@ import { Compartment } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
 import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
-import { notifyDocumentChange } from './lsp/diagnostics.js';
+import { notifyDocumentChange, updateDiagnosticsStatus } from './lsp/diagnostics.js';
 
 // Sample Python code - will be loaded from file
 let sampleCode = '# Loading example...\n';
@@ -138,6 +138,7 @@ async function handleBoardChange(event) {
         if (view) {
             // Clear stale gutter markers from previous LSP instance
             view.dispatch(setDiagnostics(view.state, []));
+            updateDiagnosticsStatus([]);
 
             // Reconfigure the compartment with extensions bound to the new client
             const content = view.state.doc.toString();
@@ -199,6 +200,7 @@ async function handleTypeCheckModeChange(event) {
 
         if (view) {
             view.dispatch(setDiagnostics(view.state, []));
+            updateDiagnosticsStatus([]);
             const content = view.state.doc.toString();
             documentVersion = 1;
             const newExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', content);

@@ -237,6 +237,19 @@ main {
     padding: 0 4px;
 }
 
+/* Diagnostics status bar */
+#diagnostics-status {
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+#diagnostics-status .count-error { color: #f44; }
+#diagnostics-status .count-warning { color: #b8860b; }
+#diagnostics-status .count-info { color: #4af; }
+
 /* Footer */
 footer {
     height: var(--footer-height);

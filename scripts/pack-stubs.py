@@ -45,22 +45,28 @@ class Board:
 BOARDS: list[Board] = [
     Board(
         id="esp32",
-        name="esp32 ESP32_GENERIC",
+        name="esp32",
         package="micropython-esp32-stubs",
         description="ESP32 with WiFi, BLE, machine, esp32 modules",
         bundled=True,
     ),
     Board(
         id="rp2",
-        name="rp2 Pico_W (RP2040)",
+        name="Pico_W (rp2)",
         package="micropython-rp2-stubs",
         description="RP2040 with PIO, machine, rp2 modules",
     ),
     Board(
         id="stm32",
-        name="stm32 PYBV11",
+        name="Pyboard v1.1",
         package="micropython-stm32-stubs",
         description="STM32 with machine, pyb modules",
+    ),
+    Board(
+        id="samd",
+        name="Wio Terminal (samd)",
+        package="micropython-samd-stubs",
+        description="SAMD51",
     ),
 ]
 
@@ -68,7 +74,7 @@ BOARDS: list[Board] = [
 VIRTUAL_BOARDS: list[Board] = [
     Board(
         id="cpython",
-        name="Just CPython (no stubs)",
+        name="CPython (no stubs)",
         package="",
         description="Standard CPython only — no MicroPython stubs loaded",
     ),

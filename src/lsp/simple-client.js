@@ -22,20 +22,40 @@ export class SimpleLSPClient {
         this.requestHandlers = new Map();
 
         // Default handler for workspace/configuration requests from Pyright
+        // Pyright requests sections like 'python', 'python.analysis', 'pyright'
+        // and expects the value for that specific section.
         this.onRequest('workspace/configuration', (params) => {
-            return (params.items || []).map(() => ({
+            const mode = this.config.typeCheckingMode || 'standard';
+            const fullConfig = {
                 python: {
                     analysis: {
                         typeshedPaths: ['/typeshed-fallback'],
                         stubPath: '/typings',
+                        include: ['/workspace'],
+                        typeCheckingMode: mode,
                         diagnosticSeverityOverrides: {
                             reportMissingModuleSource: 'none',
                         },
                     },
                     pythonVersion: '3.11',
                     pythonPlatform: 'Linux',
+                },
+                pyright: {
+                    typeCheckingMode: mode,
                 }
-            }));
+            };
+            return (params.items || []).map((item) => {
+                const section = item.section || '';
+                // Navigate the config tree by section path (e.g., 'python.analysis')
+                const parts = section.split('.');
+                let value = fullConfig;
+                for (const part of parts) {
+                    if (part && value && typeof value === 'object') {
+                        value = value[part];
+                    }
+                }
+                return value || {};
+            });
         });
     }
 
@@ -64,6 +84,12 @@ export class SimpleLSPClient {
             processId: null,
             rootUri: this.config.rootUri || 'file:///workspace',
             capabilities: {
+                workspace: {
+                    configuration: true,
+                    didChangeConfiguration: {
+                        dynamicRegistration: false
+                    }
+                },
                 textDocument: {
                     synchronization: {
                         dynamicRegistration: false,
@@ -100,21 +126,22 @@ export class SimpleLSPClient {
 
         // Send settings to Pyright (typeshed paths, python config)
         // ref: https://micropython-stubs.readthedocs.io/en/main/22_vscode.html
-        this.notify('workspace/didChangeConfiguration', {
-            settings: {
-                python: {
-                    analysis: {
-                        typeshedPaths: ['/typeshed-fallback'],
-                        stubPath: '/typings',
-                        diagnosticSeverityOverrides: {
-                            reportMissingModuleSource: 'none',
-                        },
+        const configSettings = {
+            python: {
+                analysis: {
+                    typeshedPaths: ['/typeshed-fallback'],
+                    stubPath: '/typings',
+                    include: ['/workspace'],
+                    typeCheckingMode: this.config.typeCheckingMode || 'standard',
+                    diagnosticSeverityOverrides: {
+                        reportMissingModuleSource: 'none',
                     },
-                    pythonVersion: '3.11',
-                    pythonPlatform: 'Linux',
-                }
+                },
+                pythonVersion: '3.11',
+                pythonPlatform: 'Linux',
             }
-        });
+        };
+        this.notify('workspace/didChangeConfiguration', { settings: configSettings });
 
         console.log('LSP initialized, capabilities:', this.serverCapabilities);
     }

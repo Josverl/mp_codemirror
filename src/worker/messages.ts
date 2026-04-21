@@ -16,6 +16,8 @@ export interface MsgInitServer {
     typeshedFallback: ArrayBuffer | false | undefined;
     /** Board stubs zip (ArrayBuffer), or false to skip, or undefined to use bundled default */
     boardStubs: ArrayBuffer | false | undefined;
+    /** Pyright type checking mode: off, basic, standard, strict */
+    typeCheckingMode?: string;
 }
 
 export interface MsgServerInitialized {

@@ -86,12 +86,14 @@ body.light-theme a {
 
 /* Header */
 header {
-    height: var(--header-height);
-    padding: 15px 30px;
+    min-height: var(--header-height);
+    padding: 10px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 header h1 {
@@ -101,29 +103,41 @@ header h1 {
 
 .controls {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .sample-selector {
     display: flex;
-    gap: 5px;
+    gap: 4px;
     align-items: center;
+    min-width: 0;
+}
+
+.sample-selector select {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .board-selector {
     display: flex;
-    gap: 5px;
+    gap: 4px;
     align-items: center;
 }
 
-.board-selector label {
-    font-size: 14px;
+.board-selector label,
+.typecheck-selector label {
+    font-size: 13px;
     font-weight: 500;
 }
 
-.board-selector select {
-    min-width: 160px;
+.typecheck-selector {
+    display: flex;
+    gap: 4px;
+    align-items: center;
 }
 
 .loading-indicator {
@@ -137,12 +151,12 @@ header h1 {
 }
 
 select {
-    padding: 8px 12px;
-    font-size: 14px;
+    padding: 4px 8px;
+    font-size: 13px;
     border-radius: 4px;
     cursor: pointer;
     font-weight: 500;
-    min-width: 200px;
+    min-width: auto;
 }
 
 body.dark-theme select {

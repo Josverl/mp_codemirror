@@ -18,11 +18,13 @@ import { createTransport } from './transport-factory.js';
  * @param {string} [config.workerUrl] - Worker script URL
  * @param {number} [config.timeout=5000] - Request timeout in ms
  * @param {ArrayBuffer} [config.boardStubs] - Board stubs zip (undefined = use bundled default)
+ * @param {string} [config.typeCheckingMode] - Pyright type checking mode
  */
 export async function createLSPClient(config = {}) {
     const transport = createTransport({
         workerUrl: config.workerUrl,
         boardStubs: config.boardStubs,
+        typeCheckingMode: config.typeCheckingMode,
     });
 
     console.log('Creating LSP client...');
@@ -30,6 +32,7 @@ export async function createLSPClient(config = {}) {
     const client = new SimpleLSPClient({
         rootUri: 'file:///workspace',
         timeout: config.timeout || 5000,
+        typeCheckingMode: config.typeCheckingMode,
     });
 
     await transport.connect();

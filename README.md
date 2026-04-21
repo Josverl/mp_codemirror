@@ -318,13 +318,15 @@ The test suite covers:
 ## Development Guidelines
 
 ### Code Style
-
-- Modern ES6+ JavaScript
-- Use `const`/`let`, avoid `var`
-- Prefer arrow functions
-- Use async/await over callbacks
-- Keep functions small and focused
-- Add JSDoc comments for public APIs
+- Python code 
+    - ruff, typed 
+- JavaScript 
+    - Modern ES6+ JavaScript
+    - Use `const`/`let`, avoid `var`
+    - Prefer arrow functions
+    - Use async/await over callbacks
+    - Keep functions small and focused
+    - Add JSDoc comments for public APIs
 
 ### Making Changes
 
@@ -342,21 +344,6 @@ When adding new features:
 3. Update tests
 4. Update this README
 5. Consider LSP integration compatibility
-
-## Troubleshooting
-
-### Editor doesn't load
-- **Issue:** "Failed to fetch" errors in console
-- **Solution:** Make sure you're using a web server, not opening the file directly
-
-### Import errors
-- **Issue:** Module resolution errors
-- **Solution:** Check that import maps are supported in your browser, or update browser version
-
-### Styling issues
-- **Issue:** Editor looks broken
-- **Solution:** Clear browser cache and reload, check browser console for CSS errors
-
 ## Contributing
 
 See [docs/contributing.md](docs/contributing.md) for development setup, testing, and contribution guidelines.
@@ -367,38 +354,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Resources
 
+- [Micropython Stubs](https://github.com/josverl/micropython-stubs)
+- [Pyright](https://github.com/microsoft/pyright#static-type-checker-for-python)
 - [CodeMirror 6 Documentation](https://codemirror.net/6/)
-- [CodeMirror 6 Examples](https://codemirror.net/examples/)
-- [CodeMirror Discussion Forum](https://discuss.codemirror.net/)
 - [Python Language Package](https://github.com/codemirror/lang-python)
-
-## Roadmap
-
-### Phase 1: Basic Editor ✅ (Complete)
-- CodeMirror 6 setup with Python support
-- Basic editing features
-- Theme support
-
-### Phase 2: LSP Integration ✅ (Complete)
-- Browser-based LSP client ✅
-- Pyright running in Web Worker (no server needed) ✅
-- Real-time diagnostics ✅
-- Autocompletion ✅
-- Hover tooltips ✅
-
-### Phase 3: MicroPython Stubs ✅ (Complete)
-- Board-specific type stubs (ESP32, RP2040, STM32) ✅
-- Live board switching via dropdown ✅
-- Dynamic stub loading in Web Worker ✅
-
-### Phase 4: Testing & CI (Current)
-- Pytest + Playwright test suite
-- CI workflows for testing and deployment
-
-### Future
-- Go to definition, find references
-- Rename symbol, signature help
-
----
-
-**Questions or Issues?** Open an issue on GitHub or check the [CodeMirror forum](https://discuss.codemirror.net/).
+- [Micropython documentation](https://docs.micropython.org)

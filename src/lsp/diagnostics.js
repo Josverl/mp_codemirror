@@ -5,7 +5,8 @@
  * to show errors, warnings, and hints from the LSP server.
  */
 
-import { lintGutter, setDiagnostics } from '@codemirror/lint';
+import { lintGutter, lintKeymap, setDiagnostics } from '@codemirror/lint';
+import { keymap } from '@codemirror/view';
 
 /**
  * Update the diagnostics status bar below the editor
@@ -56,8 +57,8 @@ export function createLSPDiagnostics(client, fileUri, view) {
         }
     });
 
-    // Return linter extension with gutter
-    return [lintGutter()];
+    // Return linter extension with gutter and keyboard navigation (F8 / Shift-F8)
+    return [lintGutter(), keymap.of(lintKeymap)];
 }
 
 /**

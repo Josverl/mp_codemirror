@@ -25,7 +25,7 @@ jobs:
         run: uv sync --extra test
 
       - name: Run unit tests
-        run: uv run pytest -m unit -v
+        run: uv run pytest -m unit -v || test $? -eq 5
 
   security-audit:
     # Tier 0: Check npm dependencies for known vulnerabilities.

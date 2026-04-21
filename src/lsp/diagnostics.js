@@ -5,15 +5,36 @@
  * to show errors, warnings, and hints from the LSP server.
  */
 
-import { lintGutter, lintKeymap, setDiagnostics } from '@codemirror/lint';
+import { lintGutter, setDiagnostics, openLintPanel, nextDiagnostic, previousDiagnostic } from '@codemirror/lint';
 import { keymap } from '@codemirror/view';
+import { Prec } from '@codemirror/state';
 
 /**
  * Lint keyboard navigation extension (F8 / Shift-F8).
- * Exported separately so it can be included in the base editor extensions,
- * independent of whether the LSP client is connected.
+ * Opens the lint panel and navigates to next/previous diagnostic.
+ * Uses high precedence to override basicSetup's default lintKeymap
+ * (which only navigates without opening the panel).
  */
-export const lintKeymapExtension = keymap.of(lintKeymap);
+export const lintKeymapExtension = Prec.high(keymap.of([
+    {
+        key: 'F8',
+        run(view) {
+            openLintPanel(view);
+            const result = nextDiagnostic(view);
+            view.focus();
+            return result;
+        }
+    },
+    {
+        key: 'Shift-F8',
+        run(view) {
+            openLintPanel(view);
+            const result = previousDiagnostic(view);
+            view.focus();
+            return result;
+        }
+    }
+]));
 
 /**
  * Update the diagnostics status bar below the editor

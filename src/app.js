@@ -599,6 +599,10 @@ export function setEditorContent(content) {
 document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 document.getElementById('typeCheckBtn').addEventListener('click', triggerTypeCheck);
 document.getElementById('clearBtn').addEventListener('click', clearEditor);
+document.getElementById('helpBtn').addEventListener('click', () => {
+    const panel = document.getElementById('keyboard-help');
+    panel.hidden = !panel.hidden;
+});
 document.getElementById('loadSampleBtn').addEventListener('click', loadSample);
 document.getElementById('typeCheckMode').addEventListener('change', handleTypeCheckModeChange);
 

@@ -270,6 +270,58 @@ footer a:hover {
     text-decoration: underline;
 }
 
+/* Keyboard shortcuts help panel */
+#keyboard-help {
+    font-size: 12px;
+    padding: 8px 16px;
+    border-bottom: 1px solid #d4d4d4;
+    overflow-y: auto;
+    max-height: 200px;
+}
+
+#keyboard-help table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#keyboard-help th {
+    text-align: left;
+    padding: 2px 8px;
+    font-weight: 600;
+    border-bottom: 1px solid #d4d4d4;
+}
+
+#keyboard-help td {
+    padding: 2px 8px;
+}
+
+#keyboard-help kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    font-family: monospace;
+    font-size: 11px;
+    border-radius: 3px;
+    border: 1px solid #999;
+    background: #f7f7f7;
+    color: #333;
+    box-shadow: 0 1px 0 #bbb;
+}
+
+body.dark-theme #keyboard-help {
+    border-bottom-color: #3e3e42;
+}
+
+body.dark-theme #keyboard-help th {
+    border-bottom-color: #3e3e42;
+}
+
+body.dark-theme #keyboard-help kbd {
+    background: #3c3c3c;
+    color: #d4d4d4;
+    border-color: #555;
+    box-shadow: 0 1px 0 #222;
+}
+
 /* Lint panel (F8 / Shift-F8 diagnostic navigation) */
 .cm-panel.cm-panel-lint {
     background-color: #f5f5f5;

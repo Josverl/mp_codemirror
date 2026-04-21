@@ -29,6 +29,22 @@
                     <option value="strict">Strict</option>
                 </select>
             </div>
+            <div class="share-wrapper">
+                <button id="shareBtn" aria-label="Share code" title="Share code">Share</button>
+                <div id="shareDropdown" class="share-dropdown" hidden>
+                    <p class="share-title">Sharing a Code Sample</p>
+                    <p class="share-desc">Copy a link or markdown to the clipboard.</p>
+                    <button id="copyLink" class="share-option" aria-label="Copy shareable link">
+                        <span class="share-icon">📋</span> Shareable link
+                    </button>
+                    <button id="copyMdLink" class="share-option" aria-label="Copy markdown with link">
+                        <span class="share-icon">📋</span> Markdown with link
+                    </button>
+                    <button id="copyMdCode" class="share-option" aria-label="Copy markdown with link and code">
+                        <span class="share-icon">📋</span> Markdown with link and code
+                    </button>
+                </div>
+            </div>
             <button id="themeToggle" aria-label="dark/light theme">🌓</button>
             <button id="typeCheckBtn" aria-label="type check with Pyright">👀</button>
             <button id="clearBtn" aria-label="Clear">Clear</button>

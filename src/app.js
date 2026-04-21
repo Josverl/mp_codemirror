@@ -9,6 +9,7 @@ import { EditorView, basicSetup } from 'codemirror';
 import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
 import { notifyDocumentChange, updateDiagnosticsStatus } from './lsp/diagnostics.js';
+import { restoreFromUrl, initShareDropdown } from './share.js';
 
 // Sample Python code - will be loaded from file
 let sampleCode = '# Loading example...\n';
@@ -378,15 +379,34 @@ let view;
 
 // Initialize editor after loading sample
 async function initializeEditor() {
+    // Check URL parameters first (shareable link)
+    const urlState = await restoreFromUrl();
+
+    // If URL specifies a board, apply it before board selector init
+    if (urlState.board) {
+        localStorage.setItem('mp_board', urlState.board);
+    }
+
+    // If URL specifies typeCheckMode, apply it
+    if (urlState.typeCheckMode) {
+        currentTypeCheckMode = urlState.typeCheckMode;
+        localStorage.setItem('mp_typeCheckMode', urlState.typeCheckMode);
+        document.getElementById('typeCheckMode').value = urlState.typeCheckMode;
+    }
+
     // Fetch available examples and board manifest in parallel
     await Promise.all([
         fetchExampleFiles(),
         initBoardSelector(),
     ]);
 
-    // Load the first available example, or use default
-    const defaultFile = exampleFiles.length > 0 ? exampleFiles[0].file : 'blink_led.py';
-    await loadSampleFromFile(defaultFile);
+    // Use code from URL if present, otherwise load first example
+    if (urlState.code) {
+        sampleCode = urlState.code;
+    } else {
+        const defaultFile = exampleFiles.length > 0 ? exampleFiles[0].file : 'blink_led.py';
+        await loadSampleFromFile(defaultFile);
+    }
 
     // Initialize LSP client — Pyright runs in a Web Worker
     try {
@@ -465,6 +485,20 @@ async function initializeEditor() {
 
     // Populate the example selector after editor is initialized
     populateExampleSelector();
+
+    // Initialize share dropdown
+    initShareDropdown(
+        () => view.state.doc.toString(),
+        () => currentBoardId,
+        () => currentTypeCheckMode,
+    );
+
+    // If loaded from a shareable link, clear URL params to keep the
+    // address bar clean without triggering a reload.
+    if (urlState.code) {
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState(null, '', cleanUrl);
+    }
 
     console.log('CodeMirror Python Editor initialized successfully!');
 }

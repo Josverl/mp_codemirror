@@ -1,12 +1,4 @@
 # mp_codemirror - CodeMirror Python Editor with LSP support
-shebang := if os() == 'windows' {
-  'powershell.exe'
-} else {
-  '/usr/bin/env pwsh'
-}
-
-# Set shell for non-Windows OSs:
-set shell := ["powershell", "-c"]
 
 # Set shell for Windows OSs:
 set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
@@ -28,30 +20,36 @@ setup:
 
 # build the Pyright web worker (production)
 build:
-    just pack-typeshed
-    just pack-stubs
+    just pack
     npx webpack --mode production
 
 # build the Pyright web worker (development, with source maps)
 build-dev:
-    just pack-typeshed
-    just pack-stubs
+    just pack
     npx webpack --mode development
 
 # pack Pyright's typeshed-fallback into a zip for browser use
 pack-typeshed:
-    node scripts/pack-typeshed.mjs
+    uv run scripts/pack-typeshed.py
 
 # pack MicroPython board stubs into zip files for each board
 pack-stubs:
-    node scripts/pack-stubs.mjs
+    uv run scripts/pack-stubs.py
+
+# pack MicroPython board stubs and typeshed-fallback
+pack:
+    just pack-typeshed
+    just pack-stubs
 
 # rebuild everything from scratch
 rebuild:
     npm install --ignore-scripts
-    just pack-typeshed
-    just pack-stubs
+    just pack
     npx webpack --mode production
+
+# format Python code with ruff
+format:
+    ruff format tests/
 
 # --- Server recipes ---
 
@@ -59,11 +57,7 @@ rebuild:
 http:
     python -m http.server 8888
 
-# format Python code with ruff
-format:
-    ruff format tests/
-
-# start the HTTP server and open the browser
+# start the HTTP server and open the browser (Unix)
 serve:
     #!/usr/bin/env bash
     set -euo pipefail

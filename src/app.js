@@ -77,6 +77,12 @@ async function fetchBoardStubs(boardId) {
     const board = boardManifest?.boards.find(b => b.id === boardId);
     if (!board) throw new Error(`Unknown board: ${boardId}`);
 
+    // No stubs file means CPython-only — pass false to skip MicroPython stubs
+    if (!board.file) {
+        stubsCache.set(boardId, false);
+        return false;
+    }
+
     // Bundled board doesn't need fetching — pass undefined to use worker's default
     if (board.bundled) {
         stubsCache.set(boardId, undefined);

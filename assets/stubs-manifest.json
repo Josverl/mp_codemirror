@@ -4,26 +4,34 @@
   "boards": [
     {
       "id": "esp32",
-      "name": "ESP32 (Generic)",
+      "name": "esp32 ESP32_GENERIC",
       "file": "stubs-esp32.zip",
-      "size": 254493,
+      "size": 251972,
       "description": "ESP32 with WiFi, BLE, machine, esp32 modules",
       "bundled": true
     },
     {
       "id": "rp2",
-      "name": "Raspberry Pi Pico (RP2040)",
+      "name": "rp2 Pico_W (RP2040)",
       "file": "stubs-rp2.zip",
-      "size": 255548,
+      "size": 252956,
       "description": "RP2040 with PIO, machine, rp2 modules",
       "bundled": false
     },
     {
       "id": "stm32",
-      "name": "STM32 (Generic)",
+      "name": "stm32 PYBV11",
       "file": "stubs-stm32.zip",
-      "size": 258912,
+      "size": 256646,
       "description": "STM32 with machine, pyb modules",
+      "bundled": false
+    },
+    {
+      "id": "cpython",
+      "name": "Just CPython (no stubs)",
+      "file": null,
+      "size": 0,
+      "description": "Standard CPython only \u2014 no MicroPython stubs loaded",
       "bundled": false
     }
   ]

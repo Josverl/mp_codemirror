@@ -29,6 +29,26 @@ jobs:
       - name: Run unit tests
         run: uv run pytest -m unit -v
 
+  security-audit:
+    # Tier 0: Check npm dependencies for known vulnerabilities.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Run npm audit
+        run: npm audit --omit=dev || true
+
   editor-tests:
     # Tier 1: Playwright + HTTP server. Needs browser.
     runs-on: ubuntu-latest

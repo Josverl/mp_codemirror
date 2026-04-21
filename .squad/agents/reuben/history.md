@@ -19,3 +19,12 @@
 - **Performance opportunity**: LSP modules eagerly imported; could lazy-load after editor renders.
 - **Verbose logging**: Heavy console.log throughout LSP modules; needs log-level gating for production.
 - **Resilience gap**: No worker crash recovery — user must refresh page if Pyright worker dies.
+
+### 2026-04-21: Documentation Peer Review
+- Reviewed all 12 user-facing docs. Found widespread staleness — many files still describe WebSocket-only architecture.
+- `PYRIGHT_LSP_PLAN.md` is the worst offender: autocompletion/hover marked as TODO when both are DONE, architecture diagram ignores Web Worker.
+- `README.md` roadmap at bottom contradicts feature list at top. CDN version numbers stale.
+- `CONTRIBUTING.md` setup instructions outdated (wrong port, missing `uv`, missing worker build step, references `test.html`).
+- `server/README.md` and `tests/README.md` use PowerShell syntax on a Linux project.
+- Recommended archiving: `CDN_TEST_REPORT.md`, `PYRIGHT_LSP_PLAN.md`, `JESSE_AI_WINDOWS_ISSUE.md` → `.ai_history/`.
+- Pattern: docs lag code by 2+ phases. Need a docs-update checklist in PR template.

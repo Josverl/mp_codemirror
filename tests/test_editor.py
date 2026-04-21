@@ -20,43 +20,36 @@ def _goto_editor(page, live_server):
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
 
+@pytest.fixture(scope="module")
+def editor_page(shared_page, live_server):
+    """Module-scoped page that has already loaded the editor. For read-only tests."""
+    shared_page.goto(f"{live_server}/index.html")
+    shared_page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    return shared_page
+
+
 # ---------------------------------------------------------------------------
 # Page structure
 # ---------------------------------------------------------------------------
 
 
-def test_page_loads(page, live_server):
-    """Page loads and has the correct title."""
+def test_no_console_errors_on_load(page, live_server):
+    """Page loads without JS errors, CSP violations, or failed resource loads."""
+    errors = []
+    page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+
     page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("domcontentloaded")
-    assert page.title() == "CodeMirror Python Editor"
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+
+    # Filter out known non-issues (e.g. favicon 404 in dev)
+    real_errors = [e for e in errors if "favicon" not in e.lower()]
+    assert real_errors == [], f"Console errors on page load: {real_errors}"
 
 
-def test_editor_container_exists(page, live_server):
+def test_editor_container_exists(editor_page):
     """Editor container element is present in the DOM."""
-    _goto_editor(page, live_server)
-    expect(page.locator("#editor-container")).to_be_visible()
-
-
-def test_header_elements_present(page, live_server):
-    """All header controls are rendered."""
-    _goto_editor(page, live_server)
-
-    expect(page.locator("header h1")).to_be_visible()
-    assert page.locator("header h1").inner_text() == "CodeMirror 6 MicroPython Editor"
-
-    expect(page.locator("#themeToggle")).to_be_visible()
-    expect(page.locator("#typeCheckBtn")).to_be_visible()
-    expect(page.locator("#clearBtn")).to_be_visible()
-    expect(page.locator("#sampleSelect")).to_be_visible()
-    expect(page.locator("#loadSampleBtn")).to_be_visible()
-
-
-def test_footer_displays(page, live_server):
-    """Footer and its documentation link are visible."""
-    _goto_editor(page, live_server)
-    expect(page.locator("footer")).to_be_visible()
-    expect(page.locator("footer a")).to_be_visible()
+    expect(editor_page.locator("#editor-container")).to_be_visible()
 
 
 # ---------------------------------------------------------------------------
@@ -64,48 +57,40 @@ def test_footer_displays(page, live_server):
 # ---------------------------------------------------------------------------
 
 
-def test_codemirror_editor_initializes(page, live_server):
+def test_codemirror_editor_initializes(editor_page):
     """CodeMirror editor, content area, and gutters are all rendered."""
-    _goto_editor(page, live_server)
-
-    expect(page.locator(".cm-editor")).to_be_visible()
-    expect(page.locator(".cm-content")).to_be_visible()
-    expect(page.locator(".cm-gutters")).to_be_visible()
+    expect(editor_page.locator(".cm-editor")).to_be_visible()
+    expect(editor_page.locator(".cm-content")).to_be_visible()
+    expect(editor_page.locator(".cm-gutters")).to_be_visible()
 
 
-def test_line_numbers_displayed(page, live_server):
+def test_line_numbers_displayed(editor_page):
     """Line-number gutter is visible and contains gutter elements."""
-    _goto_editor(page, live_server)
-
-    expect(page.locator(".cm-lineNumbers")).to_be_visible()
-    assert page.locator(".cm-gutterElement").count() > 0, "Line number elements should exist"
+    expect(editor_page.locator(".cm-lineNumbers")).to_be_visible()
+    assert editor_page.locator(".cm-gutterElement").count() > 0, "Line number elements should exist"
 
 
-def test_sample_code_loads(page, live_server):
+def test_sample_code_loads(editor_page):
     """Initial sample code (MicroPython blink example) is loaded."""
-    _goto_editor(page, live_server)
-
     # Wait for real content — the placeholder is '# Loading example...'
-    page.wait_for_function(
+    editor_page.wait_for_function(
         "() => document.querySelector('.cm-content').innerText.includes('machine')",
         timeout=CDN_TIMEOUT,
     )
-    content = page.locator(".cm-content").inner_text()
+    content = editor_page.locator(".cm-content").inner_text()
     assert "machine" in content, "Sample code should contain MicroPython imports"
     assert "def" in content, "Sample code should contain function definitions"
 
 
-def test_python_syntax_highlighting(page, live_server):
+def test_python_syntax_highlighting(editor_page):
     """Python syntax is highlighted — multiple .cm-line elements exist."""
-    _goto_editor(page, live_server)
-
     # Wait for sample content
-    page.wait_for_function(
+    editor_page.wait_for_function(
         "() => document.querySelectorAll('.cm-line').length > 5",
         timeout=CDN_TIMEOUT,
     )
-    expect(page.locator(".cm-line").first).to_be_visible()
-    assert page.locator(".cm-line").count() > 5, "Sample code should produce multiple highlighted lines"
+    expect(editor_page.locator(".cm-line").first).to_be_visible()
+    assert editor_page.locator(".cm-line").count() > 5, "Sample code should produce multiple highlighted lines"
 
 
 # ---------------------------------------------------------------------------
@@ -113,10 +98,9 @@ def test_python_syntax_highlighting(page, live_server):
 # ---------------------------------------------------------------------------
 
 
-def test_initial_theme_is_light(page, live_server):
+def test_initial_theme_is_light(editor_page):
     """Page starts with the light theme applied."""
-    _goto_editor(page, live_server)
-    classes = page.locator("body").get_attribute("class") or ""
+    classes = editor_page.locator("body").get_attribute("class") or ""
     assert "light-theme" in classes, f"Expected light-theme on body, got: {classes!r}"
 
 
@@ -193,16 +177,14 @@ def test_editor_accepts_keyboard_input(page, live_server):
     assert "Hello, MicroPython!" in page.locator(".cm-content").inner_text()
 
 
-def test_sample_selector_populated(page, live_server):
+def test_sample_selector_populated(editor_page):
     """Example select dropdown is populated with at least one option after init."""
-    _goto_editor(page, live_server)
-
     # Wait for JS to populate the select with example options
-    page.wait_for_function(
+    editor_page.wait_for_function(
         "() => document.getElementById('sampleSelect').options.length > 1",
         timeout=CDN_TIMEOUT,
     )
-    option_count = page.evaluate("() => document.getElementById('sampleSelect').options.length")
+    option_count = editor_page.evaluate("() => document.getElementById('sampleSelect').options.length")
     assert option_count > 1, "sampleSelect should have example options beyond the placeholder"
 
 

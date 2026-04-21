@@ -12,6 +12,8 @@ How to decide who handles what.
 | Code review | Reuben | Review PRs, check quality, suggest improvements |
 | Security | Yen | OWASP, CSP, SRI, supply chain, XSS prevention |
 | Release management | Saul | Tags, versioning, changelogs, deploy gates |
+| Documentation | Tess, Frank | Guides, walkthroughs, demos, doc cleanup |
+| Diagrams | Virgil | Mermaid architecture diagrams, flowcharts, visuals |
 | Testing | Basher, Rusty, Linus, Turk | Write tests, find edge cases, verify fixes |
 | Scope & priorities | {Name} | What to build next, trade-offs, decisions |
 | Session logging | Scribe | Automatic — never needs routing |

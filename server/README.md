@@ -1,8 +1,10 @@
 # Server Directory
 
-This directory contains the LSP bridge servers for the CodeMirror Python editor.
+> **Note:** This server is for dev/debug only. For normal use, Pyright runs in a Web Worker in the browser — no server needed. Only use the WebSocket bridge when debugging LSP communication with `?lsp=websocket` mode.
 
-## jesse-ai Pyright LSP Bridge (Recommended) ✅
+This directory contains the WebSocket LSP bridge for the CodeMirror Python editor (dev/debug only).
+
+## jesse-ai Pyright LSP Bridge
 
 **Location**: `server/pyright-lsp-bridge/` (Git Submodule)
 
@@ -10,7 +12,7 @@ The jesse-ai/python-language-server is added as a git submodule for easy version
 
 ### Setup
 
-```powershell
+```bash
 # Initialize submodule (if not already done)
 git submodule update --init --recursive
 
@@ -21,9 +23,9 @@ npm install
 
 ### Run
 
-```powershell
+```bash
 cd server/pyright-lsp-bridge
-npm start -- --port 9011 --bot-root d:\mypython\mp_codemirror --jesse-root d:\mypython\mp_codemirror\src
+npm start -- --port 9011 --bot-root /path/to/mp_codemirror --jesse-root /path/to/mp_codemirror/src
 ```
 
 **Parameters:**
@@ -33,7 +35,7 @@ npm start -- --port 9011 --bot-root d:\mypython\mp_codemirror --jesse-root d:\my
 
 ### Update Submodule
 
-```powershell
+```bash
 # Update to latest version
 cd server/pyright-lsp-bridge
 git pull origin main
@@ -50,21 +52,15 @@ Our original Python asyncio WebSocket bridge. Kept as reference and working back
 
 ### Setup
 
-```powershell
+```bash
 # Requires Python venv with websockets
 uv pip install websockets
 ```
 
 ### Run
 
-```powershell
-.venv\Scripts\python.exe server/lsp_bridge.py
+```bash
+python server/lsp_bridge.py
 ```
 
 **Note**: Uses port 8765 (different from jesse-ai's 9011)
-
-## Cleanup
-
-You can safely delete:
-- `server/jesse-lsp/` - Broken prebuilt Windows package
-- `server/python-language-server/` - Old clone (replaced by submodule)

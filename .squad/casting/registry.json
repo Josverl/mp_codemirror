@@ -65,6 +65,24 @@
       "persistent_name": "Reuben",
       "universe": "Ocean's Eleven",
       "status": "active"
+    },
+    "tess": {
+      "created_at": "2026-04-21T14:00:00.000Z",
+      "persistent_name": "Tess",
+      "universe": "Ocean's Eleven",
+      "status": "active"
+    },
+    "frank": {
+      "created_at": "2026-04-21T14:00:00.000Z",
+      "persistent_name": "Frank",
+      "universe": "Ocean's Eleven",
+      "status": "active"
+    },
+    "virgil": {
+      "created_at": "2026-04-21T14:00:00.000Z",
+      "persistent_name": "Virgil",
+      "universe": "Ocean's Eleven",
+      "status": "active"
     }
   }
 }

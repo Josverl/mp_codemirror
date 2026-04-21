@@ -269,7 +269,17 @@ export class SimpleLSPClient {
      */
     disconnect() {
         if (this.connected) {
+            // Reject all pending requests before teardown
+            for (const [id, pending] of this.pendingRequests.entries()) {
+                clearTimeout(pending.timeout);
+                pending.reject(new Error('Client disconnected'));
+            }
+            this.pendingRequests.clear();
+
             try {
+                // LSP spec: shutdown is a request, exit is a notification.
+                // Use notify for both since we're tearing down and won't
+                // process the shutdown response anyway.
                 this.notify('shutdown', {});
                 this.notify('exit', {});
             } catch (error) {

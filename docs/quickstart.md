@@ -1,34 +1,18 @@
 # Quick Start Guide
 
-## Get Started in 4 Steps
+## Get Started in 3 Steps
 
-### Step 1: Clone and Install
+### Step 1: Clone and Setup
 
 ```bash
 git clone <repository-url>
 cd mp_codemirror
-
-# Initialize submodules (needed for dev only)
-git submodule update --init --recursive
-
-# Install dependencies
-npm install --ignore-scripts
-uv sync
+just setup
 ```
 
-### Step 2: Build the Worker
+This initializes submodules, installs dependencies, and builds the Pyright Web Worker (`dist/pyright_worker.js`).
 
-Pyright runs entirely in the browser via a Web Worker. You must build it first:
-
-```bash
-just build
-# or manually:
-just pack-typeshed && just pack-stubs && npx webpack --mode production
-```
-
-This creates `dist/pyright_worker.js` which bundles Pyright, typeshed, and MicroPython stubs.
-
-### Step 3: Start the HTTP Server
+### Step 2: Start the HTTP Server
 
 ```bash
 just http
@@ -38,7 +22,7 @@ python -m http.server 8888
 
 No LSP bridge server is needed — Pyright runs in the browser.
 
-### Step 4: Open in Browser
+### Step 3: Open in Browser
 
 Navigate to: `http://localhost:8888/src/`
 

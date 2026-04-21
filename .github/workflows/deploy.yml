@@ -1,8 +1,11 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [ main ]
+  # Deploy only after Tests workflow succeeds on main
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +19,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Only deploy if tests passed (or manual trigger)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -38,14 +43,28 @@ jobs:
       - name: Pack typeshed
         run: node scripts/pack-typeshed.mjs
 
+      - name: Pack board stubs
+        run: node scripts/pack-stubs.mjs
+
       - name: Build worker
         run: npx webpack --mode production
 
+      - name: Verify build artifacts
+        run: |
+          set -euo pipefail
+          if [ ! -f dist/pyright_worker.js ] || [ ! -s dist/pyright_worker.js ]; then
+            echo "ERROR: dist/pyright_worker.js missing or empty"
+            exit 1
+          fi
+          echo "pyright_worker.js: $(stat -c%s dist/pyright_worker.js) bytes"
+
       - name: Prepare deploy directory
         run: |
+          set -euo pipefail
           mkdir -p deploy
           cp -r src/* deploy/
           cp dist/pyright_worker.js deploy/
+          cp -r assets deploy/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

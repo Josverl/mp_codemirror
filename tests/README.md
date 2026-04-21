@@ -4,16 +4,10 @@ This directory contains Playwright-based tests for the CodeMirror Python Editor.
 
 ## Quick Start
 
-**IMPORTANT:** Start servers before running tests:
-```powershell
-# VSCode: Run Task > "Start All Servers" (Ctrl+Shift+P)
-# Or manually: Start LSP bridge on port 9011 and HTTP server on port 8888
-```
-
-Then run tests:
+Run tests (the HTTP server is auto-started by test fixtures):
 ```bash
 # Run real-time LSP tests
-uv run pytest tests/test_lsp_realtime.py -v
+pytest tests/test_lsp_realtime.py -v
 
 # Run focused LSP tests (fast - ~9 seconds)
 pytest tests/test_lsp_diagnostics.py -v
@@ -111,7 +105,6 @@ def test_diagnostic_icon_appears(page, live_server):
 **Server already running?**
 ```bash
 # Kill process on port 8888
-netstat -ano | findstr :8888
-taskkill /PID <pid> /F
+lsof -ti:8888 | xargs kill -9
 ```
 

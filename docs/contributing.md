@@ -7,7 +7,8 @@ Thank you for your interest in contributing to this project! This document provi
 ### Prerequisites
 
 - A modern web browser (Chrome 89+, Firefox 89+, Safari 15+)
-- Python 3.x (for local development server) OR Node.js (for alternative server)
+- Python 3.x and [uv](https://docs.astral.sh/uv/) for environment management
+- Node.js (for building the Pyright Web Worker)
 - Git for version control
 - A code editor (VS Code recommended)
 
@@ -19,17 +20,18 @@ Thank you for your interest in contributing to this project! This document provi
    cd mp_codemirror
    ```
 
-2. **Start local development server:**
+2. **Run the setup recipe** (installs dependencies, builds the worker):
    ```bash
-   cd src
-   python -m http.server 8000
+   just setup
    ```
 
-3. **Open in browser:**
-   Navigate to `http://localhost:8000/`
+3. **Start the HTTP server:**
+   ```bash
+   just http
+   ```
 
-4. **Run tests:**
-   Open `http://localhost:8000/test.html` in your browser
+4. **Open in browser:**
+   Navigate to `http://localhost:8888/src/`
 
 ## Development Workflow
 
@@ -151,25 +153,31 @@ Before submitting a PR, verify:
 - [ ] Theme toggle works
 - [ ] Code can be typed and edited
 - [ ] Keyboard shortcuts work
+- [ ] LSP diagnostics appear for code errors
+- [ ] Autocompletion works (type `sys.` and check)
+- [ ] Hover tooltips show type info
+- [ ] Board selector switches stubs
 - [ ] Works in Chrome, Firefox, and Safari
 - [ ] Responsive design works on mobile viewport
 - [ ] No accessibility issues
 
 ### Automated Tests
 
-Add tests for new features in `tests/test_editor.py`:
+Run tests with pytest:
 
-```python
-def test_your_feature(page, live_server):
-    """Test description"""
-    page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("networkidle")
-    
-    # Your test logic
-    assert page.locator("#element").is_visible()
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run by tier
+pytest tests/ -m unit -v
+pytest tests/ -m editor -v
+pytest tests/ -m worker -v
+pytest tests/ -m lsp -v
+
+# Run with browser visible
+pytest tests/ --headed
 ```
-
-Run tests with: `pytest tests/ -v`
 
 ## Adding New Features
 

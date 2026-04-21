@@ -92,9 +92,7 @@ The editor displays **rich documentation on hover** using Pyright's type analysi
 - Max width 500px, max height 400px, scrollable for long docs
 - 98% opacity for excellent readability
 
-### Planned (Phase 2 - In Progress)
-- ✅ Autocompletion - Intelligent code completion powered by Pyright (COMPLETE)
-- ✅ Hover tooltips with documentation (COMPLETE)
+### Planned (Future)
 - 🔲 Go to definition
 - 🔲 Find references
 
@@ -134,12 +132,13 @@ mp_codemirror/
 │   │   ├── examples.json   # List of example files
 │   │   ├── blink_led.py    # LED blink example (default)
 │   │   ├── espnow.py       # ESP-NOW example
+│   │   ├── rp2_pio.py      # RP2040 PIO example
 │   │   └── temperature_sensor.py  # Temperature sensor example
 │   ├── index.html          # Main HTML page
 │   ├── styles.css          # Custom styling
 │   └── app.js              # Application logic and CodeMirror setup
 ├── dist/
-│   └── worker.js           # Built Pyright worker (via webpack)
+│   └── pyright_worker.js   # Built Pyright worker (via webpack)
 ├── assets/
 │   └── stubs-manifest.json # Board stubs manifest
 ├── scripts/
@@ -236,6 +235,14 @@ The editor loads `examples/blink_led.py` by default on startup. You can add more
 
 ## Technical Details
 
+For architecture diagrams, integration guide, and detailed documentation see the [docs/](docs/) folder:
+
+- [Architecture](docs/architecture.md) — component diagrams, LSP communication flow, build pipeline
+- [Showcase](docs/showcase.md) — demo walkthrough, video script, micropython-stubs advantages, integration guide
+- [Quick Start](docs/quickstart.md) — get running in 4 steps
+- [Technical](docs/technical.md) — CDN dependency pinning details
+- [Contributing](docs/contributing.md) — development setup and guidelines
+
 ### Architecture
 
 - **No Build Step for UI:** CodeMirror loaded via ES modules from CDN (esm.sh)
@@ -249,7 +256,7 @@ The editor loads `examples/blink_led.py` by default on startup. You can add more
 
 All dependencies are loaded from CDN, no npm installation required:
 
-- `codemirror@6.0.1` - Core editor
+- `codemirror@6.0.2` - Core editor
 - `@codemirror/view` - Editor view
 - `@codemirror/state` - Editor state management
 - `@codemirror/language` - Language support
@@ -277,7 +284,7 @@ See `src/index.html` for the complete import map with dependency pinning.
 
 ```bash
 # Install Python dependencies
-pip install pytest playwright pytest-playwright
+uv sync
 
 # Install Playwright browsers
 playwright install chromium
@@ -355,11 +362,7 @@ When adding new features:
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+See [docs/contributing.md](docs/contributing.md) for development setup, testing, and contribution guidelines.
 
 ## License
 
@@ -379,18 +382,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Basic editing features
 - Theme support
 
-### Phase 2: LSP Integration ✅ (Complete - Basic Features)
+### Phase 2: LSP Integration ✅ (Complete)
 - Browser-based LSP client ✅
-- Pyright v1.1.407 integration via WebSocket ✅
+- Pyright running in Web Worker (no server needed) ✅
 - Real-time diagnostics ✅
-- WebSocket transport layer ✅
-- Autocompletion (in progress)
-- Hover tooltips (in progress)
+- Autocompletion ✅
+- Hover tooltips ✅
 
-### Phase 3: MicroPython Support (Next)
-- Custom type stubs for MicroPython
-- Device-specific stubs
-- Board selector UI
+### Phase 3: MicroPython Stubs ✅ (Complete)
+- Board-specific type stubs (ESP32, RP2040, STM32) ✅
+- Live board switching via dropdown ✅
+- Dynamic stub loading in Web Worker ✅
+
+### Phase 4: Testing & CI (Current)
+- Pytest + Playwright test suite
+- CI workflows for testing and deployment
+
+### Future
+- Go to definition, find references
+- Rename symbol, signature help
 
 ---
 

@@ -73,19 +73,19 @@ The mock transport (Sprint 1) was for initial development only. To provide real 
 ### Week 1: Research & Server Setup
 
 #### Task 1.1: Research Pyright Deployment (1 day)
-- [ ] Read Pyright documentation
-- [ ] Research WebSocket LSP bridges
-- [ ] Evaluate Node.js vs Python bridge
-- [ ] Document findings in this file
+- [x] Read Pyright documentation
+- [x] Research WebSocket LSP bridges
+- [x] Evaluate Node.js vs Python bridge
+- [x] Document findings in this file
 
 **Resources**:
 - https://github.com/microsoft/pyright
 - https://microsoft.github.io/language-server-protocol/
 
 #### Task 1.2: Choose Implementation Approach (0.5 day)
-- [ ] Decide: Node.js or Python bridge
-- [ ] Decide: stdio or TCP for Pyright communication
-- [ ] Document decision with rationale
+- [x] Decide: Node.js or Python bridge
+- [x] Decide: stdio or TCP for Pyright communication
+- [x] Document decision with rationale
 
 **Recommendation**: Python bridge (matches MicroPython project theme)
 
@@ -98,32 +98,32 @@ npm install -g pyright
 pyright --help
 ```
 
-- [ ] Install Pyright
-- [ ] Verify pyright-langserver available
-- [ ] Test basic LSP communication with manual messages
+- [x] Install Pyright
+- [x] Verify pyright-langserver available
+- [x] Test basic LSP communication with manual messages
 
 #### Task 1.4: Create WebSocket Bridge (2 days)
-- [ ] Create `server/lsp-bridge.py` or `server/lsp-bridge.js`
-- [ ] Implement WebSocket server
-- [ ] Spawn Pyright subprocess
-- [ ] Forward messages bidirectionally
-- [ ] Test with simple LSP initialize
+- [x] Create `server/lsp-bridge.py` or `server/lsp-bridge.js`
+- [x] Implement WebSocket server
+- [x] Spawn Pyright subprocess
+- [x] Forward messages bidirectionally
+- [x] Test with simple LSP initialize
 
 #### Task 1.5: Test Server Locally (1 day)
-- [ ] Start bridge server
-- [ ] Connect with WebSocket client (wscat or browser)
-- [ ] Send LSP initialize message
-- [ ] Verify Pyright responds
-- [ ] Document manual testing steps
+- [x] Start bridge server
+- [x] Connect with WebSocket client (wscat or browser)
+- [x] Send LSP initialize message
+- [x] Verify Pyright responds
+- [x] Document manual testing steps
 
 ### Week 2: Client Integration & Testing
 
 #### Task 2.1: Create WebSocketTransport (1 day)
-- [ ] Create `src/lsp/websocket-transport.js`
-- [ ] Implement WebSocket connection
-- [ ] Implement send/receive methods
-- [ ] Add reconnection logic
-- [ ] Add error handling
+- [x] Create `src/lsp/websocket-transport.js`
+- [x] Implement WebSocket connection
+- [x] Implement send/receive methods
+- [x] Add reconnection logic
+- [x] Add error handling
 
 **Interface** (must match MockTransport):
 ```javascript
@@ -138,10 +138,10 @@ class WebSocketTransport {
 ```
 
 #### Task 2.2: Update Client to Use WebSocket (0.5 day)
-- [ ] Modify `src/lsp/client.js`
-- [ ] Add config flag for transport type
-- [ ] Keep MockTransport for tests
-- [ ] Use WebSocketTransport in production
+- [x] Modify `src/lsp/client.js`
+- [x] Add config flag for transport type
+- [x] Keep MockTransport for tests
+- [x] Use WebSocketTransport in production
 
 ```javascript
 // In client.js
@@ -164,18 +164,18 @@ x: int = "string"  # Should show type error
 import nonexistent_module  # Should show import error
 ```
 
-- [ ] Load test files in editor
-- [ ] Verify Pyright diagnostics appear
-- [ ] Check diagnostic messages are accurate
-- [ ] Test diagnostic updates on edit
-- [ ] Test diagnostic clearing when fixed
+- [x] Load test files in editor
+- [x] Verify Pyright diagnostics appear
+- [x] Check diagnostic messages are accurate
+- [x] Test diagnostic updates on edit
+- [x] Test diagnostic clearing when fixed
 
 #### Task 2.4: Update Playwright Tests (1 day)
-- [ ] Add server startup to conftest.py
-- [ ] Update tests to use real server
-- [ ] Add tests for server connection
-- [ ] Add tests for server disconnect handling
-- [ ] Verify all tests pass
+- [x] Add server startup to conftest.py
+- [x] Update tests to use real server
+- [x] Add tests for server connection
+- [x] Add tests for server disconnect handling
+- [x] Verify all tests pass
 
 ```python
 # New fixture in conftest.py
@@ -189,10 +189,10 @@ def lsp_server():
 ```
 
 #### Task 2.5: Documentation (0.5 day)
-- [ ] Create `server/README.md` with setup instructions
-- [ ] Document WebSocket protocol
-- [ ] Add troubleshooting guide
-- [ ] Update main README.md
+- [x] Create `server/README.md` with setup instructions
+- [x] Document WebSocket protocol
+- [x] Add troubleshooting guide
+- [x] Update main README.md
 
 ## Testing Plan
 

@@ -76,7 +76,7 @@ This document outlines the plan to integrate **Pyright/Pylance LSP Server** supp
 - ✅ Function signature validation
 - ✅ Performance optimized with 300ms debouncing
 
-### Sprint 10: Autocompletion Integration (🔄 NEXT)
+### Sprint 10: Autocompletion Integration (✅ COMPLETED)
 **Goal**: Provide intelligent code suggestions from Pyright as user types
 
 **Remaining Tasks**:
@@ -104,13 +104,13 @@ This document outlines the plan to integrate **Pyright/Pylance LSP Server** supp
 - `completionItem/resolve` - Get full completion details (optional)
 
 **Success Criteria**:
-- [ ] Typing trigger characters shows completion popup
-- [ ] Completions are relevant to context
-- [ ] MicroPython modules show correct completions
-- [ ] Performance is responsive (<200ms)
-- [ ] All tests pass
+- [x] Typing trigger characters shows completion popup
+- [x] Completions are relevant to context
+- [x] MicroPython modules show correct completions
+- [x] Performance is responsive (<200ms)
+- [x] All tests pass
 
-### Sprint 11: Hover Tooltips (📋 PLANNED)
+### Sprint 11: Hover Tooltips (✅ COMPLETED)
 **Goal**: Show type information and documentation on hover
 
 **Remaining Tasks**:
@@ -136,11 +136,11 @@ This document outlines the plan to integrate **Pyright/Pylance LSP Server** supp
 - `textDocument/hover` - Request hover information
 
 **Success Criteria**:
-- [ ] Hover shows type information for variables
-- [ ] Function signatures display correctly
-- [ ] Docstrings render with Markdown formatting
-- [ ] MicroPython module documentation appears
-- [ ] Tooltips position correctly and disappear appropriately
+- [x] Hover shows type information for variables
+- [x] Function signatures display correctly
+- [x] Docstrings render with Markdown formatting
+- [x] MicroPython module documentation appears
+- [x] Tooltips position correctly and disappear appropriately
 
 ### Sprint 12: Advanced LSP Features (📋 FUTURE)
 **Goal**: Add navigation and refactoring capabilities
@@ -262,18 +262,18 @@ mp_codemirror/
 - ✅ MicroPython stubs integrated
 
 ### Sprint 10 Success (Autocompletion)
-- [ ] Typing `.` shows relevant completions
-- [ ] Built-in function completions work
-- [ ] MicroPython module completions accurate
-- [ ] Performance under 200ms response time
-- [ ] All automated tests pass
+- [x] Typing `.` shows relevant completions
+- [x] Built-in function completions work
+- [x] MicroPython module completions accurate
+- [x] Performance under 200ms response time
+- [x] All automated tests pass
 
 ### Sprint 11 Success (Hover Tooltips)
-- [ ] Hover shows type information
-- [ ] Function signatures display correctly
-- [ ] Docstrings render with Markdown
-- [ ] MicroPython documentation appears
-- [ ] Tooltips behave consistently
+- [x] Hover shows type information
+- [x] Function signatures display correctly
+- [x] Docstrings render with Markdown
+- [x] MicroPython documentation appears
+- [x] Tooltips behave consistently
 
 ### Production-Ready Success (After Sprint 12)
 - [ ] All core LSP features implemented

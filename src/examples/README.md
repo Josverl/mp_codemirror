@@ -4,7 +4,14 @@ This folder contains example Python code files that can be loaded into the edito
 
 ## Usage
 
-These examples are loaded automatically when you click the "Load Sample" button in the editor. By default, `blink_led.py` is loaded when the page first opens.
+Select an example from the dropdown and click the "Load" button in the editor toolbar. By default, `blink_led.py` is loaded when the page first opens.
+
+## Included Examples
+
+- **blink_led.py** — LED blink example (default)
+- **espnow.py** — ESP-NOW communication
+- **rp2_pio.py** — RP2040 PIO programmable I/O
+- **temperature_sensor.py** — Temperature sensor reading
 
 ## Adding New Examples
 

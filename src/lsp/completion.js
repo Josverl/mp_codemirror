@@ -113,9 +113,10 @@ export function createCompletionSource(lspClient, documentUri) {
         console.log(`LSP completion at line ${lineNumber + 1}, char ${character}, word: "${word.text}"`);
 
         // Determine the starting position for completion
-        // If completing after a dot (attribute access), start from current position
-        // Otherwise, start from beginning of the word
-        const from = word.text.endsWith('.') ? pos : word.from;
+        // For dotted access like "sys.arg", start from after the last dot
+        // so CodeMirror filters completions against "arg" not "sys.arg"
+        const dotIndex = word.text.lastIndexOf('.');
+        const from = dotIndex >= 0 ? word.from + dotIndex + 1 : word.from;
 
         try {
             console.log('Sending textDocument/completion request to LSP...');

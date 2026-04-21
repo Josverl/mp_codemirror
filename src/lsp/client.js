@@ -1,41 +1,40 @@
 /**
  * LSP Client Setup for CodeMirror
- * 
- * This file sets up the LSP client with WebSocket transport
+ *
+ * Creates and initializes an LSP client with either Worker or WebSocket transport.
+ * Supports board switching by tearing down and rebuilding the worker.
  */
 
-import { autocompletion } from '@codemirror/autocomplete';
+import { EditorState } from '@codemirror/state';
 import { createCompletionSource } from './completion.js';
 import { createLSPDiagnostics, notifyDocumentOpen } from './diagnostics.js';
 import { createHoverTooltip } from './hover.js';
 import { SimpleLSPClient } from './simple-client.js';
-import { WebSocketTransport } from './websocket-transport.js';
+import { createTransport } from './transport-factory.js';
 
 /**
  * Create and initialize an LSP client
  * @param {Object} config - Configuration options
- * @param {string} config.wsUrl - WebSocket URL (default: ws://localhost:9011/lsp)
+ * @param {string} [config.workerUrl] - Worker script URL
+ * @param {number} [config.timeout=5000] - Request timeout in ms
+ * @param {ArrayBuffer} [config.boardStubs] - Board stubs zip (undefined = use bundled default)
  */
 export async function createLSPClient(config = {}) {
-    const wsUrl = config.wsUrl || 'ws://localhost:9011/lsp';
-
-    // Create the WebSocket transport
-    const transport = new WebSocketTransport(wsUrl);
-
-    console.log('Creating LSP client with WebSocket transport');
-
-    // Create the client
-    const client = new SimpleLSPClient({
-        rootUri: 'file:///workspace',
-        timeout: 5000
+    const transport = createTransport({
+        workerUrl: config.workerUrl,
+        boardStubs: config.boardStubs,
     });
 
-    // Connect the WebSocket transport
-    console.log('Connecting WebSocket transport...');
-    await transport.connect();
-    console.log('WebSocket transport connected');
+    console.log('Creating LSP client...');
 
-    // Connect the client to the transport
+    const client = new SimpleLSPClient({
+        rootUri: 'file:///workspace',
+        timeout: config.timeout || 5000,
+    });
+
+    await transport.connect();
+    console.log('Transport connected');
+
     await client.connect(transport);
     console.log('LSP Client initialized:', client.serverCapabilities);
 
@@ -45,7 +44,7 @@ export async function createLSPClient(config = {}) {
 /**
  * Create an LSP plugin extension for an editor
  */
-export function createLSPPlugin(client, view, fileUri = 'file:///document.py', languageId = 'python', initialContent = '') {
+export function createLSPPlugin(client, view, fileUri = 'file:///workspace/document.py', languageId = 'python', initialContent = '') {
     // Store client reference for later use
     if (!window.lspClients) {
         window.lspClients = new Map();
@@ -61,13 +60,12 @@ export function createLSPPlugin(client, view, fileUri = 'file:///document.py', l
     // Create completion source
     const completionSource = createCompletionSource(client, fileUri);
 
-    // Create autocompletion extension with LSP completion source
-    const completionExtension = autocompletion({
-        override: [completionSource],
-        activateOnTyping: true,
-        maxRenderedOptions: 100,
-        defaultKeymap: true
-    });
+    // Provide LSP completions through the language data facet so they
+    // integrate with the existing autocompletion() from basicSetup instead
+    // of creating a competing second autocomplete instance.
+    const completionExtension = EditorState.languageData.of(() => [{
+        autocomplete: completionSource
+    }]);
 
     // Create hover tooltip extension
     const hoverExtension = createHoverTooltip(client, fileUri);
@@ -78,6 +76,33 @@ export function createLSPPlugin(client, view, fileUri = 'file:///document.py', l
         completionExtension,
         hoverExtension
     ];
+}
+
+/**
+ * Switch board stubs by tearing down and rebuilding the LSP worker.
+ * Re-opens all tracked documents with fresh diagnostics.
+ *
+ * @param {Object} current - Current { client, transport } from createLSPClient
+ * @param {Object} config - Same config as createLSPClient, with new boardStubs
+ * @returns {Object} New { client, transport }
+ */
+export async function switchBoard(current, config) {
+    // Tear down old client and transport
+    try {
+        current.client.disconnect();
+    } catch (e) { /* ignore shutdown errors */ }
+    try {
+        current.transport.close();
+    } catch (e) { /* ignore close errors */ }
+
+    // Create new client with new board stubs
+    const { client, transport } = await createLSPClient(config);
+
+    // Do NOT re-open documents here — the caller is responsible for
+    // reconfiguring the CodeMirror LSP compartment (which calls
+    // createLSPPlugin → notifyDocumentOpen with the actual content).
+
+    return { client, transport };
 }
 
 /**

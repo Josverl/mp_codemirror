@@ -1,6 +1,6 @@
 # CodeMirror 6 MicroPython Editor
 
-A simple, static HTML5 application featuring a CodeMirror 6 editor configured for Python syntax highlighting. This project is designed to be deployed to GitHub Pages and serves as a foundation for future LSP integration with Pylance and MicroPython type stubs.
+A static HTML5 application featuring a CodeMirror 6 editor with full LSP support via Pyright running in a Web Worker. Includes MicroPython board-specific type stubs (ESP32, RP2040, STM32) with live switching. Deploys to GitHub Pages as static files — no server needed for LSP features.
 
 ## Features
 
@@ -16,10 +16,11 @@ A simple, static HTML5 application featuring a CodeMirror 6 editor configured fo
 - ✅ Undo/Redo history
 - ✅ Tab key support for indentation
 - ✅ Responsive design (mobile-friendly)
-- ✅ **LSP Integration** - Real Pyright v1.1.407 via WebSocket
+- ✅ **LSP Integration** - Pyright running in a Web Worker (no server needed)
 - ✅ **Real-time Diagnostics** - Errors and warnings as you type (debounced 300ms)
 - ✅ **Type Checking** - Full Python type analysis
 - ✅ **Document Versioning** - Automatic version tracking for LSP updates
+- ✅ **Board Selector** - Switch between ESP32, RP2040, STM32 stubs
 
 ### Real-Time Diagnostics
 
@@ -91,48 +92,67 @@ The editor displays **rich documentation on hover** using Pyright's type analysi
 - Max width 500px, max height 400px, scrollable for long docs
 - 98% opacity for excellent readability
 
-### Planned (Phase 2 - In Progress)
-- ✅ Autocompletion - Intelligent code completion powered by Pyright (COMPLETE - Sprint 4)
-- ✅ Hover tooltips with documentation (COMPLETE - Sprint 4)
+### Planned (Future)
 - 🔲 Go to definition
 - 🔲 Find references
 
-### Planned (Phase 3)
-- 🔲 MicroPython type stubs
-- 🔲 Device-specific stubs (ESP32, RP2040, etc.)
-- 🔲 Board selector for context-aware completions
+### Complete (Phase 3)
+- ✅ MicroPython type stubs (ESP32, RP2040, STM32)
+- ✅ Device-specific stubs switchable via board selector dropdown
+- ✅ Board switching with live re-analysis
+
+### Current (Phase 4)
+- Testing, CI, and code quality improvements
+- Pytest test tiers: unit, editor, worker, lsp
 
 ## Project Structure
 
 ```
 mp_codemirror/
 ├── .github/
-│   └── copilot-instructions.md  # Agent instructions
+│   ├── copilot-instructions.md  # Agent instructions
+│   └── workflows/
+│       ├── test.yml             # CI test workflow
+│       └── deploy.yml           # GitHub Pages deployment
 ├── .vscode/
-│   └── tasks.json          # VSCode tasks for starting servers
+│   └── tasks.json          # VSCode tasks for dev servers
 ├── src/
 │   ├── lsp/                # LSP client implementation
 │   │   ├── client.js       # Main LSP client setup
-│   │   ├── websocket-transport.js  # WebSocket transport for Pyright
+│   │   ├── worker-transport.js     # Web Worker transport
+│   │   ├── transport-factory.js    # Transport factory
 │   │   ├── diagnostics.js  # Diagnostics extension for CodeMirror
-│   │   └── simple-client.js        # Simplified LSP client wrapper
+│   │   ├── completion.js   # Autocompletion integration
+│   │   ├── hover.js        # Hover tooltips integration
+│   │   └── simple-client.js        # LSP protocol client wrapper
+│   ├── worker/             # Pyright Web Worker source
+│   │   └── pyright-worker.ts       # Worker entry point (bundled to dist/)
 │   ├── examples/           # Python example files
 │   │   ├── examples.json   # List of example files
 │   │   ├── blink_led.py    # LED blink example (default)
 │   │   ├── espnow.py       # ESP-NOW example
+│   │   ├── rp2_pio.py      # RP2040 PIO example
 │   │   └── temperature_sensor.py  # Temperature sensor example
 │   ├── index.html          # Main HTML page
 │   ├── styles.css          # Custom styling
 │   └── app.js              # Application logic and CodeMirror setup
-├── server/
-│   ├── pyright-lsp-bridge/ # Git submodule: jesse-ai/python-language-server
-│   │   ├── pyright-bridge.ts   # WebSocket bridge implementation
-│   │   └── pyrightconfig.json  # Pyright configuration template
-│   └── README.md           # Server documentation
+├── dist/
+│   └── pyright_worker.js   # Built Pyright worker (via webpack)
+├── assets/
+│   └── stubs-manifest.json # Board stubs manifest
+├── scripts/
+│   ├── pack-typeshed.mjs   # Pack typeshed for browser use
+│   └── pack-stubs.mjs      # Pack MicroPython stubs per board
 ├── tests/
-│   ├── conftest.py         # Pytest configuration
-│   ├── test_editor.py      # Editor tests with Playwright
+│   ├── conftest.py         # Pytest configuration and fixtures
+│   ├── test_editor.py      # Editor UI tests (Playwright)
+│   ├── test_worker_transport.py  # Web Worker transport tests
+│   ├── test_lsp_features.py     # LSP feature tests
+│   ├── test_lsp_diagnostics.py  # Diagnostics tests
 │   └── README.md           # Testing documentation
+├── typings/                # MicroPython type stubs
+├── justfile                # Build and dev task runner
+├── webpack.config.cjs      # Webpack config for worker build
 └── README.md               # This file
 ```
 
@@ -146,36 +166,27 @@ mp_codemirror/
    cd mp_codemirror
    ```
 
-2. **Initialize the git submodule (LSP bridge):**
+2. **Install dependencies:**
    ```bash
    git submodule update --init --recursive
-   cd server/pyright-lsp-bridge
-   npm install
-   cd ../..
+   npm install --ignore-scripts
+   uv sync
    ```
 
-3. **Start the development servers:**
-
-   **Option A: Using VSCode Tasks (Recommended):**
-   - Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
-   - Type "Tasks: Run Task"
-   - Select "Start All Servers"
-   - Both the LSP bridge and HTTP server will start automatically
-   
-   **Option B: Manual start:**
-   
-   Terminal 1 - LSP Bridge:
+3. **Build the Pyright Web Worker:**
    ```bash
-   cd server/pyright-lsp-bridge
-   npm start
+   just build
    ```
-   
-   Terminal 2 - HTTP Server:
-   ```bash
-   python -m http.server 8888
-   ```
+   This bundles Pyright, typeshed, and MicroPython stubs into `dist/pyright_worker.js`.
 
-4. **Open in browser:**
+4. **Start the HTTP server:**
+   ```bash
+   just http
+   # or: python -m http.server 8888
+   ```
+   No LSP bridge server is needed — Pyright runs in the browser via a Web Worker.
+
+5. **Open in browser:**
    Navigate to `http://localhost:8888/src/`
 
 ### GitHub Pages Deployment
@@ -221,18 +232,27 @@ The editor loads `examples/blink_led.py` by default on startup. You can add more
 
 ## Technical Details
 
+For architecture diagrams, integration guide, and detailed documentation see the [docs/](docs/) folder:
+
+- [Architecture](docs/architecture.md) — component diagrams, LSP communication flow, build pipeline
+- [Showcase](docs/showcase.md) — demo walkthrough, video script, micropython-stubs advantages, integration guide
+- [Quick Start](docs/quickstart.md) — get running in 4 steps
+- [Technical](docs/technical.md) — CDN dependency pinning details
+- [Contributing](docs/contributing.md) — development setup and guidelines
+
 ### Architecture
 
-- **No Build Step:** Uses ES modules loaded directly from CDN (esm.sh)
+- **No Build Step for UI:** CodeMirror loaded via ES modules from CDN (esm.sh)
+- **Web Worker for LSP:** Pyright runs in a Web Worker (`dist/pyright_worker.js`), built via webpack
+- **Board Switching:** ESP32, RP2040, STM32 stubs, switchable via dropdown
+- **Static Deployment:** Full LSP features work on GitHub Pages — no server needed
 - **Module-based:** Modern ES6+ JavaScript with imports
-- **CDN Provider:** esm.sh for CodeMirror packages
-- **Browser Compatibility:** Modern browsers with ES module support
 
 ### Dependencies (via CDN)
 
 All dependencies are loaded from CDN, no npm installation required:
 
-- `codemirror@6.0.1` - Core editor
+- `codemirror@6.0.2` - Core editor
 - `@codemirror/view` - Editor view
 - `@codemirror/state` - Editor state management
 - `@codemirror/language` - Language support
@@ -260,7 +280,7 @@ See `src/index.html` for the complete import map with dependency pinning.
 
 ```bash
 # Install Python dependencies
-pip install pytest playwright pytest-playwright
+uv sync
 
 # Install Playwright browsers
 playwright install chromium
@@ -271,6 +291,12 @@ playwright install chromium
 ```bash
 # Run all tests
 pytest tests/ -v
+
+# Run by tier
+pytest tests/ -m unit -v          # Unit tests
+pytest tests/ -m editor -v        # Editor/UI tests (Playwright)
+pytest tests/ -m worker -v        # Web Worker tests
+pytest tests/ -m lsp -v           # LSP feature tests
 
 # Run with browser visible
 pytest tests/ --headed
@@ -332,11 +358,7 @@ When adding new features:
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+See [docs/contributing.md](docs/contributing.md) for development setup, testing, and contribution guidelines.
 
 ## License
 
@@ -356,18 +378,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Basic editing features
 - Theme support
 
-### Phase 2: LSP Integration ✅ (Complete - Basic Features)
+### Phase 2: LSP Integration ✅ (Complete)
 - Browser-based LSP client ✅
-- Pyright v1.1.407 integration via WebSocket ✅
+- Pyright running in Web Worker (no server needed) ✅
 - Real-time diagnostics ✅
-- WebSocket transport layer ✅
-- Autocompletion (in progress)
-- Hover tooltips (in progress)
+- Autocompletion ✅
+- Hover tooltips ✅
 
-### Phase 3: MicroPython Support (Next)
-- Custom type stubs for MicroPython
-- Device-specific stubs
-- Board selector UI
+### Phase 3: MicroPython Stubs ✅ (Complete)
+- Board-specific type stubs (ESP32, RP2040, STM32) ✅
+- Live board switching via dropdown ✅
+- Dynamic stub loading in Web Worker ✅
+
+### Phase 4: Testing & CI (Current)
+- Pytest + Playwright test suite
+- CI workflows for testing and deployment
+
+### Future
+- Go to definition, find references
+- Rename symbol, signature help
 
 ---
 

@@ -1,302 +1,228 @@
 """
-Test suite for LSP Real-time Diagnostics
-Tests the integration with Pyright LSP server and real-time error detection
+LSP Real-Time Diagnostics Tests
+
+These tests verify that the browser's CodeMirror editor receives live
+diagnostics from the Pyright Web Worker as the user types, including:
+  - didChange notifications being sent and debounced
+  - version counter incrementing correctly
+  - diagnostics being updated when code changes
+
+All tests require the Pyright worker bundle at dist/pyright_worker.js.
 """
+
 import re
 import time
+from pathlib import Path
+
+import pytest
+
+# ---------------------------------------------------------------------------
+# Module-level skip marker
+# ---------------------------------------------------------------------------
+
+_worker_available = (Path(__file__).parent.parent / "dist" / "pyright_worker.js").exists()
+
+requires_lsp = pytest.mark.skipif(
+    not _worker_available,
+    reason="Worker bundle not found at dist/pyright_worker.js. Build it first.",
+)
+
+pytestmark = pytest.mark.worker
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+EDITOR_TIMEOUT = 15_000
+LSP_TIMEOUT = 20_000
+DEBOUNCE_MS = 300  # must match CHANGE_DEBOUNCE_MS in app.js
 
 
-def test_lsp_server_connects(page, live_server, lsp_server):
-    """Test that the LSP client connects to the WebSocket server"""
-    # Collect console messages
-    console_messages = []
-    page.on("console", lambda msg: console_messages.append(msg.text))
-    
-    # Navigate to the page
-    page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("networkidle")
-    
-    # Wait for LSP initialization
-    time.sleep(3)
-    
-    # Check for WebSocket connection
-    ws_msgs = [msg for msg in console_messages if "WebSocket" in msg and "Connect" in msg]
-    assert len(ws_msgs) > 0, "WebSocket should connect"
-    
-    # Check for LSP initialization
-    init_msgs = [msg for msg in console_messages if "LSP" in msg or "Pyright" in msg]
-    assert len(init_msgs) > 0, "LSP should initialize"
+def _load_and_wait(page, base_url: str):
+    """Navigate to editor and wait for LSP to initialise."""
+    page.goto(f"{base_url}/index.html")
+    page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
 
 
-def test_realtime_diagnostics_invalid_import(page, live_server, lsp_server):
-    """Test that real-time diagnostics detect invalid import statements"""
-    # Collect console messages
-    console_messages = []
-    page.on("console", lambda msg: console_messages.append(msg.text))
-    
-    # Navigate and wait for initialization
-    page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("networkidle")
-    time.sleep(3)
-    
-    # Clear the editor
+def _clear_editor(page):
     page.locator("#clearBtn").click()
-    time.sleep(0.5)
-    
-    # Get the editor textbox
-    editor = page.locator(".cm-content[contenteditable='true']")
-    
-    # Type invalid code
-    editor.click()
-    editor.press_sequentially("import nonexistent_module")
-    
-    # Wait for debounce (300ms) + processing time
-    time.sleep(1)
-    
-    # Check for didChange notification in console
-    didchange_msgs = [msg for msg in console_messages if "didChange notification" in msg]
-    assert len(didchange_msgs) > 0, "Should send didChange notification"
-    
-    # Check for diagnostics received
-    diagnostic_msgs = [msg for msg in console_messages if "Received diagnostics" in msg]
-    assert len(diagnostic_msgs) > 0, "Should receive diagnostics from Pyright"
-    
-    # Check for error indicator in the gutter (red dot)
-    # The diagnostic should create a lint marker
-    time.sleep(0.5)
-    
-    # Verify error is visible by checking for diagnostic CSS classes or gutter elements
-    # CodeMirror adds diagnostic markers to the gutter
-    page.wait_for_selector(".cm-gutters", timeout=5000)
-    
-
-def test_realtime_diagnostics_undefined_variable(page, live_server, lsp_server):
-    """Test that real-time diagnostics detect undefined variables"""
-    # Collect console messages
-    console_messages = []
-    page.on("console", lambda msg: console_messages.append(msg.text))
-    
-    # Navigate and wait for initialization
-    page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("networkidle")
-    time.sleep(3)
-    
-    # Clear the editor
-    page.locator("#clearBtn").click()
-    time.sleep(0.5)
-    
-    # Get the editor textbox
-    editor = page.locator(".cm-content[contenteditable='true']")
-    
-    # Type code with undefined variable
-    editor.click()
-    editor.press_sequentially("print(undefined_variable)")
-    
-    # Wait for debounce + processing
-    time.sleep(1)
-    
-    # Check for didChange notification
-    didchange_msgs = [msg for msg in console_messages if "didChange" in msg]
-    assert len(didchange_msgs) > 0, "Should send didChange notification"
-    
-    # Check for diagnostics received
-    diagnostic_msgs = [msg for msg in console_messages if "diagnostic" in msg.lower()]
-    assert len(diagnostic_msgs) > 0, "Should receive diagnostics"
+    time.sleep(0.3)
 
 
-def test_realtime_diagnostics_multiple_errors(page, live_server, lsp_server):
-    """Test that real-time diagnostics can show multiple errors simultaneously"""
-    # Collect console messages
-    console_messages = []
-    page.on("console", lambda msg: console_messages.append(msg.text))
-    
-    # Navigate and wait for initialization
-    page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("networkidle")
-    time.sleep(3)
-    
-    # Clear the editor
-    page.locator("#clearBtn").click()
-    time.sleep(0.5)
-    
-    # Get the editor textbox
-    editor = page.locator(".cm-content[contenteditable='true']")
-    
-    # Type code with multiple errors
-    editor.click()
-    editor.press_sequentially("import nonexistent_module\nprint(undefined_var)")
-    
-    # Wait for debounce + processing
-    time.sleep(1)
-    
-    # Check for diagnostics received
-    diagnostic_msgs = [msg for msg in console_messages if "diagnostic" in msg.lower()]
-    assert len(diagnostic_msgs) > 0, "Should receive diagnostics"
-    
-    # Check that didChange was sent
-    didchange_msgs = [msg for msg in console_messages if "didChange" in msg]
-    assert len(didchange_msgs) > 0, "Should send didChange notification"
-
-
-def test_realtime_diagnostics_clear_on_fix(page, live_server, lsp_server):
-    """Test that diagnostics clear when code is fixed"""
-    # Collect console messages
-    console_messages = []
-    page.on("console", lambda msg: console_messages.append(msg.text))
-    
-    # Navigate and wait for initialization
-    page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("networkidle")
-    time.sleep(3)
-    
-    # Clear the editor
-    page.locator("#clearBtn").click()
-    time.sleep(0.5)
-    
-    # Get the editor textbox
-    editor = page.locator(".cm-content[contenteditable='true']")
-    
-    # Type invalid code first
-    editor.click()
-    editor.press_sequentially("import nonexistent_module")
-    time.sleep(1)
-    
-    # Verify diagnostics were received
-    diagnostic_msgs = [msg for msg in console_messages if "diagnostic" in msg.lower()]
-    assert len(diagnostic_msgs) > 0, "Should detect error first"
-    
-    # Clear messages to start fresh
-    console_messages.clear()
-    
-    # Now replace with valid code
-    page.keyboard.press("Control+A")
-    editor.press_sequentially("x = 10\nprint(x)")
-    
-    # Wait for debounce + processing
-    time.sleep(1)
-    
-    # Check that didChange was sent
-    didchange_msgs = [msg for msg in console_messages if "didChange" in msg]
-    assert len(didchange_msgs) > 0, "Should send didChange for fix"
-    
-    # Check for diagnostics received (should be empty or have no errors)
-    diagnostic_msgs = [msg for msg in console_messages if "diagnostic" in msg.lower()]
-    assert len(diagnostic_msgs) > 0, "Should receive diagnostics update"
-
-
-def test_realtime_diagnostics_debouncing(page, live_server, lsp_server):
-    """Test that didChange notifications are properly debounced"""
-    # Collect console messages with timestamps
-    console_messages = []
-    
-    def collect_with_time(msg):
-        console_messages.append({
-            'text': msg.text,
-            'time': time.time()
-        })
-    
-    page.on("console", collect_with_time)
-    
-    # Navigate and wait for initialization
-    page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("networkidle")
-    time.sleep(3)
-    
-    # Clear the editor
-    page.locator("#clearBtn").click()
-    time.sleep(0.5)
-    
-    # Get the editor textbox
+def _type_in_editor(page, text: str, delay: int = 50):
     editor = page.locator(".cm-content[contenteditable='true']")
     editor.click()
-    
-    # Clear messages to start fresh
-    console_messages.clear()
-    
-    # Type quickly (simulating rapid typing)
-    editor.press_sequentially("x = 1", delay=50)  # 50ms between keys
-    
-    # Wait for debounce timeout
-    time.sleep(0.5)
-    
-    # Count didChange notifications
-    didchange_msgs = [msg for msg in console_messages if "didChange notification" in msg['text']]
-    
-    # Should only send ONE notification after debouncing
-    # (or very few, not one per keystroke)
-    assert len(didchange_msgs) <= 2, f"Should debounce changes, got {len(didchange_msgs)} notifications"
+    editor.press_sequentially(text, delay=delay)
 
 
-def test_realtime_diagnostics_version_increment(page, live_server, lsp_server):
-    """Test that document version increments with each change"""
-    # Collect console messages
-    console_messages = []
-    page.on("console", lambda msg: console_messages.append(msg.text))
-    
-    # Navigate and wait for initialization
-    page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("networkidle")
-    time.sleep(3)
-    
-    # Clear the editor
-    page.locator("#clearBtn").click()
-    time.sleep(0.5)
-    
-    # Get the editor textbox
-    editor = page.locator(".cm-content[contenteditable='true']")
-    editor.click()
-    
-    # Clear messages to start fresh
-    console_messages.clear()
-    
-    # Make first change
-    editor.press_sequentially("x = 1")
-    time.sleep(0.6)  # Wait for debounce
-    
-    # Make second change
-    editor.press("Enter")
-    editor.press_sequentially("y = 2")
-    time.sleep(0.6)  # Wait for debounce
-    
-    # Extract version numbers from didChange messages
-    version_pattern = re.compile(r'version (\d+)')
-    versions = []
-    for msg in console_messages:
-        if "didChange notification" in msg:
-            match = version_pattern.search(msg)
-            if match:
-                versions.append(int(match.group(1)))
-    
-    # Should have at least one version (may coalesce rapid changes due to debounce)
-    assert len(versions) >= 1, f"Should have at least 1 version update, got {len(versions)}"
-    
-    # If we got multiple versions, they should increment
+# ---------------------------------------------------------------------------
+# Real-time diagnostics tests
+# ---------------------------------------------------------------------------
+
+
+@requires_lsp
+def test_lsp_server_connects_via_browser(page, live_server):
+    """Browser must log a successful transport connection and LSP handshake."""
+    console: list[str] = []
+    page.on("console", lambda m: console.append(m.text))
+
+    _load_and_wait(page, live_server)
+
+    transport_connected = any("Transport connected" in m for m in console)
+    lsp_ready = any("LSP client ready" in m for m in console)
+
+    assert transport_connected, f"Transport connection message not found. Console: {console[:15]}"
+    assert lsp_ready, f"'LSP client ready' not found in console. Console: {console[:15]}"
+
+
+@requires_lsp
+def test_did_change_notification_sent_on_typing(page, live_server):
+    """Editing the document must trigger a didChange notification to the LSP."""
+    console: list[str] = []
+    page.on("console", lambda m: console.append(m.text))
+
+    _load_and_wait(page, live_server)
+
+    _clear_editor(page)
+    console.clear()
+
+    _type_in_editor(page, "import nonexistent_module")
+    # Wait for debounce + a small margin
+    time.sleep((DEBOUNCE_MS + 500) / 1000)
+
+    didchange_msgs = [m for m in console if "didChange notification" in m]
+    assert didchange_msgs, (
+        f"Expected 'didChange notification' in console after typing. "
+        f"Console: {[m for m in console if 'did' in m.lower()]}"
+    )
+
+
+@requires_lsp
+def test_diagnostics_received_for_invalid_import(page, live_server):
+    """Invalid import statement must result in diagnostics being received."""
+    console: list[str] = []
+    page.on("console", lambda m: console.append(m.text))
+
+    _load_and_wait(page, live_server)
+
+    _clear_editor(page)
+    console.clear()
+
+    _type_in_editor(page, "import nonexistent_module_xyz")
+
+    # Wait for debounce + Pyright round-trip
+    deadline = time.time() + LSP_TIMEOUT / 1000
+    while time.time() < deadline:
+        if any("Received diagnostics" in m for m in console):
+            break
+        time.sleep(0.5)
+
+    assert any("Received diagnostics" in m for m in console), (
+        "Pyright must push diagnostics after an invalid import. "
+        f"Console: {[m for m in console if 'diagnostic' in m.lower()]}"
+    )
+
+
+@requires_lsp
+def test_lint_marker_appears_in_gutter_on_typing(page, live_server):
+    """Typing invalid code must cause a lint marker to appear in the gutter."""
+    _load_and_wait(page, live_server)
+
+    _clear_editor(page)
+    _type_in_editor(page, "result = undefined_var_abc")
+
+    marker = page.locator(".cm-lint-marker")
+    marker.first.wait_for(timeout=LSP_TIMEOUT)
+    assert marker.count() > 0, "Lint marker must appear after typing invalid code"
+
+
+@requires_lsp
+def test_did_change_is_debounced(page, live_server):
+    """Rapid typing must produce at most a few didChange notifications, not one per key."""
+    console: list[str] = []
+    page.on("console", lambda m: console.append(m.text))
+
+    _load_and_wait(page, live_server)
+
+    _clear_editor(page)
+    console.clear()
+
+    # Type quickly (50 ms per key → 5 keys in ~250 ms, less than debounce window)
+    _type_in_editor(page, "x = 1", delay=50)
+
+    # Wait for the debounce window to flush
+    time.sleep((DEBOUNCE_MS + 400) / 1000)
+
+    didchange_count = sum(1 for m in console if "didChange notification" in m)
+    assert didchange_count <= 2, f"Debouncer must coalesce rapid keystrokes; got {didchange_count} notifications"
+
+
+@requires_lsp
+def test_document_version_increments(page, live_server):
+    """Each debounced change must increment the LSP document version."""
+    console: list[str] = []
+    page.on("console", lambda m: console.append(m.text))
+
+    _load_and_wait(page, live_server)
+
+    _clear_editor(page)
+    console.clear()
+
+    version_re = re.compile(r"version\s+(\d+)", re.IGNORECASE)
+
+    # First edit
+    _type_in_editor(page, "x = 1")
+    time.sleep((DEBOUNCE_MS + 400) / 1000)
+
+    # Second edit
+    page.locator(".cm-content").press("Enter")
+    _type_in_editor(page, "y = 2")
+    time.sleep((DEBOUNCE_MS + 400) / 1000)
+
+    versions = [
+        int(m.group(1)) for msg in console if "didChange notification" in msg for m in [version_re.search(msg)] if m
+    ]
+
+    assert len(versions) >= 1, (
+        f"At least one version number must be logged. Console: {[m for m in console if 'didChange' in m]}"
+    )
     if len(versions) > 1:
-        assert versions[-1] > versions[0], f"Version should increment: {versions}"
+        assert versions[-1] > versions[0], f"Version must strictly increase: {versions}"
 
 
-def test_valid_micropython_code_no_errors(page, live_server, lsp_server):
-    """Test that valid MicroPython code with 'machine' import shows no errors"""
-    # Collect console messages
-    console_messages = []
-    page.on("console", lambda msg: console_messages.append(msg.text))
-    
-    # Navigate and wait for initialization  
-    page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("networkidle")
-    time.sleep(3)
-    
-    # The default example (blink LED) should be loaded
-    # It uses 'from machine import Pin' which should be valid with MicroPython stubs
-    
-    # Wait a bit more for diagnostics
-    time.sleep(2)
-    
-    # Check diagnostics - should be empty for valid MicroPython code
-    diagnostic_msgs = [msg for msg in console_messages if "Received diagnostics" in msg]
-    
-    # Find the last diagnostics message
-    if diagnostic_msgs:
-        last_diagnostic = diagnostic_msgs[-1]
-        # Should show empty array
-        assert "[]" in last_diagnostic, f"Valid MicroPython code should have no errors, got: {last_diagnostic}"
+@requires_lsp
+def test_diagnostics_update_when_code_fixed(page, live_server):
+    """Replacing invalid code with valid code must trigger a new diagnostics push."""
+    console: list[str] = []
+    page.on("console", lambda m: console.append(m.text))
+
+    _load_and_wait(page, live_server)
+
+    _clear_editor(page)
+    console.clear()
+
+    # Step 1: introduce an error
+    _type_in_editor(page, "x = totally_undefined")
+    deadline = time.time() + LSP_TIMEOUT / 1000
+    while time.time() < deadline:
+        if any("Received diagnostics" in m for m in console):
+            break
+        time.sleep(0.5)
+
+    assert any("Received diagnostics" in m for m in console), "Should receive diagnostics for invalid code first"
+    console.clear()
+
+    # Step 2: use the Clear button, then type valid code
+    _clear_editor(page)
+    _type_in_editor(page, "x: int = 42")
+
+    deadline = time.time() + LSP_TIMEOUT / 1000
+    while time.time() < deadline:
+        if any("Received diagnostics" in m for m in console):
+            break
+        time.sleep(0.5)
+
+    assert any("Received diagnostics" in m for m in console), (
+        "Pyright must push updated diagnostics after fixing the code"
+    )

@@ -14,7 +14,7 @@
     ],
     "extraPaths": [
         "src/lib"
-        //     "D:/mypython/mp_codemirror/src",
+        //     "/home/jos/mp_codemirror/src",
     ],
     "executionEnvironments": [
         {
@@ -24,9 +24,9 @@
             ]
         },
         {
-            "root": "D:/mypython/mp_codemirror",
+            "root": "/home/jos/mp_codemirror",
             "extraPaths": [
-                "D:/mypython/mp_codemirror/src",
+                "/home/jos/mp_codemirror/src",
             ]
         }
     ]

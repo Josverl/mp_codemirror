@@ -19,6 +19,24 @@ export class SimpleLSPClient {
         this.connected = false;
         this.initializing = null;
         this.messageHandlers = [];
+        this.requestHandlers = new Map();
+
+        // Default handler for workspace/configuration requests from Pyright
+        this.onRequest('workspace/configuration', (params) => {
+            return (params.items || []).map(() => ({
+                python: {
+                    analysis: {
+                        typeshedPaths: ['/typeshed-fallback'],
+                        stubPath: '/typings',
+                        diagnosticSeverityOverrides: {
+                            reportMissingModuleSource: 'none',
+                        },
+                    },
+                    pythonVersion: '3.11',
+                    pythonPlatform: 'Linux',
+                }
+            }));
+        });
     }
 
     /**
@@ -80,6 +98,24 @@ export class SimpleLSPClient {
         // Send initialized notification
         this.notify('initialized', {});
 
+        // Send settings to Pyright (typeshed paths, python config)
+        // ref: https://micropython-stubs.readthedocs.io/en/main/22_vscode.html
+        this.notify('workspace/didChangeConfiguration', {
+            settings: {
+                python: {
+                    analysis: {
+                        typeshedPaths: ['/typeshed-fallback'],
+                        stubPath: '/typings',
+                        diagnosticSeverityOverrides: {
+                            reportMissingModuleSource: 'none',
+                        },
+                    },
+                    pythonVersion: '3.11',
+                    pythonPlatform: 'Linux',
+                }
+            }
+        });
+
         console.log('LSP initialized, capabilities:', this.serverCapabilities);
     }
 
@@ -132,8 +168,8 @@ export class SimpleLSPClient {
         try {
             const message = JSON.parse(messageStr);
 
-            // Response to a request
-            if (message.id !== undefined && this.pendingRequests.has(message.id)) {
+            // Response to a request we sent
+            if (message.id !== undefined && !message.method && this.pendingRequests.has(message.id)) {
                 const pending = this.pendingRequests.get(message.id);
                 this.pendingRequests.delete(message.id);
 
@@ -147,13 +183,55 @@ export class SimpleLSPClient {
                     pending.resolve(message.result);
                 }
             }
-            // Notification from server
+            // Server→client request (has both id and method)
+            else if (message.id !== undefined && message.method) {
+                this.handleServerRequest(message);
+            }
+            // Notification from server (method but no id)
             else if (message.method) {
                 this.handleNotification(message.method, message.params);
             }
         } catch (error) {
             console.error('Error handling LSP message:', error);
         }
+    }
+
+    /**
+     * Handle requests from the server (e.g., workspace/configuration)
+     */
+    handleServerRequest(message) {
+        const handler = this.requestHandlers.get(message.method);
+        if (handler) {
+            try {
+                const result = handler(message.params);
+                this.transport.send(JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: message.id,
+                    result: result
+                }));
+            } catch (error) {
+                this.transport.send(JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: message.id,
+                    error: { code: -32603, message: error.message }
+                }));
+            }
+        } else {
+            // Respond with null for unhandled requests
+            console.warn(`Unhandled server request: ${message.method}`);
+            this.transport.send(JSON.stringify({
+                jsonrpc: '2.0',
+                id: message.id,
+                result: null
+            }));
+        }
+    }
+
+    /**
+     * Register a handler for server→client requests
+     */
+    onRequest(method, handler) {
+        this.requestHandlers.set(method, handler);
     }
 
     /**
@@ -192,7 +270,17 @@ export class SimpleLSPClient {
      */
     disconnect() {
         if (this.connected) {
+            // Reject all pending requests before teardown
+            for (const [id, pending] of this.pendingRequests.entries()) {
+                clearTimeout(pending.timeout);
+                pending.reject(new Error('Client disconnected'));
+            }
+            this.pendingRequests.clear();
+
             try {
+                // LSP spec: shutdown is a request, exit is a notification.
+                // Use notify for both since we're tearing down and won't
+                // process the shutdown response anyway.
                 this.notify('shutdown', {});
                 this.notify('exit', {});
             } catch (error) {

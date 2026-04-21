@@ -20,11 +20,9 @@ Unit and integration testing should be based on Pytest + Playwright - but only s
 
 ## Development servers
 The development servers are defined in the .vscode/tasks.json file
-- "Start LSP Bridge" - port 9011 - starts the LSP bridge server (pyright-lsp-bridge)
-- "Start HTTP Server" - port 8888 - starts a simple HTTP server to serve the src/ folder
+- "Start HTTP Server" - port 8888 - starts a simple HTTP server to serve the project
 
-these tasks can be run concurrently for development.
-The LSP bridge server can take a while to start up, so start it first.
+Pyright runs in a Web Worker in the browser — no server needed.
 
 ## Python Environment Setup
 
@@ -33,11 +31,10 @@ The repository includes automated setup workflow in `.github/workflows/`:
 - `copilot-setup-steps.yml` - Copilot agent environment setup
 
 These workflows automatically:
-1. Initialize and update git submodules recursively
-2. Install `uv` package manager using astral-sh/setup-uv@v3
-3. Install Python and project dependencies
-4. Install MicroPython stubs to `typings/` directory
-5. Cache environment for faster subsequent runs
+1. Install `uv` package manager using astral-sh/setup-uv
+2. Install Python and project dependencies
+3. Install MicroPython stubs to `typings/` directory
+4. Cache environment for faster subsequent runs
 
 ### Local Development
 use `uv` for environment management
@@ -50,9 +47,6 @@ use `pytest` as the test runner
 # Windows: irm https://astral.sh/uv/install.ps1 | iex
 # Unix: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Initialize submodules
-git submodule update --init --recursive
-
 # Install dependencies
 uv sync
 
@@ -63,147 +57,100 @@ uv pip install micropython-esp32-stubs --target typings
 ## Project Structure
 
 ```
-d:\mypython\mp_codemirror\
+mp_codemirror/
 ├── .github/
-│   └── copilot-instructions.md  # This file - Agent instructions
+│   ├── copilot-instructions.md  # This file - Agent instructions
+│   └── workflows/
+│       ├── test.yml             # CI test workflow
+│       └── deploy.yml           # GitHub Pages deployment
 ├── src/
 │   ├── index.html      # Main HTML page
 │   ├── styles.css      # Custom styling
-│   └── app.js          # Application logic and CodeMirror setup
+│   ├── app.js          # Application logic and CodeMirror setup
+│   ├── lsp/            # LSP client implementation
+│   │   ├── client.js              # LSP client factory
+│   │   ├── simple-client.js       # LSP protocol (JSON-RPC)
+│   │   ├── worker-transport.js    # Web Worker transport
+│   │   ├── transport-factory.js   # Transport factory
+│   │   ├── diagnostics.js         # Diagnostics → CodeMirror
+│   │   ├── completion.js          # Autocompletion
+│   │   └── hover.js               # Hover tooltips
+│   ├── worker/         # Pyright Web Worker source
+│   │   └── pyright-worker.ts      # Worker entry (bundled to dist/)
+│   └── examples/       # Python example files
+├── dist/
+│   └── worker.js       # Built Pyright worker (webpack output)
+├── assets/
+│   └── stubs-manifest.json  # Board stubs manifest
+├── scripts/
+│   ├── pack-typeshed.mjs    # Pack typeshed for browser
+│   └── pack-stubs.mjs       # Pack stubs per board
 ├── tests/
-│   ├── conftest.py     # Pytest configuration and fixtures
-│   ├── test_editor.py  # Playwright-based editor tests
-│   └── README.md       # Testing documentation
-└── README.md           # Project documentation
+│   ├── conftest.py          # Pytest configuration and fixtures
+│   ├── test_editor.py       # Editor UI tests
+│   ├── test_worker_transport.py  # Worker transport tests
+│   ├── test_lsp_features.py     # LSP feature tests
+│   └── README.md            # Testing documentation
+├── typings/             # MicroPython type stubs
+├── justfile             # Build and dev task runner
+├── webpack.config.cjs   # Webpack config for worker build
+└── README.md            # Project documentation
 ```
 
-## Phase 1: Basic CodeMirror Setup (Current Phase)
+## Phase 1: Basic CodeMirror Setup (COMPLETE)
 
-### Requirements
+Delivered: Static HTML5 page with CodeMirror 6 loaded via CDN (esm.sh), Python syntax highlighting, line numbers, dark/light theme toggle, bracket matching, code folding, auto-indentation. Deploys to GitHub Pages as static files.
 
-1. **Single-page application** that works without a build step
-2. **CodeMirror 6** loaded via CDN (ES modules)
-3. **Python language support** only
-4. **Basic features**:
-   - Syntax highlighting for Python
-   - Line numbers
-   - Basic theme (light/dark toggle optional)
-   - Auto-indentation
-   - Bracket matching
-   - Code folding
+## Phase 2: LSP Integration (COMPLETE)
 
-### Implementation Steps
+Delivered: Pyright runs in a **Web Worker** (`dist/pyright_worker.js`, built via webpack). No server required.
 
-#### Step 1: Create src/index.html
-- Use modern HTML5 structure
-- Import CodeMirror 6 via ES modules from CDN (unpkg or jsDelivr)
-- Include a container div for the editor
-- Link to external CSS and JS files
+### What was built:
+- **Web Worker transport** (`src/lsp/worker-transport.js`) — runs Pyright in-browser
+- **Transport factory** (`src/lsp/transport-factory.js`) — creates the worker transport
+- **LSP client** (`src/lsp/simple-client.js`) — JSON-RPC 2.0, transport-agnostic
+- **Real-time diagnostics** — errors/warnings as you type (300ms debounce)
+- **Autocompletion** — context-aware completions from Pyright
+- **Hover tooltips** — type info, docstrings, MicroPython docs
 
-#### Step 2: Create src/app.js
-- Import necessary CodeMirror packages:
-  - `@codemirror/state`
-  - `@codemirror/view` (EditorView, basicSetup)
-  - `@codemirror/lang-python`
-  - `@codemirror/theme-one-dark` (optional)
-- Initialize EditorView with Python language support
-- Configure basic editor extensions (line numbers, bracket matching, etc.)
-- Add sample Python code as initial content
-
-#### Step 3: Create src/styles.css
-- Style the editor container (full viewport or configurable height)
-- Add responsive design considerations
-- Ensure proper font rendering (monospace font)
-
-#### Step 4: Create README.md
-- Document the project purpose
-- Add setup/deployment instructions for GitHub Pages
-- List current features and roadmap
-
-### CodeMirror 6 Extensions to Include
-
-```javascript
-- basicSetup (from @codemirror/basic-setup or manual selection)
-- python() (from @codemirror/lang-python)
-- EditorView.lineWrapping (optional)
-- bracketMatching()
-- closeBrackets()
-- indentOnInput()
-- highlightActiveLineGutter()
-- highlightActiveLine()
+### Build step:
+```bash
+just build          # or: npm run build:worker
+# Produces dist/pyright_worker.js
 ```
 
-### Testing Checklist
+## Phase 3: MicroPython Type Stubs (COMPLETE)
 
-- [ ] Page loads without errors in browser console
-- [ ] Python syntax is highlighted correctly
-- [ ] Line numbers display properly
-- [ ] Typing and editing works smoothly
-- [ ] Works on GitHub Pages after deployment
+Delivered: Board-specific MicroPython stubs with live switching.
 
-## Phase 2: LSP Integration (Future)
+### What was built:
+- **Board selector dropdown** — ESP32, RP2040, STM32
+- **Per-board stub packing** (`scripts/pack-stubs.mjs`) — stubs bundled as zip files
+- **Dynamic stub loading** — worker loads/unloads stubs on board switch
+- **ZenFS virtual filesystem** — in-worker filesystem for typeshed + stubs
+- Type stubs sourced from `micropython-esp32-stubs`, `micropython-rp2-stubs`
 
-### Planned Architecture
+## Phase 4: Testing, CI, and Code Quality (Current Phase)
 
-1. **Browser-based LSP client**:
-   - Use `vscode-languageclient/browser` or custom implementation
-   - WebSocket or Web Worker communication
+### Test tiers:
+```bash
+pytest tests/ -m unit -v          # Unit tests
+pytest tests/ -m editor -v        # Editor/UI tests (Playwright)
+pytest tests/ -m worker -v        # Web Worker tests
+pytest tests/ -m lsp -v           # LSP feature tests
+pytest tests/ -v                  # All tests
+```
 
-2. **Pylance LSP Server**:
-   - Options:
-     - Run Pylance in browser via Pyodide/WebAssembly (challenging)
-     - Host Pylance server separately (requires backend)
-     - Use alternative Python LSP (pyright standalone, python-lsp-server)
-
-3. **CodeMirror LSP Extension**:
-   - Create or integrate LSP extension for CodeMirror 6
-   - Map LSP features to CodeMirror (diagnostics, completions, hover)
-
-### LSP Features to Implement
-
-- Autocompletion (LSP completionProvider)
-- Hover tooltips (type information)
-- Diagnostics (errors/warnings as inline markers)
-- Go to definition
-- Find references
-- Signature help
-
-### Design Considerations
-
-- Keep static GitHub Pages deployment if possible
-- If backend needed, document hosting requirements
-- Consider WebAssembly-based solutions for client-only deployment
-
-## Phase 3: MicroPython Type Stubs (Future)
-
-### Requirements
-
-1. **Custom type stubs** for MicroPython stdlib
-2. **Device-specific stubs** (ESP32, RP2040, etc.)
-3. **LSP configuration** to prioritize MicroPython stubs over CPython
-
-### Implementation Strategy
-
-1. **Stub sources**:
-   - Use existing MicroPython stubs (micropython-stubs, Thonny, etc.)
-   - Generate stubs from MicroPython firmware documentation
-   - Maintain custom stub repository
-
-2. **LSP Integration**:
-   - Configure Pylance/Pyright to use MicroPython stubs
-   - Set `python.analysis.stubPath` or equivalent
-   - Disable incompatible CPython stdlib stubs
-
-3. **UI Enhancements**:
-   - Board/firmware selector dropdown
-   - Dynamic stub loading based on target
-   - Documentation links for MicroPython-specific APIs
+### CI:
+- `.github/workflows/test.yml` — runs tests on push/PR
+- `.github/workflows/deploy.yml` — deploys to GitHub Pages
 
 ### Testing Strategy
 
 - Test completion for MicroPython-specific modules (machine, micropython, etc.)
 - Verify CPython-only modules are not suggested
 - Test device-specific APIs (ESP32 vs RP2040)
+- Run test tiers independently: `pytest -m unit`, `pytest -m editor`, `pytest -m worker`, `pytest -m lsp`
 
 ## Development Guidelines
 

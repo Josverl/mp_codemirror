@@ -9,24 +9,13 @@ jobs:
         timeout-minutes: 10
 
         steps:
-            # Step 1: Checkout with submodules
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
-                  submodules: "recursive"
                   fetch-depth: 1
 
-            # Step 2: Update submodules to latest
-            - name: Update git submodules
-              run: |
-                  echo "📦 Updating git submodules..."
-                  git submodule sync --recursive
-                  git submodule update --init --recursive --remote
-                  git submodule status
-
-            # Step 3: Install uv package manager
             - name: Install uv
-              uses: astral-sh/setup-uv@v3
+              uses: astral-sh/setup-uv@v8.1.0
               with:
                   enable-cache: true
                   cache-dependency-glob: "pyproject.toml"
@@ -35,22 +24,11 @@ jobs:
             - name: Set up Python
               run: uv python install
 
-            # Step 5: Set up Node.js for LSP Bridge server
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v6
               with:
                   node-version: 'lts/*'
-                  cache: 'npm'
-                  cache-dependency-path: 'server/pyright-lsp-bridge/package.json'
 
-            # Step 6: Install Node.js dependencies for LSP Bridge
-            - name: Install LSP Bridge dependencies
-              run: |
-                  echo "📦 Installing Node.js dependencies for LSP Bridge..."
-                  cd server/pyright-lsp-bridge
-                  npm ci
-
-            # Step 7: Create virtual environment and install dependencies
             - name: Install project dependencies
               run: |
                   echo "📦 Installing dependencies with uv..."
@@ -77,7 +55,7 @@ jobs:
                   uv pip list
                   echo ""
                   echo "📍 Submodule Status:"
-                  git submodule status
+                  echo "(no submodules)"
                   echo ""
                   echo "📍 MicroPython Stubs:"
                   ls -la typings/ 2>/dev/null || echo "No typings directory yet"
@@ -96,7 +74,6 @@ jobs:
                       .venv
                       typings
                       ~/.cache/uv
-                      server/pyright-lsp-bridge/node_modules
-                  key: ${{ runner.os }}-env-${{ hashFiles('pyproject.toml', 'uv.lock', 'server/pyright-lsp-bridge/package.json', 'server/pyright-lsp-bridge/package-lock.json') }}
+                  key: ${{ runner.os }}-env-${{ hashFiles('pyproject.toml', 'uv.lock') }}
                   restore-keys: |
                       ${{ runner.os }}-env-

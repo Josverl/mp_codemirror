@@ -8,6 +8,8 @@ CodeMirror editor initialises correctly with Python syntax highlighting.
 import pytest
 from playwright.sync_api import Page, expect
 
+pytestmark = pytest.mark.editor
+
 
 def test_no_cdn_errors_on_load(page: Page, live_server):
     """
@@ -24,11 +26,10 @@ def test_no_cdn_errors_on_load(page: Page, live_server):
 
     page.on("console", handle_console)
     page.goto(f"{live_server}/index.html")
-    page.wait_for_load_state("networkidle", timeout=15_000)
+    # Wait for editor to render rather than networkidle (worker keeps network busy)
+    page.wait_for_selector(".cm-editor", timeout=30_000)
 
-    assert cdn_errors == [], (
-        f"Found {len(cdn_errors)} CDN error(s):\n" + "\n".join(cdn_errors[:5])
-    )
+    assert cdn_errors == [], f"Found {len(cdn_errors)} CDN error(s):\n" + "\n".join(cdn_errors[:5])
 
 
 def test_codemirror_editor_initialises(page: Page, live_server):

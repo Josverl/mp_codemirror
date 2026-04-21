@@ -5,81 +5,86 @@ Pytest configuration for CodeMirror Editor tests
 import socket
 import subprocess
 import time
+import urllib.request
 from pathlib import Path
+
+# Build artifact detection
+WORKER_JS = Path(__file__).parent.parent / "dist" / "pyright_worker.js"
+worker_available = WORKER_JS.exists()
 
 import pytest
 from playwright.sync_api import sync_playwright
 
 
-def is_port_open(host, port):
-    """Check if a port is open"""
+def is_port_open(host: str, port: int) -> bool:
+    """Check if a TCP port is accepting connections."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(1)
     try:
-        result = sock.connect_ex((host, port))
-        sock.close()
-        return result == 0
+        return sock.connect_ex((host, port)) == 0
     except Exception:
         return False
+    finally:
+        sock.close()
 
 
-@pytest.fixture(scope="session")
-def lsp_server():
-    """
-    Verify the Pyright LSP bridge server is running.
-    Note: The server should be started manually via VSCode tasks or 'npm start' 
-    before running tests.
-    """
-    # Check if LSP server is running on port 9011
-    if not is_port_open("localhost", 9011):
-        pytest.fail(
-            "LSP server is not running on port 9011. "
-            "Start it with: Run Task > 'Start All Servers' or 'npm start' in server/pyright-lsp-bridge"
-        )
-    
-    yield "ws://localhost:9011/lsp"
+def _detect_server_base_url() -> str | None:
+    """Return the base URL of the HTTP server on :8888 by probing known paths."""
+    for candidate in (
+        "http://localhost:8888/index.html",
+        "http://localhost:8888/src/index.html",
+    ):
+        try:
+            resp = urllib.request.urlopen(candidate, timeout=2)
+            if resp.status == 200:
+                return candidate.removesuffix("/index.html")
+        except Exception:
+            pass
+    return None
 
 
 @pytest.fixture(scope="session")
 def live_server():
     """
-    Start or verify HTTP server is running.
-    If port 8888 is already in use, assume server is running and use it.
-    Otherwise, start a new server.
+    Provide the base URL for the editor.  Reuses an already-running server on
+    :8888 (detecting whether it serves from the project root or src/), and
+    starts a fresh one only when the port is free.
     """
-    server_url = "http://localhost:8888"
-    
-    # Check if server is already running
     if is_port_open("localhost", 8888):
-        # Server already running, use it
-        yield server_url
+        base = _detect_server_base_url()
+        yield base or "http://localhost:8888"
         return
-    
-    # Get the src directory path
-    src_dir = Path(__file__).parent.parent / "src"
 
-    # Start the HTTP server in the background
+    # Serve from project root so both src/ and dist/ are accessible
+    project_root = Path(__file__).parent.parent
     process = subprocess.Popen(
-        ["python", "-m", "http.server", "8888"],
-        cwd=str(src_dir),
+        ["python3", "-m", "http.server", "8888"],
+        cwd=str(project_root),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-
-    # Wait for server to start
     time.sleep(1)
-
-    # Yield the server URL
-    yield server_url
-
-    # Cleanup: terminate the server
+    yield "http://localhost:8888/src"
     process.terminate()
     process.wait()
 
 
 @pytest.fixture(scope="session")
+def project_server(live_server):
+    """Base URL serving the project root (for tests that need both src/ and dist/).
+
+    If live_server already points to root, returns it as-is.
+    If it points to /src, returns the parent.
+    """
+    if live_server.endswith("/src"):
+        yield live_server.removesuffix("/src")
+    else:
+        yield live_server
+
+
+@pytest.fixture(scope="session")
 def browser():
-    """Create a browser instance for the entire test session"""
+    """Single browser instance shared across the test session."""
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         yield browser
@@ -88,14 +93,20 @@ def browser():
 
 @pytest.fixture(scope="function")
 def page(browser):
-    """Create a new page for each test (reusing the browser)"""
-    # ignore_https_errors allows CDN resources to load in environments
-    # where a TLS interception proxy is in use (e.g. CI/CD sandboxes)
+    """Fresh page (and context) for every test function."""
+    # ignore_https_errors lets CDN resources load behind TLS interception proxies
     context = browser.new_context(ignore_https_errors=True)
     page = context.new_page()
-    
     yield page
-    
-    # Cleanup
+    page.close()
+    context.close()
+
+
+@pytest.fixture(scope="module")
+def shared_page(browser):
+    """Module-scoped page for read-only tests. Avoids CDN re-downloads."""
+    context = browser.new_context(ignore_https_errors=True)
+    page = context.new_page()
+    yield page
     page.close()
     context.close()

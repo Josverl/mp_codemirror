@@ -34,6 +34,9 @@ let currentTypeCheckMode = localStorage.getItem('mp_typeCheckMode') || 'standard
 // Debounce timer for didChange notifications
 let changeDebounceTimer = null;
 
+// Theme compartment — reconfigured on theme toggle
+let themeCompartment = new Compartment();
+
 // LSP compartment — reconfigured on board switch
 let lspCompartment = new Compartment();
 const CHANGE_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
@@ -458,6 +461,7 @@ async function initializeEditor() {
     const extensions = [
         basicSetup,
         python(),
+        themeCompartment.of(isDarkTheme ? darkTheme : lightTheme),
         lintKeymapExtension,      // F8 / Shift-F8 diagnostic navigation
         createUpdateListener(),   // Add real-time diagnostics listener
         lspCompartment.of([])     // Start with empty LSP extensions
@@ -513,8 +517,12 @@ function toggleTheme() {
     document.body.classList.toggle('light-theme', !isDarkTheme);
     document.body.classList.toggle('dark-theme', isDarkTheme);
 
-    // Note: Currently theme changes via CSS only
-    // TODO: Implement proper editor theme reconfiguration with darkTheme/lightTheme extensions
+    // Reconfigure the editor theme
+    if (view) {
+        view.dispatch({
+            effects: themeCompartment.reconfigure(isDarkTheme ? darkTheme : lightTheme)
+        });
+    }
 }
 
 // Clear editor content

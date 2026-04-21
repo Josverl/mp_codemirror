@@ -36,7 +36,7 @@ const CHANGE_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
 
 // Resolve base path for assets (stubs, manifest)
 function getAssetsBase() {
-    return window.location.pathname.includes('/src/') ? '../assets' : './stubs';
+    return window.location.pathname.includes('/src/') ? '../assets' : './assets';
 }
 
 // Fetch board stubs manifest and populate the board selector

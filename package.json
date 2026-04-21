@@ -9,7 +9,6 @@
     "build:typeshed": "node scripts/pack-typeshed.mjs"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
     "@zenfs/archives": "^0.1.0",
     "@zenfs/core": "1.6.4",
     "archiver": "^7.0.1",

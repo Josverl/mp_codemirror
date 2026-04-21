@@ -51,6 +51,8 @@ extraPaths = ["src/lib"]
 # how to check
 typeCheckingMode = "standard"
 pythonPlatform = "Linux"
+reportMissingImports = true
+reportMissingTypeStubs = false
 reportMissingModuleSource = "none"
 reportOptionalMemberAccess = "information"
 reportOptionalCall = "information"

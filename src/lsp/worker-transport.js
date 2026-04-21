@@ -16,6 +16,7 @@ export class WorkerTransport {
         this._messageQueue = [];
         this._connectReject = null;
         this._boardStubs = options.boardStubs; // ArrayBuffer | false | undefined
+        this._typeCheckingMode = options.typeCheckingMode; // string | undefined
     }
 
     /**
@@ -56,6 +57,7 @@ export class WorkerTransport {
                         userFiles: {},
                         typeshedFallback: undefined, // use bundled typeshed
                         boardStubs: this._boardStubs, // use bundled default or override
+                        typeCheckingMode: this._typeCheckingMode,
                     });
                     return;
                 }

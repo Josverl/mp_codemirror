@@ -112,21 +112,23 @@ function createUserFiles(parentPath: string, folder: UserFolder) {
 /**
  * Create pyrightconfig.json in the virtual workspace
  */
-function writePyrightConfig() {
+function writePyrightConfig(typeCheckingMode: string = "standard") {
     const config = {
         typeshedPath: "/typeshed-fallback",
         stubPath: "/typings",
         include: ["/workspace"],
         pythonPlatform: "Linux",
-        typeCheckingMode: "standard",
+        typeCheckingMode,
         reportMissingModuleSource: "none",
         reportMissingTypeStubs: false,
     };
 
+    const configJson = JSON.stringify(config, null, 2);
     fs.writeFileSync(
         "/workspace/pyrightconfig.json",
-        JSON.stringify(config, null, 2)
+        configJson
     );
+
 }
 
 /**
@@ -143,7 +145,7 @@ async function handleInitServer(msg: MsgInitServer) {
         }
 
         // Write pyrightconfig
-        writePyrightConfig();
+        writePyrightConfig(msg.typeCheckingMode || "standard");
 
         console.log("[pyright-worker] Creating Pyright server...");
 

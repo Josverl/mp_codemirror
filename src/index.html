@@ -20,8 +20,17 @@
                 </select>
                 <span id="boardLoading" class="loading-indicator" hidden>⏳</span>
             </div>
-            <button id="themeToggle" aria-label="dark/light theme">🌓 Toggle Theme</button>
-            <button id="typeCheckBtn" aria-label="type check with Pyright">🔍 Type Check</button>
+            <div class="typecheck-selector">
+                <label for="typeCheckMode">Check:</label>
+                <select id="typeCheckMode" aria-label="Pyright type checking mode">
+                    <option value="off">Off</option>
+                    <option value="basic">Basic</option>
+                    <option value="standard" selected>Standard</option>
+                    <option value="strict">Strict</option>
+                </select>
+            </div>
+            <button id="themeToggle" aria-label="dark/light theme">🌓</button>
+            <button id="typeCheckBtn" aria-label="type check with Pyright">🔍👀</button>
             <button id="clearBtn" aria-label="Clear">Clear</button>
             <div class="sample-selector">
                 <select id="sampleSelect" aria-label="Select example file">

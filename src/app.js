@@ -27,6 +27,9 @@ let currentBoardId = null;
 let boardManifest = null;
 let stubsCache = new Map(); // boardId → ArrayBuffer
 
+// Type checking mode
+let currentTypeCheckMode = localStorage.getItem('mp_typeCheckMode') || 'standard';
+
 // Debounce timer for didChange notifications
 let changeDebounceTimer = null;
 
@@ -122,6 +125,7 @@ async function handleBoardChange(event) {
                 workerUrl,
                 timeout: 15000,
                 boardStubs: stubs,
+                typeCheckingMode: currentTypeCheckMode,
             }
         );
 
@@ -149,6 +153,64 @@ async function handleBoardChange(event) {
         console.error(`Board switch failed:`, err);
         // Revert UI to current board
         select.value = currentBoardId;
+    } finally {
+        loading.hidden = true;
+        select.disabled = false;
+    }
+}
+
+// Handle type checking mode change — requires worker restart
+async function handleTypeCheckModeChange(event) {
+    const newMode = event.target.value;
+    if (newMode === currentTypeCheckMode) return;
+
+    if (!lspClient || !lspTransport) {
+        currentTypeCheckMode = newMode;
+        localStorage.setItem('mp_typeCheckMode', newMode);
+        return;
+    }
+
+    const loading = document.getElementById('boardLoading');
+    const select = event.target;
+
+    try {
+        loading.hidden = false;
+        select.disabled = true;
+
+        const stubs = await fetchBoardStubs(currentBoardId);
+        const workerUrl = window.location.pathname.includes('/src/')
+            ? '../dist/pyright_worker.js'
+            : './pyright_worker.js';
+
+        const result = await switchBoard(
+            { client: lspClient, transport: lspTransport },
+            {
+                workerUrl,
+                timeout: 15000,
+                boardStubs: stubs,
+                typeCheckingMode: newMode,
+            }
+        );
+
+        lspClient = result.client;
+        lspTransport = result.transport;
+        currentTypeCheckMode = newMode;
+        localStorage.setItem('mp_typeCheckMode', newMode);
+
+        if (view) {
+            view.dispatch(setDiagnostics(view.state, []));
+            const content = view.state.doc.toString();
+            documentVersion = 1;
+            const newExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', content);
+            view.dispatch({
+                effects: lspCompartment.reconfigure(newExtensions)
+            });
+        }
+
+        console.log(`Switched to type checking mode: ${newMode}`);
+    } catch (err) {
+        console.error('Type check mode switch failed:', err);
+        select.value = currentTypeCheckMode;
     } finally {
         loading.hidden = true;
         select.disabled = false;
@@ -338,6 +400,7 @@ async function initializeEditor() {
         const lspResult = await createLSPClient({
             workerUrl,
             timeout: 15000,
+            typeCheckingMode: currentTypeCheckMode,
         });
         lspClient = lspResult.client;
         lspTransport = lspResult.transport;
@@ -500,6 +563,14 @@ document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 document.getElementById('typeCheckBtn').addEventListener('click', triggerTypeCheck);
 document.getElementById('clearBtn').addEventListener('click', clearEditor);
 document.getElementById('loadSampleBtn').addEventListener('click', loadSample);
+document.getElementById('typeCheckMode').addEventListener('change', handleTypeCheckModeChange);
+
+// Restore saved type checking mode
+const savedTypeCheckMode = localStorage.getItem('mp_typeCheckMode');
+if (savedTypeCheckMode) {
+    document.getElementById('typeCheckMode').value = savedTypeCheckMode;
+    currentTypeCheckMode = savedTypeCheckMode;
+}
 
 // Initialize with light theme
 document.body.classList.add('light-theme');

@@ -4,7 +4,7 @@
   "boards": [
     {
       "id": "esp32",
-      "name": "esp32 ESP32_GENERIC",
+      "name": "esp32",
       "file": "stubs-esp32.zip",
       "size": 251972,
       "description": "ESP32 with WiFi, BLE, machine, esp32 modules",
@@ -12,7 +12,7 @@
     },
     {
       "id": "rp2",
-      "name": "rp2 Pico_W (RP2040)",
+      "name": "Pico_W (rp2)",
       "file": "stubs-rp2.zip",
       "size": 252956,
       "description": "RP2040 with PIO, machine, rp2 modules",
@@ -20,15 +20,23 @@
     },
     {
       "id": "stm32",
-      "name": "stm32 PYBV11",
+      "name": "Pyboard v1.1",
       "file": "stubs-stm32.zip",
       "size": 256646,
       "description": "STM32 with machine, pyb modules",
       "bundled": false
     },
     {
+      "id": "samd",
+      "name": "Wio Terminal (samd)",
+      "file": "stubs-samd.zip",
+      "size": 198029,
+      "description": "SAMD51",
+      "bundled": false
+    },
+    {
       "id": "cpython",
-      "name": "Just CPython (no stubs)",
+      "name": "CPython (no stubs)",
       "file": null,
       "size": 0,
       "description": "Standard CPython only \u2014 no MicroPython stubs loaded",

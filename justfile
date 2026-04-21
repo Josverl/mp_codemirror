@@ -83,9 +83,9 @@ serve:
 test *args='':
     pytest tests/ -v {{args}}
 
-# run only the spike/worker tests
+# run only the worker transport tests
 test-worker *args='':
-    pytest tests/test_spike_worker.py -v {{args}}
+    pytest tests/test_worker_transport.py -v {{args}}
 
 # --- Info recipes ---
 

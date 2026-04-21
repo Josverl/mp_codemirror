@@ -4,18 +4,19 @@ A static HTML5 application featuring a CodeMirror 6 editor with full LSP support
 
 ## Features
 
-### Current (Phase 1 & 2)
-- ✅ Python syntax highlighting
-- ✅ Line numbers
-- ✅ Dark/Light theme toggle
-- ✅ Auto-indentation (4 spaces for Python)
-- ✅ Bracket matching and auto-closing
-- ✅ Code folding
-- ✅ Multiple cursors/selections
-- ✅ Search functionality (Ctrl/Cmd+F)
-- ✅ Undo/Redo history
-- ✅ Tab key support for indentation
-- ✅ Responsive design (mobile-friendly)
+### Current 
+- ✅ Tablestakes CodeMirror functionality 
+   - ✅ Line numbers
+   - ✅ Dark/Light theme toggle
+   - ✅ Auto-indentation (4 spaces for Python)
+   - ✅ Bracket matching and auto-closing
+   - ✅ Code folding
+   - ✅ Multiple cursors/selections
+   - ✅ Search functionality (Ctrl/Cmd+F)
+   - ✅ Undo/Redo history
+   - ✅ Tab key support for indentation
+   - ✅ Responsive design (though the current layout is bad 😁)
+- ✅ **MicroPython** syntax highlighting
 - ✅ **LSP Integration** - Pyright running in a Web Worker (no server needed)
 - ✅ **Real-time Diagnostics** - Errors and warnings as you type (debounced 300ms)
 - ✅ **Type Checking** - Full Python type analysis
@@ -24,7 +25,7 @@ A static HTML5 application featuring a CodeMirror 6 editor with full LSP support
 
 ### Real-Time Diagnostics
 
-The editor now provides **real-time feedback** on your Python code:
+The editor provides **real-time feedback** on your MicroPython code:
 
 - **Instant Error Detection:** Syntax errors, undefined variables, and import issues are highlighted as you type
 - **Smart Debouncing:** Changes are sent to the LSP server after 300ms of inactivity to prevent overwhelming the server

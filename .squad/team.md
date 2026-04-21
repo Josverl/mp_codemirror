@@ -26,6 +26,15 @@
 | Virgil | Diagram Specialist | `.squad/agents/virgil/charter.md` | ✅ Active |
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 📋 Silent |
 | Ralph | Work Monitor | `.squad/agents/ralph/charter.md` | 🔄 Monitor |
+| @copilot | 🤖 Coding Agent | `copilot-instructions.md` | ✅ Active |
+
+<!-- copilot-auto-assign: true -->
+
+### @copilot Capability Profile
+
+- 🟢 Good fit: bug fix, test coverage, lint, format, dependency update, small feature, scaffolding, doc fix, documentation, shareable, link, url, encode, decode, css, style, dropdown, button, ui tweak
+- 🟡 Needs review: medium feature, refactoring, api endpoint, migration, new component, new page
+- 🔴 Not suitable: architecture, system design, security, auth, encryption, performance, multi-agent, webpack config, pyright internals
 
 ## Project Context
 

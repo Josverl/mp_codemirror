@@ -47,9 +47,11 @@ How to decide who handles what.
 | Work Type | Primary | Secondary |
 |-----------|---------|----------|
 | System design, test strategy | Danny | — |
-| CodeMirror, Playwright, UI | Basher | — |
-| LSP bridge, pytest, server | Rusty | — |
+| CodeMirror, Playwright, UI | Basher | @copilot |
+| LSP bridge, pytest, server | Rusty | @copilot |
 | End-to-end, LSP+editor flows | Linus | — |
 | JS unit tests, Web Workers, webpack, MSW | Turk | — |
 | CI, environment, tooling | Livingston | — |
+| Bug fixes, small features, scaffolding | @copilot | — |
+| Documentation fixes | @copilot | Tess, Frank |
 

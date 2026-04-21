@@ -135,43 +135,54 @@ Browser (static HTML page served from GitHub Pages)
 
 ## 5. Implementation Path
 
-### Phase 1: Static Editor
+### Step 1: Static Editor
 
-Built a CodeMirror 6 editor loaded entirely via CDN (esm.sh). Python syntax highlighting, line numbers, bracket matching, code folding, auto-indentation, search, theme toggle.
+Built a CodeMirror 6 editor loaded entirely via a CDN (I selected esm.sh). This provides basic Python syntax highlighting, line numbers, bracket matching, code folding, auto-indentation, search, theme toggle.
+This is table stakes, code mirror does the heavy lifting.
 
-**Key challenge:** CDN version conflicts. Multiple CodeMirror packages pulling different versions of `@codemirror/state` caused `instanceof` failures. Solved with explicit `?deps=` pinning in an import map.
+**Key challenge:** MicroPython is not CPython - Your editor will show many errors, in good code, and also wont notice some errors in  invalid MicroPython code.
 
-**Enabled:** A working Python editor deployable to GitHub Pages with zero build step for the editor itself.
+### Step 2: LSP Integration
 
-### Phase 2: LSP Integration
+Add Pyright as a language server. 
+Started with a WebSocket bridge prototype, then migrated to a Web Worker (`src/worker/pyright-worker.ts`) — Pyright runs entirely in the browser.
+Implemented three LSP features: 
+ - real-time diagnostics (errors/warnings as you type),
+ - autocompletion (context-aware suggestions with type-based icons),
+ - hover tooltips (signatures, docstrings, documentation links).
 
-Added Pyright as a language server. Started with a WebSocket bridge prototype, then migrated to a Web Worker (`src/worker/pyright-worker.ts`) — Pyright runs entirely in the browser.
+**Key challenge:** Bundling Pyright for the browser via webpack. 
+Pyright depends on Node APIs (`fs`, `path`, `child_process`) that don't exist in a Web Worker. 
+Solved by aliasing `fs` to ZenFS, stubbing `@yarnpkg/fslib` and `tmp`, and adding polyfills for `assert`, `crypto`, `stream`, `url`, `zlib`.
 
-Implemented three LSP features: real-time diagnostics (errors/warnings as you type), autocompletion (context-aware suggestions with type-based icons), and hover tooltips (signatures, docstrings, documentation links).
-
-**Key challenge:** Bundling Pyright for the browser via webpack. Pyright depends on Node APIs (`fs`, `path`, `child_process`) that don't exist in a Web Worker. Solved by aliasing `fs` to ZenFS, stubbing `@yarnpkg/fslib` and `tmp`, and adding polyfills for `assert`, `crypto`, `stream`, `url`, `zlib`.
-
-**Enabled:** Full type checking in the browser with no server. The transport-agnostic client design meant the migration from WebSocket to Web Worker required zero changes to the LSP protocol code.
+**Enabled:** Full type checking in the browser with no server. T
+he transport-agnostic client design meant the migration from WebSocket to Web Worker required zero changes to the LSP protocol code.
 
 ### Phase 3: MicroPython Stubs
 
-Added board-specific MicroPython type stubs. Built a board selector UI (ESP32, RP2040, STM32). Created packing scripts (`scripts/pack-stubs.mjs`) that zip per-board stubs from the installed `micropython-*-stubs` packages. The worker loads stubs into a ZenFS virtual filesystem alongside typeshed.
+Added board-specific MicroPython type stubs including a simple port/board selector UI (ESP32, RP2040, STM32). 
+Created packing scripts (`scripts/pack-stubs.mjs`) that zip per-board stubs from the installed `micropython-*-stubs` packages. 
+The worker loads these stubs into a ZenFS virtual filesystem alongside typeshed.
 
-**Key challenge:** Stub loading and board switching. Stubs must be available in the worker's virtual filesystem before Pyright can use them. Board switching requires a clean Pyright state — the simplest approach was destroying and recreating the worker.
+**Key challenge:** Stub loading and board switching. 
+Stubs must be available in the worker's virtual filesystem before Pyright can use them. 
+Board switching requires a clean Pyright state — the simplest approach was destroying and recreating the worker.
 
-**Enabled:** Board-specific completions, diagnostics, and hover docs. `import espnow` works on ESP32 but errors on RP2040. `rp2.PIO` completes on RP2040 but not ESP32.
+**Enabled:** Board-specific completions, diagnostics, and hover docs. 
+- `import espnow` works on ESP32 but errors on RP2040.
+- `rp2.PIO` completes on RP2040 but not ESP32.
 
 ### Phase 4: Testing and CI
 
-Added a Pytest + Playwright test suite with four tiers: unit tests, editor UI tests, Web Worker transport tests, and LSP feature tests. GitHub Actions CI runs tests on push and PR. Deployment workflow pushes to GitHub Pages.
+Added a Pytest + Playwright test suite with four tiers: 
+ - unit tests, editor UI tests, Web Worker transport tests, and LSP feature tests.
+ - GitHub Actions CI runs tests on push and PR. Deployment workflow pushes to GitHub Pages.
 
 **Key challenge:** Testing async Web Worker communication from Python. Playwright's page evaluation and network interception were used to verify LSP message flows.
 
-**Enabled:** Regression protection. Confidence to refactor without breaking features.
-
 ---
 
-## 6. Integration Guide — Adding MicroPython LSP to Your Tool
+# Integration Guide — Adding MicroPython LSP to Your Tool
 
 If you already have a CodeMirror 6 editor and want to add MicroPython type checking, here's what to integrate. Each step builds on the previous one. Steps 1-5 give you a working editor with diagnostics; steps 6-7 are optional enhancements.
 
@@ -242,14 +253,15 @@ See `scripts/pack-stubs.mjs` for the packing logic. You can also fetch stub zips
 
 Pyright reads `pyrightconfig.json` from the virtual filesystem. You can write one into ZenFS at worker startup to control:
 
-- `typeCheckingMode` — `"off"`, `"basic"`, `"standard"`, or `"strict"`
+- `typeCheckingMode` — `"off"`, `"basic"`, `"standard"`, or `"strict"` (recommended `"standard"` ) 
 - `pythonVersion` — e.g., `"3.4"` (MicroPython roughly targets Python 3.4)
 - `pythonPlatform` — e.g., `"Linux"`
 - `typingsPath` — where to find stubs (default: `./typings`)
+- `typeshedPath` — required to override stdlib stubs such as `time.sleep_ms()` (default: `./typings`)
 
 ### Step 7: Add Board / Port / Version Switching (Optional)
 
-If your users work with multiple MicroPython boards:
+If your users work with multiple MicroPython ports or boards, or versions:
 
 1. Create a UI selector (dropdown, tabs, etc.)
 2. Maintain a manifest mapping board IDs to stub zip URLs
@@ -260,7 +272,7 @@ The worker teardown/recreate approach is the simplest way to get a clean Pyright
 
 ---
 
-## 7. Current Limitations
+## PoC Limitations
 
 - **Three boards only** — ESP32, RP2040, STM32, all at firmware version 1.28.0. No other boards or firmware versions.
 - **No go-to-definition or find-references** — Only diagnostics, completions, and hover are implemented.
@@ -275,7 +287,7 @@ The worker teardown/recreate approach is the simplest way to get a clean Pyright
 
 ---
 
-## 8. Future Improvements
+## Future Improvements
 
 - **More boards and firmware versions** — Pack stubs for ESP32-S3, ESP32-C3, ESP8266, and more. Add a version selector alongside the board selector.
 - **Size optimization** — Tree-shake Pyright to remove unused analysis features. Lazy-load board stubs (fetch only when selected). Apply compression to the worker bundle.

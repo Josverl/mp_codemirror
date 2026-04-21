@@ -18,6 +18,9 @@
 | Linus | Integration Tester | `.squad/agents/linus/charter.md` | ✅ Active |
 | Livingston | DevOps | `.squad/agents/livingston/charter.md` | ✅ Active |
 | Turk | Web/JS Tester | `.squad/agents/turk/charter.md` | ✅ Active |
+| Saul | Release Manager | `.squad/agents/saul/charter.md` | ✅ Active |
+| Yen | Security Specialist | `.squad/agents/yen/charter.md` | ✅ Active |
+| Reuben | Code Reviewer | `.squad/agents/reuben/charter.md` | ✅ Active |
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 📋 Silent |
 | Ralph | Work Monitor | `.squad/agents/ralph/charter.md` | 🔄 Monitor |
 

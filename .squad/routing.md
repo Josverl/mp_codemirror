@@ -9,8 +9,10 @@ How to decide who handles what.
 | {domain 1} | {Name} | {example tasks} |
 | {domain 2} | {Name} | {example tasks} |
 | {domain 3} | {Name} | {example tasks} |
-| Code review | {Name} | Review PRs, check quality, suggest improvements |
-| Testing | {Name} | Write tests, find edge cases, verify fixes |
+| Code review | Reuben | Review PRs, check quality, suggest improvements |
+| Security | Yen | OWASP, CSP, SRI, supply chain, XSS prevention |
+| Release management | Saul | Tags, versioning, changelogs, deploy gates |
+| Testing | Basher, Rusty, Linus, Turk | Write tests, find edge cases, verify fixes |
 | Scope & priorities | {Name} | What to build next, trade-offs, decisions |
 | Session logging | Scribe | Automatic — never needs routing |
 

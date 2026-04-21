@@ -72,7 +72,7 @@ You can verify this works by:
    - All buttons should function correctly
    - No console errors
 
-## Alternative Approaches (Not Used)
+## Alternative Approaches
 
 ### 1. Import Map with Manual Package Entries
 Defining each package separately in the import map:
@@ -101,7 +101,7 @@ Using `?bundle` or `?standalone` flags:
 - Still doesn't solve version conflicts with the base `codemirror` package
 
 ### 3. Using Different CDN Providers
-Tried: jspm.dev, unpkg, cdn.jsdelivr.net, cdn.skypack.dev
+Options: jspm.dev, unpkg, cdn.jsdelivr.net, cdn.skypack.dev
 **Issues:**
 - Same fundamental problem with version resolution
 - Some CDNs don't support import maps well
@@ -110,9 +110,8 @@ Tried: jspm.dev, unpkg, cdn.jsdelivr.net, cdn.skypack.dev
 ### 4. Local Bundling with Vite/Rollup
 Using a build tool to bundle everything:
 **Issues:**
-- Requires build step (violates project goal)
-- Can't deploy as static files to GitHub Pages without CI/CD
 - More complex development workflow
+- Orthrogonal to the purpose of this PoC
 
 ## Best Practices for CDN-Based CodeMirror
 
@@ -132,19 +131,6 @@ When adding new CodeMirror extensions, use the same dependency versions:
 // When adding @codemirror/lang-javascript
 "@codemirror/lang-javascript": "https://esm.sh/@codemirror/lang-javascript@6.2.2?deps=@codemirror/state@6.4.1,@codemirror/view@6.35.0,..."
 ```
-
-### 3. Test After Changes
-Always test after modifying the import map:
-- Check browser console for errors
-- Test all editor functionality
-- Verify syntax highlighting works
-- Use Playwright tests to catch regressions
-
-### 4. Document Version Choices
-Keep a record of why specific versions were chosen:
-- Compatibility requirements
-- Bug fixes in specific versions
-- Breaking changes to avoid
 
 ## Debugging Version Conflicts
 
@@ -206,7 +192,7 @@ Add `<link rel="modulepreload">` for faster loading:
 The Pyright Web Worker bundles typeshed and stubs into the worker itself, so no additional caching strategy is needed for LSP data.
 
 ### 3. Lazy Loading Language Modes
-Load Python support only when needed:
+Load Python support only when needed (but that is most of the times anyway) :
 ```javascript
 const python = await import('@codemirror/lang-python');
 view.dispatch({
@@ -417,7 +403,7 @@ User clicks         app.js              diagnostics.js      SimpleLSPClient     
 ### Why Custom Implementation?
 
 **No Official CodeMirror LSP Package:**
-- `@codemirror/lsp-client` doesn't exist as a stable package
+- `@codemirror/lsp-client` doesn't exist as a **stable** package
 - Other LSP client libraries (like `vscode-languageclient`) are designed for VS Code, not browsers
 
 **Custom Implementation Benefits:**
@@ -434,8 +420,8 @@ User clicks         app.js              diagnostics.js      SimpleLSPClient     
 - ✅ `textDocument/publishDiagnostics` notification handling
 - ✅ Real-time diagnostics with automatic updates
 - ✅ Document version tracking
-- ⏳ `textDocument/completion` (Sprint 4)
-- ⏳ `textDocument/hover` (Sprint 4)
+- ⏳ `textDocument/completion`
+- ⏳ `textDocument/hover`
 
 ### Testing the LSP Client
 
@@ -477,38 +463,19 @@ lspClient.onNotification((method, params) => {
 
 ### Future Enhancements
 
-**Sprint 3: Real-Time Diagnostics** ✅ **COMPLETE**
-- ✅ Added debounced `textDocument/didChange` on every keystroke (300ms)
-- ✅ Optimized message frequency with debouncing
-- ✅ Document version tracking
+**Add functionality**
 - 📝 Incremental sync for large documents (deferred to performance optimization phase)
-
-**Sprint 4: Autocompletion** ✅ **COMPLETE**
-- ✅ Implemented `textDocument/completion` LSP integration
-- ✅ Context-aware position calculation (attribute access vs word completion)
-- ✅ Type-based completion icons (function, variable, class, keyword)
-- ✅ Support for Python stdlib, imports, and MicroPython modules
-- ✅ Detailed documentation in .ai_history/SPRINT4_SUMMARY.md
-
-**Sprint 4: Hover Tooltips** ✅ **COMPLETE**
-- ✅ Hover tooltips (`textDocument/hover`) with rich documentation
-- ✅ Markdown rendering with code block support
-- ✅ Dual-theme CSS styling for readability
-- ✅ Position range calculation from LSP
-- ✅ Integration with @codemirror/view hoverTooltip extension
-
-**Sprint 4: Future LSP Features** (Next)
 - ⏳ Go to definition (`textDocument/definition`)
 - ⏳ Find references (`textDocument/references`)
 - ⏳ Signature help (`textDocument/signatureHelp`)
 
-**Performance Optimizations** (Future)
+**Performance Optimizations** 
 - Message batching for multiple rapid changes
 - Incremental document sync (send diffs, not full text)
 - Web Worker for message processing
 - Completion result caching
 
-## LSP Autocompletion Architecture (Sprint 4)
+## LSP Autocompletion Architecture 
 
 ### Overview
 
@@ -675,31 +642,7 @@ const completionExtension = autocompletion({
 
 ### Common Issues & Solutions
 
-#### Issue 1: Completion Menu Not Appearing
-
-**Symptom:** LSP returns items but menu doesn't show.
-
-**Cause:** Incorrect `from` position calculation.
-
-**Solution:** 
-```javascript
-// WRONG: Always use word.from
-const from = word.from;  // Breaks "sys." completion
-
-// RIGHT: Context-aware
-const from = word.text.endsWith('.') ? pos : word.from;
-```
-
-#### Issue 2: Import Map Missing
-
-**Symptom:** `Failed to resolve module specifier "@codemirror/autocomplete"`
-
-**Solution:** Add to import map in `index.html`:
-```javascript
-"@codemirror/autocomplete": "https://esm.sh/@codemirror/autocomplete@6.18.3?deps=..."
-```
-
-#### Issue 3: Empty Results on Syntax Errors
+#### Issue 1: Empty Results on Syntax Errors
 
 **Symptom:** Typing `sys.` shows no completions automatically.
 
@@ -714,11 +657,6 @@ const from = word.text.endsWith('.') ? pos : word.from;
 - Format conversion: ~5ms (96 items)
 - UI rendering: ~10ms (CodeMirror)
 - **Total:** ~65-115ms from trigger to display
-
-**Optimization:**
-- ✅ Early return on no match (avoids LSP call)
-- ✅ `validFor` regex filters client-side (reduces LSP calls)
-- ⚠️ No result caching (future improvement)
 
 ### File Structure
 
@@ -749,11 +687,11 @@ src/lsp/
 - [ ] Signature help during function calls
 - [ ] Trigger character configuration
 
-## LSP Hover Tooltips Architecture (Sprint 4)
+## LSP Hover Tooltips Architecture 
 
 ### Overview
 
-Sprint 4 added LSP-powered hover tooltips using Pyright's `textDocument/hover` capability. The implementation integrates with CodeMirror's `hoverTooltip` extension to display rich documentation on mouse hover.
+Adds LSP-powered hover tooltips using Pyright's `textDocument/hover` capability. The implementation integrates with CodeMirror's `hoverTooltip` extension to display rich documentation on mouse hover.
 
 ### Component Structure
 
@@ -879,7 +817,7 @@ function renderMarkdown(container, markdown) {
 - ✅ Simple and fast
 - ✅ Handles code blocks correctly
 - ✅ Preserves HTML in documentation
-- ⚠️ No bold/italic/lists (sufficient for LSP hover content)
+- ⚠️ No bold/italic/lists ( TODO:) 
 
 ### Position Range Calculation
 
@@ -1018,37 +956,6 @@ export function createHoverTooltip(lspClient, documentUri) {
 - ✅ Dark theme - Dark bg, light text, excellent contrast
 - ✅ Code blocks readable in both themes
 - ✅ Links visible and clickable
-
-### Common Issues & Solutions
-
-#### Issue 1: Transparent Tooltips
-
-**Problem:** Initial implementation used CSS variables, resulting in too-transparent tooltips.
-
-**Solution:**
-- Use explicit colors (#ffffff, #2d2d2d)
-- Add 98% opacity
-- Increase shadow intensity
-- Add solid borders
-
-#### Issue 2: Long Documentation Overflow
-
-**Problem:** Some documentation is very long (Pin class = 300+ lines).
-
-**Solution:**
-- Max height: 400px
-- overflow-y: auto
-- Custom scrollbar styling
-- Top-aligned to show beginning first
-
-#### Issue 3: Hover on Wrong Position
-
-**Problem:** Hovering near a word but not on it triggered wrong or no hover.
-
-**Solution:**
-- Use LSP range when provided (most accurate)
-- Fallback to word boundaries
-- Return null when no hover data available
 
 ### File Structure
 

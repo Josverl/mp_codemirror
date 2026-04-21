@@ -78,9 +78,7 @@ def test_line_numbers_displayed(page, live_server):
     _goto_editor(page, live_server)
 
     expect(page.locator(".cm-lineNumbers")).to_be_visible()
-    assert page.locator(".cm-gutterElement").count() > 0, (
-        "Line number elements should exist"
-    )
+    assert page.locator(".cm-gutterElement").count() > 0, "Line number elements should exist"
 
 
 def test_sample_code_loads(page, live_server):
@@ -107,9 +105,7 @@ def test_python_syntax_highlighting(page, live_server):
         timeout=CDN_TIMEOUT,
     )
     expect(page.locator(".cm-line").first).to_be_visible()
-    assert page.locator(".cm-line").count() > 5, (
-        "Sample code should produce multiple highlighted lines"
-    )
+    assert page.locator(".cm-line").count() > 5, "Sample code should produce multiple highlighted lines"
 
 
 # ---------------------------------------------------------------------------
@@ -146,13 +142,9 @@ def test_theme_toggle_cycles_back_to_light(page, live_server):
 
     body = page.locator("body")
     page.locator("#themeToggle").click()
-    page.wait_for_function(
-        "() => document.body.classList.contains('dark-theme')", timeout=5000
-    )
+    page.wait_for_function("() => document.body.classList.contains('dark-theme')", timeout=5000)
     page.locator("#themeToggle").click()
-    page.wait_for_function(
-        "() => document.body.classList.contains('light-theme')", timeout=5000
-    )
+    page.wait_for_function("() => document.body.classList.contains('light-theme')", timeout=5000)
     assert "light-theme" in (body.get_attribute("class") or "")
 
 
@@ -177,9 +169,7 @@ def test_clear_button_empties_editor(page, live_server):
         "() => document.querySelector('.cm-content').innerText.trim() === ''",
         timeout=5000,
     )
-    assert page.locator(".cm-content").inner_text().strip() == "", (
-        "Editor should be empty after clear"
-    )
+    assert page.locator(".cm-content").inner_text().strip() == "", "Editor should be empty after clear"
 
 
 def test_editor_accepts_keyboard_input(page, live_server):
@@ -212,12 +202,8 @@ def test_sample_selector_populated(page, live_server):
         "() => document.getElementById('sampleSelect').options.length > 1",
         timeout=CDN_TIMEOUT,
     )
-    option_count = page.evaluate(
-        "() => document.getElementById('sampleSelect').options.length"
-    )
-    assert option_count > 1, (
-        "sampleSelect should have example options beyond the placeholder"
-    )
+    option_count = page.evaluate("() => document.getElementById('sampleSelect').options.length")
+    assert option_count > 1, "sampleSelect should have example options beyond the placeholder"
 
 
 def test_load_sample_button_loads_code(page, live_server):
@@ -238,9 +224,7 @@ def test_load_sample_button_loads_code(page, live_server):
     )
 
     # Select the first real option (index 1 skips the placeholder)
-    page.evaluate(
-        "() => { const s = document.getElementById('sampleSelect'); s.selectedIndex = 1; }"
-    )
+    page.evaluate("() => { const s = document.getElementById('sampleSelect'); s.selectedIndex = 1; }")
 
     page.locator("#loadSampleBtn").click()
 
@@ -250,9 +234,7 @@ def test_load_sample_button_loads_code(page, live_server):
     )
     content = page.locator(".cm-content").inner_text()
     assert len(content.strip()) > 0, "Editor should contain code after loading sample"
-    assert any(kw in content for kw in ("def", "import", "from", "#")), (
-        "Loaded sample should contain Python code"
-    )
+    assert any(kw in content for kw in ("def", "import", "from", "#")), "Loaded sample should contain Python code"
 
 
 # ---------------------------------------------------------------------------

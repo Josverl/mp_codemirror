@@ -91,14 +91,6 @@ export function createLSPPlugin(client, view, fileUri = 'file:///workspace/docum
  * @returns {Object} New { client, transport }
  */
 export async function switchBoard(current, config) {
-    // Collect open documents before teardown
-    const openDocs = [];
-    if (window.lspClients) {
-        for (const [uri, info] of window.lspClients.entries()) {
-            openDocs.push({ uri, languageId: info.languageId });
-        }
-    }
-
     // Tear down old client and transport
     try {
         current.client.disconnect();
@@ -110,11 +102,9 @@ export async function switchBoard(current, config) {
     // Create new client with new board stubs
     const { client, transport } = await createLSPClient(config);
 
-    // Re-open all previously open documents
-    // (The editor content will be re-sent via didChange from the CodeMirror plugin)
-    for (const doc of openDocs) {
-        notifyDocumentOpen(client, doc.uri, doc.languageId, '', 1);
-    }
+    // Do NOT re-open documents here — the caller is responsible for
+    // reconfiguring the CodeMirror LSP compartment (which calls
+    // createLSPPlugin → notifyDocumentOpen with the actual content).
 
     return { client, transport };
 }

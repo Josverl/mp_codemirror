@@ -55,7 +55,7 @@ jobs:
         run: uv run pytest -m editor -v
 
   worker-tests:
-    # Tier 2: Needs dist/worker.js built.
+    # Tier 2: Needs dist/pyright_worker.js built.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

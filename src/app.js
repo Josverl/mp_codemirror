@@ -6,6 +6,7 @@
 import { python } from '@codemirror/lang-python';
 import { Compartment } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
+import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
 import { notifyDocumentChange } from './lsp/diagnostics.js';
 
@@ -28,6 +29,9 @@ let stubsCache = new Map(); // boardId → ArrayBuffer
 
 // Debounce timer for didChange notifications
 let changeDebounceTimer = null;
+
+// LSP compartment — reconfigured on board switch
+let lspCompartment = new Compartment();
 const CHANGE_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
 
 // Resolve base path for assets (stubs, manifest)
@@ -103,8 +107,8 @@ async function handleBoardChange(event) {
 
         // Determine worker URL
         const workerUrl = window.location.pathname.includes('/src/')
-            ? '../dist/worker.js'
-            : './worker.js';
+            ? '../dist/pyright_worker.js'
+            : './pyright_worker.js';
 
         const result = await switchBoard(
             { client: lspClient, transport: lspTransport },
@@ -121,11 +125,18 @@ async function handleBoardChange(event) {
         currentBoardId = newBoardId;
         localStorage.setItem('mp_board', newBoardId);
 
-        // Re-send current editor content to the new LSP
+        // Clear old diagnostics and rebind LSP extensions to the new client
         if (view) {
+            // Clear stale gutter markers from previous LSP instance
+            view.dispatch(setDiagnostics(view.state, []));
+
+            // Reconfigure the compartment with extensions bound to the new client
             const content = view.state.doc.toString();
-            documentVersion++;
-            notifyDocumentChange(lspClient, documentUri, content, documentVersion);
+            documentVersion = 1;
+            const newExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', content);
+            view.dispatch({
+                effects: lspCompartment.reconfigure(newExtensions)
+            });
         }
 
         console.log(`Switched to board: ${newBoardId}`);
@@ -314,11 +325,11 @@ async function initializeEditor() {
         const params = new URLSearchParams(window.location.search);
         const mode = params.get('lsp') || 'worker';
 
-        // In dev, worker.js lives at /dist/worker.js; in production (deploy)
-        // it's alongside index.html. Detect by checking if we're in /src/.
+        // In dev, pyright_worker.js lives at /dist/pyright_worker.js;
+        // in production (deploy) it's alongside index.html.
         const workerUrl = window.location.pathname.includes('/src/')
-            ? '../dist/worker.js'
-            : './worker.js';
+            ? '../dist/pyright_worker.js'
+            : './pyright_worker.js';
 
         window.__lspReady = false;
         window.__lspFailed = false;
@@ -360,7 +371,6 @@ async function initializeEditor() {
     });
 
     // Build editor extensions
-    const lspCompartment = new Compartment();
     const extensions = [
         basicSetup,
         python(),

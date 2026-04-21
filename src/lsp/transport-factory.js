@@ -26,7 +26,7 @@ export function createTransport(options = {}) {
     }
 
     if (mode === 'worker') {
-        const url = options.workerUrl || './worker.js';
+        const url = options.workerUrl || './pyright_worker.js';
         console.log(`Creating Worker transport → ${url}`);
         return new WorkerTransport(url, { boardStubs: options.boardStubs });
     }

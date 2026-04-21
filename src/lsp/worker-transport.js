@@ -7,7 +7,7 @@
  */
 
 export class WorkerTransport {
-    constructor(workerUrl = '../dist/worker.js', options = {}) {
+    constructor(workerUrl = '../dist/pyright_worker.js', options = {}) {
         this.workerUrl = workerUrl;
         this.worker = null;
         this.messageHandlers = [];

@@ -22,12 +22,20 @@ test = [
     "pytest",
     "pytest-playwright",
     "websockets",
+    "ruff",
 ]
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.format]
+quote-style = "double"
+
 [tool.pytest.ini_options]
 markers = [
     "unit: Pure Python unit tests, no browser (Tier 0)",
     "editor: Editor UI tests, needs HTTP + CDN (Tier 1)",
-    "worker: Worker tests, needs dist/worker.js (Tier 2)",
+    "worker: Worker tests, needs dist/pyright_worker.js (Tier 2)",
     "lsp: Full LSP integration, needs LSP bridge (Tier 3)",
     "slow: Tests that take >10s to complete",
 ]

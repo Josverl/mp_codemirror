@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir -p deploy
           cp -r src/* deploy/
-          cp dist/worker.js deploy/
+          cp dist/pyright_worker.js deploy/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

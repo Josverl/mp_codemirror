@@ -1,7 +1,7 @@
 """
 LSP Feature Tests: Completions and Hover Tooltips
 
-Architecture: Browser (CodeMirror) <-> Web Worker (Pyright via dist/worker.js)
+Architecture: Browser (CodeMirror) <-> Web Worker (Pyright via dist/pyright_worker.js)
 
 Two modes:
   - Smoke tests (no LSP):  verify the editor doesn't crash and that
@@ -24,11 +24,11 @@ import pytest
 # Module-level skip marker (evaluated at collection time)
 # ---------------------------------------------------------------------------
 
-_worker_available = (Path(__file__).parent.parent / "dist" / "worker.js").exists()
+_worker_available = (Path(__file__).parent.parent / "dist" / "pyright_worker.js").exists()
 
 requires_lsp = pytest.mark.skipif(
     not _worker_available,
-    reason="Worker bundle not found at dist/worker.js. Build it first.",
+    reason="Worker bundle not found at dist/pyright_worker.js. Build it first.",
 )
 
 pytestmark = pytest.mark.worker
@@ -98,9 +98,7 @@ def test_builtin_keyword_completion_works_without_lsp(page, live_server):
     if autocomplete.is_visible(timeout=3_000):
         options = page.locator(".cm-completionLabel")
         labels = [options.nth(i).inner_text() for i in range(min(10, options.count()))]
-        assert any("import" in lbl for lbl in labels), (
-            f"'import' keyword should appear in completions. Got: {labels}"
-        )
+        assert any("import" in lbl for lbl in labels), f"'import' keyword should appear in completions. Got: {labels}"
     # If no autocomplete menu appears without LSP that's acceptable —
     # the important thing is no crash.
 
@@ -164,9 +162,7 @@ def test_completion_appears_after_explicit_trigger(page, live_server):
     page.keyboard.press("Control+Space")
     autocomplete = page.locator(".cm-tooltip-autocomplete")
     autocomplete.wait_for(timeout=LSP_TIMEOUT)
-    assert autocomplete.is_visible(), (
-        "Autocomplete menu must appear after Ctrl+Space on 'sys.'"
-    )
+    assert autocomplete.is_visible(), "Autocomplete menu must appear after Ctrl+Space on 'sys.'"
 
 
 @requires_lsp
@@ -214,9 +210,7 @@ def test_completion_contains_known_sys_members(page, live_server):
     options = page.locator(".cm-completionLabel")
     labels = [options.nth(i).inner_text() for i in range(min(20, options.count()))]
 
-    assert any("argv" in lbl for lbl in labels), (
-        f"'argv' missing from filtered sys completions. Got: {labels}"
-    )
+    assert any("argv" in lbl for lbl in labels), f"'argv' missing from filtered sys completions. Got: {labels}"
 
 
 @requires_lsp
@@ -313,6 +307,4 @@ def test_hover_tooltip_appears_on_identifier(page, live_server):
     # Hover is position-dependent; assert no crash first.
     # If a tooltip did appear, verify it has content.
     if hover_tip.count() > 0 and hover_tip.first.is_visible(timeout=1_000):
-        assert len(hover_tip.first.inner_text()) > 0, (
-            "Hover tooltip must contain some text"
-        )
+        assert len(hover_tip.first.inner_text()) > 0, "Hover tooltip must contain some text"

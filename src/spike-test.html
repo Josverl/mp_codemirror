@@ -65,8 +65,8 @@
             
             try {
                 // Step 1: Load worker
-                addLog('Creating Web Worker from dist/worker.js...');
-                const worker = new Worker('../dist/worker.js');
+                addLog('Creating Web Worker from dist/pyright_worker.js...');
+                const worker = new Worker('../dist/pyright_worker.js');
                 
                 // Wait for serverLoaded
                 const loaded = await new Promise((resolve, reject) => {

@@ -1,113 +1,85 @@
 # Quick Start Guide
 
-## 🚀 Get Started in 3 Steps
+## Get Started in 4 Steps
 
-### Step 1: Initialize the Project
+### Step 1: Clone and Install
 
 ```bash
-# Clone and setup
 git clone <repository-url>
 cd mp_codemirror
 
-# Initialize LSP bridge submodule
+# Initialize submodules (needed for dev only)
 git submodule update --init --recursive
-cd server/pyright-lsp-bridge
-npm install
-cd ../..
+
+# Install dependencies
+npm install --ignore-scripts
+uv sync
 ```
 
-### Step 2: Start the Servers
+### Step 2: Build the Worker
 
-**Option A: Using VSCode Tasks (Recommended)**
+Pyright runs entirely in the browser via a Web Worker. You must build it first:
 
-1. Open the project in VSCode
-2. Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
-3. Type "Tasks: Run Task"
-4. Select **"Start All Servers"**
-5. Both servers start automatically! 🎉
-
-**Option B: Manual Start**
-
-Terminal 1 - LSP Bridge:
 ```bash
-cd server/pyright-lsp-bridge
-npm start
+just build
+# or manually:
+just pack-typeshed && just pack-stubs && npx webpack --mode production
 ```
 
-Terminal 2 - HTTP Server:
+This creates `dist/pyright_worker.js` which bundles Pyright, typeshed, and MicroPython stubs.
+
+### Step 3: Start the HTTP Server
+
 ```bash
+just http
+# or:
 python -m http.server 8888
 ```
 
-### Step 3: Open in Browser
+No LSP bridge server is needed — Pyright runs in the browser.
+
+### Step 4: Open in Browser
 
 Navigate to: `http://localhost:8888/src/`
 
-Start coding with real-time LSP diagnostics! 🐍✨
+You get full LSP features (diagnostics, completions, hover, board switching) with no server-side components.
 
 ---
 
-## 📋 VSCode Tasks
+## VSCode Tasks
 
 ### Available Tasks
 
-- **Start All Servers** - Starts both LSP and HTTP server
-- **Start LSP Bridge** - Only starts the Pyright LSP bridge (port 9011)
-- **Start HTTP Server** - Only starts the Python HTTP server (port 8888)
+- **Start HTTP Server** — Starts the Python HTTP server (port 8888)
+- **Start LSP Bridge** — Dev/debug only: starts the WebSocket LSP bridge (port 9011)
 
-### Task Shortcuts
-
-```
-Ctrl+Shift+P → Tasks: Run Task → Select task
-```
-
-Or configure a keyboard shortcut in VSCode:
-```json
-// .vscode/keybindings.json
-[
-    {
-        "key": "ctrl+shift+s",
-        "command": "workbench.action.tasks.runTask",
-        "args": "Start All Servers"
-    }
-]
-```
+The LSP bridge is **not required** for normal use. It is only needed when developing with `?lsp=websocket` mode.
 
 ---
 
-## 📋 Quick Commands
+## Development Mode (Advanced)
 
-### Local Development
+For debugging or developing the LSP transport layer, you can use WebSocket mode instead of the Web Worker:
 
-**With VSCode:**
-```bash
-# Use tasks (Ctrl+Shift+P → Tasks: Run Task → Start All Servers)
-```
+1. Start the LSP bridge: `just lsp` (or VSCode task "Start LSP Bridge")
+2. Start the HTTP server: `just http`
+3. Open `http://localhost:8888/src/?lsp=websocket`
 
-**Manual:**
-```bash
-# LSP Bridge
-cd server/pyright-lsp-bridge
-npm start
+This routes LSP messages over WebSocket to the pyright-lsp-bridge on port 9011 instead of the in-browser worker.
 
-# HTTP Server (separate terminal)
-python -m http.server 8888
-```
+---
 
-**Alternative HTTP Servers:**
-```bash
-# Node.js
-npx serve -p 8888
-
-# PHP
-php -S localhost:8888
-```
-
-### Testing
+## Testing
 
 ```bash
-# Run Playwright tests
+# Run all tests
 pytest tests/ -v
+
+# Run by tier
+pytest tests/ -m unit -v          # Unit tests
+pytest tests/ -m editor -v        # Editor/UI tests
+pytest tests/ -m worker -v        # Web Worker tests
+pytest tests/ -m lsp -v           # LSP feature tests
 
 # Run with browser visible
 pytest tests/ --headed

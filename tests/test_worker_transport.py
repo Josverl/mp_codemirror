@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-_worker_js = Path(__file__).parent.parent / "dist" / "worker.js"
+_worker_js = Path(__file__).parent.parent / "dist" / "pyright_worker.js"
 pytestmark = [
     pytest.mark.worker,
     pytest.mark.skipif(
         not _worker_js.exists(),
-        reason="dist/worker.js not found. Run: npm run build:worker",
+        reason="dist/pyright_worker.js not found. Run: npm run build:worker",
     ),
 ]
 

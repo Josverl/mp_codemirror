@@ -58,6 +58,10 @@ lsp:
 http:
     python -m http.server 8888
 
+# format Python code with ruff
+format:
+    ruff format tests/ server/
+
 # start both servers and open the browser
 serve:
     #!/usr/bin/env bash
@@ -91,12 +95,12 @@ test-worker *args='':
 sizes:
     #!/usr/bin/env bash
     echo "=== Bundle Sizes ==="
-    if [ -f dist/worker.js ]; then
-        SIZE=$(stat -c%s dist/worker.js 2>/dev/null || stat -f%z dist/worker.js 2>/dev/null)
-        GZIP=$(gzip -c dist/worker.js | wc -c)
-        printf "worker.js:          %s (%s gzipped)\n" "$(numfmt --to=iec $SIZE 2>/dev/null || echo ${SIZE}B)" "$(numfmt --to=iec $GZIP 2>/dev/null || echo ${GZIP}B)"
+    if [ -f dist/pyright_worker.js ]; then
+        SIZE=$(stat -c%s dist/pyright_worker.js 2>/dev/null || stat -f%z dist/pyright_worker.js 2>/dev/null)
+        GZIP=$(gzip -c dist/pyright_worker.js | wc -c)
+        printf "pyright_worker.js:  %s (%s gzipped)\n" "$(numfmt --to=iec $SIZE 2>/dev/null || echo ${SIZE}B)" "$(numfmt --to=iec $GZIP 2>/dev/null || echo ${GZIP}B)"
     else
-        echo "worker.js:          not built (run 'just build')"
+        echo "pyright_worker.js:  not built (run 'just build')"
     fi
     if [ -f assets/typeshed-fallback.zip ]; then
         SIZE=$(stat -c%s assets/typeshed-fallback.zip 2>/dev/null || stat -f%z assets/typeshed-fallback.zip 2>/dev/null)

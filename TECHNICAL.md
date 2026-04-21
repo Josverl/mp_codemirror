@@ -202,8 +202,8 @@ Add `<link rel="modulepreload">` for faster loading:
 <link rel="modulepreload" href="https://esm.sh/@codemirror/lang-python@6.1.6?deps=...">
 ```
 
-### 2. Service Worker Caching
-Implement aggressive caching with service workers for offline support
+### 2. Web Worker Caching
+The Pyright Web Worker bundles typeshed and stubs into the worker itself, so no additional caching strategy is needed for LSP data.
 
 ### 3. Lazy Loading Language Modes
 Load Python support only when needed:
@@ -238,19 +238,33 @@ This project implements a **custom LSP (Language Server Protocol) client** for C
 │   client.js     │ ← LSP client factory/configuration
 └────────┬────────┘
          │
-         ├──────────────┬─────────────────────┐
-         │              │                     │
-┌────────▼──────────┐  ┌▼──────────────┐  ┌───▼──────────┐
-│ simple-client.js  │  │ websocket-    │  │diagnostics.js│
-│ (LSP Protocol)    │  │ transport.js  │  │(CodeMirror)  │
-└───────────────────┘  └───────┬───────┘  └─────────────┘
-                               │
-                     ┌─────────▼────────────┐
-                     │  Pyright LSP Server  │
-                     │  (via jesse-ai       │
-                     │   WebSocket bridge)  │
-                     └──────────────────────┘
+         ├──────────────┬──────────────────────┬─────────────────┐
+         │              │                      │                 │
+┌────────▼──────────┐  ┌▼──────────────────┐  ┌▼─────────────┐  ┌▼──────────────┐
+│ simple-client.js  │  │ transport-         │  │diagnostics.js│  │ completion.js │
+│ (LSP Protocol)    │  │ factory.js         │  │(CodeMirror)  │  │ hover.js      │
+└───────────────────┘  └────────┬───────────┘  └──────────────┘  └───────────────┘
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+          ┌────────▼─────────┐   ┌──────────▼──────────┐
+          │ worker-           │   │ websocket-           │
+          │ transport.js      │   │ transport.js         │
+          │ (default)         │   │ (dev: ?lsp=websocket)│
+          └────────┬──────────┘   └──────────┬───────────┘
+                   │                         │
+          ┌────────▼──────────┐   ┌──────────▼───────────┐
+          │  Pyright Worker   │   │  Pyright LSP Bridge  │
+          │  (dist/pyright_worker.js) │   │  (WebSocket :9011)   │
+          │  In-browser       │   │  Dev/debug only      │
+          └───────────────────┘   └──────────────────────┘
 ```
+
+### Transport Selection
+
+The transport is selected at runtime by `transport-factory.js`:
+- **Default (worker):** Pyright runs in a Web Worker (`dist/pyright_worker.js`). No server needed. Used in production and GitHub Pages.
+- **WebSocket (`?lsp=websocket`):** Routes LSP messages to `pyright-lsp-bridge` on port 9011. Dev/debug only.
 
 ### Component Responsibilities
 
@@ -1107,6 +1121,74 @@ src/styles.css            (modified)
 - [ ] Cache hover results per position
 - [ ] Preload hover for current line
 - [ ] Cancel outdated requests
+
+## Web Worker Architecture
+
+Pyright runs entirely in the browser via a Web Worker. No server is required for LSP features.
+
+### Worker Entry Point
+
+The worker is defined in `src/worker/pyright-worker.ts` and bundled by webpack to `dist/pyright_worker.js`.
+
+The build command (`just build` or `npm run build:worker`) runs:
+1. `pack-typeshed.mjs` — packs Pyright's typeshed-fallback into a zip
+2. `pack-stubs.mjs` — packs MicroPython board stubs (ESP32, RP2040, STM32) into per-board zips
+3. `webpack` — bundles everything into `dist/pyright_worker.js`
+
+### ZenFS Virtual Filesystem
+
+The worker uses ZenFS to provide an in-memory filesystem that Pyright expects:
+
+| Mount Point | Contents |
+|---|---|
+| `/typeshed-fallback` | Pyright's bundled typeshed (unpacked from zip at init) |
+| `/workspace` | The current editor document |
+| `/typings` | MicroPython board stubs (loaded per selected board) |
+| `/tmp` | Scratch space |
+
+### Message Protocol
+
+Communication between the main thread and the worker follows this sequence:
+
+```
+Main Thread                        Web Worker (Pyright)
+    │                                      │
+    │  postMessage(workerData)             │
+    ├─────────────────────────────────────>│
+    │                                      │  Initialize ZenFS, unpack typeshed
+    │         { type: "serverLoaded" }     │
+    │<─────────────────────────────────────┤
+    │                                      │
+    │  { type: "initServer", board }       │
+    ├─────────────────────────────────────>│  Load board stubs, start Pyright
+    │                                      │
+    │  { type: "serverInitialized" }       │
+    │<─────────────────────────────────────┤
+    │                                      │
+    │  { type: "lsp", message: {...} }     │  LSP JSON-RPC messages
+    ├─────────────────────────────────────>│
+    │  { type: "lsp", message: {...} }     │
+    │<─────────────────────────────────────┤
+```
+
+### Board Switching
+
+When the user selects a different board (ESP32, RP2040, STM32) from the dropdown:
+
+1. The main thread sends `{ type: "initServer", board: "esp32" }` to the worker
+2. The worker clears `/typings` and loads the new board's stub zip
+3. Pyright restarts with the new stubs
+4. The worker sends `{ type: "serverInitialized" }`
+5. The client re-sends the current document for fresh diagnostics
+
+### Static Deployment
+
+Because Pyright runs in the browser, the entire application deploys as static files to GitHub Pages:
+- `src/` — HTML, CSS, JS (CodeMirror, LSP client, transport)
+- `dist/pyright_worker.js` — bundled Pyright worker
+- `assets/` — typeshed and stubs zip files
+
+No backend server is needed for LSP features in production.
 
 ## References
 

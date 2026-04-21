@@ -7,7 +7,7 @@ diagnostics from the Pyright Web Worker as the user types, including:
   - version counter incrementing correctly
   - diagnostics being updated when code changes
 
-All tests require the Pyright worker bundle at dist/worker.js.
+All tests require the Pyright worker bundle at dist/pyright_worker.js.
 """
 
 import re
@@ -20,11 +20,11 @@ import pytest
 # Module-level skip marker
 # ---------------------------------------------------------------------------
 
-_worker_available = (Path(__file__).parent.parent / "dist" / "worker.js").exists()
+_worker_available = (Path(__file__).parent.parent / "dist" / "pyright_worker.js").exists()
 
 requires_lsp = pytest.mark.skipif(
     not _worker_available,
-    reason="Worker bundle not found at dist/worker.js. Build it first.",
+    reason="Worker bundle not found at dist/pyright_worker.js. Build it first.",
 )
 
 pytestmark = pytest.mark.worker
@@ -42,9 +42,7 @@ def _load_and_wait(page, base_url: str):
     """Navigate to editor and wait for LSP to initialise."""
     page.goto(f"{base_url}/index.html")
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
-    page.wait_for_function(
-        "() => window.__lspReady === true || window.__lspFailed === true", timeout=15000
-    )
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
 
 
 def _clear_editor(page):
@@ -74,12 +72,8 @@ def test_lsp_server_connects_via_browser(page, live_server):
     transport_connected = any("Transport connected" in m for m in console)
     lsp_ready = any("LSP client ready" in m for m in console)
 
-    assert transport_connected, (
-        f"Transport connection message not found. Console: {console[:15]}"
-    )
-    assert lsp_ready, (
-        f"'LSP client ready' not found in console. Console: {console[:15]}"
-    )
+    assert transport_connected, f"Transport connection message not found. Console: {console[:15]}"
+    assert lsp_ready, f"'LSP client ready' not found in console. Console: {console[:15]}"
 
 
 @requires_lsp
@@ -161,9 +155,7 @@ def test_did_change_is_debounced(page, live_server):
     time.sleep((DEBOUNCE_MS + 400) / 1000)
 
     didchange_count = sum(1 for m in console if "didChange notification" in m)
-    assert didchange_count <= 2, (
-        f"Debouncer must coalesce rapid keystrokes; got {didchange_count} notifications"
-    )
+    assert didchange_count <= 2, f"Debouncer must coalesce rapid keystrokes; got {didchange_count} notifications"
 
 
 @requires_lsp
@@ -189,16 +181,11 @@ def test_document_version_increments(page, live_server):
     time.sleep((DEBOUNCE_MS + 400) / 1000)
 
     versions = [
-        int(m.group(1))
-        for msg in console
-        if "didChange notification" in msg
-        for m in [version_re.search(msg)]
-        if m
+        int(m.group(1)) for msg in console if "didChange notification" in msg for m in [version_re.search(msg)] if m
     ]
 
     assert len(versions) >= 1, (
-        f"At least one version number must be logged. Console: "
-        f"{[m for m in console if 'didChange' in m]}"
+        f"At least one version number must be logged. Console: {[m for m in console if 'didChange' in m]}"
     )
     if len(versions) > 1:
         assert versions[-1] > versions[0], f"Version must strictly increase: {versions}"
@@ -223,9 +210,7 @@ def test_diagnostics_update_when_code_fixed(page, live_server):
             break
         time.sleep(0.5)
 
-    assert any("Received diagnostics" in m for m in console), (
-        "Should receive diagnostics for invalid code first"
-    )
+    assert any("Received diagnostics" in m for m in console), "Should receive diagnostics for invalid code first"
     console.clear()
 
     # Step 2: use the Clear button, then type valid code

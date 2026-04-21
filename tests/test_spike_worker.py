@@ -8,12 +8,12 @@ from pathlib import Path
 import pytest
 import json
 
-_worker_js = Path(__file__).parent.parent / "dist" / "worker.js"
+_worker_js = Path(__file__).parent.parent / "dist" / "pyright_worker.js"
 pytestmark = [
     pytest.mark.worker,
     pytest.mark.skipif(
         not _worker_js.exists(),
-        reason="dist/worker.js not found. Run: npm run build:worker",
+        reason="dist/pyright_worker.js not found. Run: npm run build:worker",
     ),
 ]
 
@@ -37,7 +37,7 @@ def test_worker_loads_and_signals_ready(page, spike_url):
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Worker load timeout (10s)')), 10000);
             try {
-                const worker = new Worker('../dist/worker.js');
+                const worker = new Worker('../dist/pyright_worker.js');
                 worker.onmessage = (e) => {
                     if (e.data.type === 'serverLoaded') {
                         clearTimeout(timeout);
@@ -66,7 +66,7 @@ def test_worker_initializes_pyright(page, spike_url):
 
     result = page.evaluate("""() => {
         return new Promise((resolve, reject) => {
-            const worker = new Worker('../dist/worker.js');
+            const worker = new Worker('../dist/pyright_worker.js');
             let phase = 'loading';
 
             const timeout = setTimeout(() => {
@@ -111,7 +111,7 @@ def test_lsp_initialize_handshake(page, spike_url):
 
     result = page.evaluate("""() => {
         return new Promise((resolve, reject) => {
-            const worker = new Worker('../dist/worker.js');
+            const worker = new Worker('../dist/pyright_worker.js');
             let phase = 'loading';
 
             const timeout = setTimeout(() => {
@@ -181,7 +181,7 @@ def test_diagnostics_for_type_error(page, spike_url):
 
     result = page.evaluate("""() => {
         return new Promise((resolve, reject) => {
-            const worker = new Worker('../dist/worker.js');
+            const worker = new Worker('../dist/pyright_worker.js');
             let phase = 'loading';
             const t0 = performance.now();
             const times = {};

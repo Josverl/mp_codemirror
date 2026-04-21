@@ -5,7 +5,7 @@ const os = require("os");
 
 module.exports = {
     entry: {
-        worker: "./src/worker/pyright-worker.ts",
+        pyright_worker: "./src/worker/pyright-worker.ts",
     },
     output: {
         path: path.resolve(__dirname, "dist"),

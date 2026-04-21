@@ -29,9 +29,7 @@ def test_no_cdn_errors_on_load(page: Page, live_server):
     # Wait for editor to render rather than networkidle (worker keeps network busy)
     page.wait_for_selector(".cm-editor", timeout=30_000)
 
-    assert cdn_errors == [], f"Found {len(cdn_errors)} CDN error(s):\n" + "\n".join(
-        cdn_errors[:5]
-    )
+    assert cdn_errors == [], f"Found {len(cdn_errors)} CDN error(s):\n" + "\n".join(cdn_errors[:5])
 
 
 def test_codemirror_editor_initialises(page: Page, live_server):
@@ -78,9 +76,7 @@ def test_example_files_populate_selector(page: Page, live_server):
 
     select = page.locator("#sampleSelect")
     # Wait until examples are populated (more than the placeholder option)
-    page.wait_for_function(
-        "document.getElementById('sampleSelect').options.length > 1", timeout=5_000
-    )
+    page.wait_for_function("document.getElementById('sampleSelect').options.length > 1", timeout=5_000)
     option_count = select.evaluate("el => el.options.length")
     assert option_count > 1, "Expected at least one example file option"
 

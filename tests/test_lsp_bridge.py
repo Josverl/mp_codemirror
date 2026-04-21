@@ -50,8 +50,7 @@ server_running = _port_open("localhost", BRIDGE_PORT)
 
 requires_server = pytest.mark.skipif(
     not server_running,
-    reason=f"LSP bridge not running on port {BRIDGE_PORT}. "
-    "Start with: npm start in server/pyright-lsp-bridge/",
+    reason=f"LSP bridge not running on port {BRIDGE_PORT}. Start with: npm start in server/pyright-lsp-bridge/",
 )
 
 # ── unit tests ────────────────────────────────────────────────────────────────
@@ -93,9 +92,7 @@ class TestPyrightBridgeUnit:
         body_bytes = message.encode("utf-8")
         expected_header = f"Content-Length: {len(body_bytes)}\r\n\r\n".encode("utf-8")
 
-        assert raw.startswith(expected_header), (
-            f"Expected header {expected_header!r}, got prefix {raw[:50]!r}"
-        )
+        assert raw.startswith(expected_header), f"Expected header {expected_header!r}, got prefix {raw[:50]!r}"
         assert raw.endswith(body_bytes)
 
     def test_write_to_pyright_no_process(self):
@@ -170,9 +167,7 @@ def _initialize(conn) -> list[dict]:
             "method": "initialize",
             "params": {
                 "processId": None,
-                "capabilities": {
-                    "textDocument": {"publishDiagnostics": {"relatedInformation": True}}
-                },
+                "capabilities": {"textDocument": {"publishDiagnostics": {"relatedInformation": True}}},
                 "rootUri": None,
             },
         },
@@ -228,9 +223,7 @@ class TestNodeBridgeLSPProtocol:
         with ws_client.connect(BRIDGE_URL, open_timeout=5) as conn:
             msgs = _initialize(conn)
             for msg in msgs:
-                assert msg.get("jsonrpc") == "2.0", (
-                    f"Message missing jsonrpc 2.0: {msg}"
-                )
+                assert msg.get("jsonrpc") == "2.0", f"Message missing jsonrpc 2.0: {msg}"
 
     def test_pyright_version_logged(self):
         """Bridge should relay a Pyright version log message on startup."""
@@ -279,16 +272,11 @@ class TestNodeBridgeLSPProtocol:
         with ws_client.connect(BRIDGE_URL, open_timeout=5) as conn:
             _initialize(conn)
             _send(conn, {"jsonrpc": "2.0", "method": "initialized", "params": {}})
-            _send(
-                conn, {"jsonrpc": "2.0", "id": 99, "method": "shutdown", "params": None}
-            )
+            _send(conn, {"jsonrpc": "2.0", "id": 99, "method": "shutdown", "params": None})
             msgs = _collect_until(conn, lambda m: m.get("id") == 99, max_msgs=10)
             shutdown_resp = [m for m in msgs if m.get("id") == 99]
             assert shutdown_resp, "No response to shutdown request"
-            assert (
-                shutdown_resp[0].get("result") is None
-                or "error" not in shutdown_resp[0]
-            )
+            assert shutdown_resp[0].get("result") is None or "error" not in shutdown_resp[0]
 
 
 @requires_server
@@ -328,9 +316,7 @@ class TestNodeBridgeDiagnostics:
                 max_msgs=30,
                 timeout=10.0,
             )
-            diag_msgs = [
-                m for m in msgs if m.get("method") == "textDocument/publishDiagnostics"
-            ]
+            diag_msgs = [m for m in msgs if m.get("method") == "textDocument/publishDiagnostics"]
             assert diag_msgs, "No publishDiagnostics received after didOpen"
 
     def test_diagnostics_contain_range_and_message(self):
@@ -345,8 +331,7 @@ class TestNodeBridgeDiagnostics:
             msgs = _collect_until(
                 conn,
                 lambda m: (
-                    m.get("method") == "textDocument/publishDiagnostics"
-                    and m.get("params", {}).get("diagnostics")
+                    m.get("method") == "textDocument/publishDiagnostics" and m.get("params", {}).get("diagnostics")
                 ),
                 max_msgs=30,
                 timeout=10.0,
@@ -354,8 +339,7 @@ class TestNodeBridgeDiagnostics:
             diag_msgs = [
                 m
                 for m in msgs
-                if m.get("method") == "textDocument/publishDiagnostics"
-                and m.get("params", {}).get("diagnostics")
+                if m.get("method") == "textDocument/publishDiagnostics" and m.get("params", {}).get("diagnostics")
             ]
             assert diag_msgs, "No non-empty publishDiagnostics received"
 
@@ -380,9 +364,7 @@ class TestNodeBridgeDiagnostics:
                 max_msgs=30,
                 timeout=10.0,
             )
-            diag_msgs = [
-                m for m in msgs if m.get("method") == "textDocument/publishDiagnostics"
-            ]
+            diag_msgs = [m for m in msgs if m.get("method") == "textDocument/publishDiagnostics"]
             if diag_msgs:
                 for msg in diag_msgs:
                     diags = msg.get("params", {}).get("diagnostics", [])
@@ -425,9 +407,7 @@ class TestNodeBridgeDiagnostics:
                 max_msgs=30,
                 timeout=10.0,
             )
-            diag_msgs = [
-                m for m in msgs if m.get("method") == "textDocument/publishDiagnostics"
-            ]
+            diag_msgs = [m for m in msgs if m.get("method") == "textDocument/publishDiagnostics"]
             assert diag_msgs, "No publishDiagnostics after didChange"
 
     def test_diagnostic_uri_matches_document(self):
@@ -445,11 +425,7 @@ class TestNodeBridgeDiagnostics:
                 max_msgs=30,
                 timeout=10.0,
             )
-            diag_msgs = [
-                m for m in msgs if m.get("method") == "textDocument/publishDiagnostics"
-            ]
+            diag_msgs = [m for m in msgs if m.get("method") == "textDocument/publishDiagnostics"]
             assert diag_msgs
             reported_uri = diag_msgs[0]["params"]["uri"]
-            assert reported_uri == uri, (
-                f"Diagnostic URI mismatch: expected {uri!r}, got {reported_uri!r}"
-            )
+            assert reported_uri == uri, f"Diagnostic URI mismatch: expected {uri!r}, got {reported_uri!r}"

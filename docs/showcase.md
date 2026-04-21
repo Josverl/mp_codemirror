@@ -100,9 +100,8 @@ Browser (static HTML page served from GitHub Pages)
 │
 ├── LSP Client (src/lsp/)
 │   ├── simple-client.js — JSON-RPC 2.0 protocol (transport-agnostic)
-│   ├── worker-transport.js — Web Worker transport (default, production)
-│   ├── websocket-transport.js — WebSocket transport (dev/debug only)
-│   ├── transport-factory.js — Selects transport based on URL params
+│   ├── worker-transport.js — Web Worker transport
+│   ├── transport-factory.js — Creates the worker transport
 │   ├── diagnostics.js — Maps LSP diagnostics → CodeMirror lint markers
 │   ├── completion.js — Maps LSP completions → CodeMirror autocomplete
 │   └── hover.js — Maps LSP hover → CodeMirror tooltips
@@ -146,7 +145,7 @@ Built a CodeMirror 6 editor loaded entirely via CDN (esm.sh). Python syntax high
 
 ### Phase 2: LSP Integration
 
-Added Pyright as a language server. Started with a WebSocket bridge (`server/pyright-lsp-bridge/`) that forwarded JSON-RPC messages between the browser and a local Pyright process. Then migrated to a Web Worker (`src/worker/pyright-worker.ts`) — Pyright runs entirely in the browser.
+Added Pyright as a language server. Started with a WebSocket bridge prototype, then migrated to a Web Worker (`src/worker/pyright-worker.ts`) — Pyright runs entirely in the browser.
 
 Implemented three LSP features: real-time diagnostics (errors/warnings as you type), autocompletion (context-aware suggestions with type-based icons), and hover tooltips (signatures, docstrings, documentation links).
 

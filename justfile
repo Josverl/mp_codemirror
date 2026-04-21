@@ -1,9 +1,17 @@
 # mp_codemirror - CodeMirror Python Editor with LSP support
+shebang := if os() == 'windows' {
+  'powershell.exe'
+} else {
+  '/usr/bin/env pwsh'
+}
+
+# Set shell for non-Windows OSs:
+set shell := ["powershell", "-c"]
+
+# Set shell for Windows OSs:
+set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
 
 set dotenv-load := false
-
-# project root for LSP bridge arguments
-root := justfile_directory()
 
 # default recipe: list available recipes
 default:
@@ -11,13 +19,10 @@ default:
 
 # initial project setup after cloning
 setup:
-    git submodule update --init --recursive
-    cd server/pyright-lsp-bridge && npm install
     npm install --ignore-scripts
     uv sync --extra test
     uv run playwright install --with-deps chromium
-    uv pip install micropython-esp32-stubs --target typings
-    just pack-typeshed
+    just build
 
 # --- Build recipes ---
 
@@ -50,33 +55,26 @@ rebuild:
 
 # --- Server recipes ---
 
-# start the LSP bridge server (port 9011)
-lsp:
-    cd server/pyright-lsp-bridge && npm start -- --port 9011 --bot-root "{{root}}" --jesse-root "{{root}}/src"
-
 # start the HTTP server (port 8888)
 http:
     python -m http.server 8888
 
 # format Python code with ruff
 format:
-    ruff format tests/ server/
+    ruff format tests/
 
-# start both servers and open the browser
+# start the HTTP server and open the browser
 serve:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "Starting LSP bridge on port 9011..."
-    cd "{{root}}/server/pyright-lsp-bridge" && npm start -- --port 9011 --bot-root "{{root}}" --jesse-root "{{root}}/src" &
-    LSP_PID=$!
     echo "Starting HTTP server on port 8888..."
     python -m http.server 8888 &
     HTTP_PID=$!
     sleep 2
     echo "Opening browser..."
     xdg-open http://localhost:8888/src/ 2>/dev/null || open http://localhost:8888/src/ 2>/dev/null || echo "Open http://localhost:8888/src/ in your browser"
-    echo "Servers running (LSP: $LSP_PID, HTTP: $HTTP_PID). Press Ctrl+C to stop."
-    trap "kill $LSP_PID $HTTP_PID 2>/dev/null" EXIT INT TERM
+    echo "Server running (HTTP: $HTTP_PID). Press Ctrl+C to stop."
+    trap "kill $HTTP_PID 2>/dev/null" EXIT INT TERM
     wait
 
 # --- Test recipes ---

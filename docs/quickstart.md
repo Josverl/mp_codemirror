@@ -35,21 +35,6 @@ You get full LSP features (diagnostics, completions, hover, board switching) wit
 ### Available Tasks
 
 - **Start HTTP Server** — Starts the Python HTTP server (port 8888)
-- **Start LSP Bridge** — Dev/debug only: starts the WebSocket LSP bridge (port 9011)
-
-The LSP bridge is **not required** for normal use. It is only needed when developing with `?lsp=websocket` mode.
-
----
-
-## Development Mode (Advanced)
-
-For debugging or developing the LSP transport layer, you can use WebSocket mode instead of the Web Worker:
-
-1. Start the LSP bridge: `just lsp` (or VSCode task "Start LSP Bridge")
-2. Start the HTTP server: `just http`
-3. Open `http://localhost:8888/src/?lsp=websocket`
-
-This routes LSP messages over WebSocket to the pyright-lsp-bridge on port 9011 instead of the in-browser worker.
 
 ---
 

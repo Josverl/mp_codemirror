@@ -13,12 +13,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+        uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
@@ -35,12 +33,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
         run: npm install --ignore-scripts
@@ -54,12 +52,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+        uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
@@ -79,14 +75,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install Node.js dependencies
         run: npm install --ignore-scripts
@@ -95,7 +89,7 @@ jobs:
         run: npx webpack --mode production
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"

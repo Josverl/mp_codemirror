@@ -1,3 +1,0 @@
-[submodule "server/pyright-lsp-bridge"]
-	path = server/pyright-lsp-bridge
-	url = https://github.com/jesse-ai/python-language-server.git

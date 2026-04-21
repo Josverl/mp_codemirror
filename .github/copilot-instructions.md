@@ -21,9 +21,8 @@ Unit and integration testing should be based on Pytest + Playwright - but only s
 ## Development servers
 The development servers are defined in the .vscode/tasks.json file
 - "Start HTTP Server" - port 8888 - starts a simple HTTP server to serve the project
-- "Start LSP Bridge" - port 9011 - OPTIONAL, dev/debug only. Starts the WebSocket LSP bridge (pyright-lsp-bridge). Only needed when using `?lsp=websocket` mode.
 
-For normal development, only the HTTP server is needed. Pyright runs in a Web Worker in the browser.
+Pyright runs in a Web Worker in the browser — no server needed.
 
 ## Python Environment Setup
 
@@ -32,11 +31,10 @@ The repository includes automated setup workflow in `.github/workflows/`:
 - `copilot-setup-steps.yml` - Copilot agent environment setup
 
 These workflows automatically:
-1. Initialize and update git submodules recursively
-2. Install `uv` package manager using astral-sh/setup-uv@v3
-3. Install Python and project dependencies
-4. Install MicroPython stubs to `typings/` directory
-5. Cache environment for faster subsequent runs
+1. Install `uv` package manager using astral-sh/setup-uv
+2. Install Python and project dependencies
+3. Install MicroPython stubs to `typings/` directory
+4. Cache environment for faster subsequent runs
 
 ### Local Development
 use `uv` for environment management
@@ -48,9 +46,6 @@ use `pytest` as the test runner
 # Install uv (if not already installed)
 # Windows: irm https://astral.sh/uv/install.ps1 | iex
 # Unix: curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Initialize submodules
-git submodule update --init --recursive
 
 # Install dependencies
 uv sync
@@ -75,9 +70,8 @@ mp_codemirror/
 │   ├── lsp/            # LSP client implementation
 │   │   ├── client.js              # LSP client factory
 │   │   ├── simple-client.js       # LSP protocol (JSON-RPC)
-│   │   ├── worker-transport.js    # Web Worker transport (default)
-│   │   ├── websocket-transport.js # WebSocket transport (dev only)
-│   │   ├── transport-factory.js   # Transport selection
+│   │   ├── worker-transport.js    # Web Worker transport
+│   │   ├── transport-factory.js   # Transport factory
 │   │   ├── diagnostics.js         # Diagnostics → CodeMirror
 │   │   ├── completion.js          # Autocompletion
 │   │   └── hover.js               # Hover tooltips
@@ -91,8 +85,6 @@ mp_codemirror/
 ├── scripts/
 │   ├── pack-typeshed.mjs    # Pack typeshed for browser
 │   └── pack-stubs.mjs       # Pack stubs per board
-├── server/
-│   └── pyright-lsp-bridge/  # Git submodule (dev/debug only)
 ├── tests/
 │   ├── conftest.py          # Pytest configuration and fixtures
 │   ├── test_editor.py       # Editor UI tests
@@ -114,9 +106,8 @@ Delivered: Static HTML5 page with CodeMirror 6 loaded via CDN (esm.sh), Python s
 Delivered: Pyright runs in a **Web Worker** (`dist/pyright_worker.js`, built via webpack). No server required.
 
 ### What was built:
-- **Web Worker transport** (`src/lsp/worker-transport.js`) — default, production transport
-- **WebSocket transport** (`src/lsp/websocket-transport.js`) — dev/debug only, via `?lsp=websocket`
-- **Transport factory** (`src/lsp/transport-factory.js`) — selects transport based on URL params
+- **Web Worker transport** (`src/lsp/worker-transport.js`) — runs Pyright in-browser
+- **Transport factory** (`src/lsp/transport-factory.js`) — creates the worker transport
 - **LSP client** (`src/lsp/simple-client.js`) — JSON-RPC 2.0, transport-agnostic
 - **Real-time diagnostics** — errors/warnings as you type (300ms debounce)
 - **Autocompletion** — context-aware completions from Pyright

@@ -15,21 +15,17 @@ import { createTransport } from './transport-factory.js';
 /**
  * Create and initialize an LSP client
  * @param {Object} config - Configuration options
- * @param {'worker'|'websocket'} [config.mode='worker'] - Transport mode
- * @param {string} [config.wsUrl] - WebSocket URL (for mode='websocket')
- * @param {string} [config.workerUrl] - Worker script URL (for mode='worker')
+ * @param {string} [config.workerUrl] - Worker script URL
  * @param {number} [config.timeout=5000] - Request timeout in ms
  * @param {ArrayBuffer} [config.boardStubs] - Board stubs zip (undefined = use bundled default)
  */
 export async function createLSPClient(config = {}) {
     const transport = createTransport({
-        mode: config.mode || 'worker',
-        wsUrl: config.wsUrl,
         workerUrl: config.workerUrl,
         boardStubs: config.boardStubs,
     });
 
-    console.log(`Creating LSP client (mode: ${config.mode || 'worker'})`);
+    console.log('Creating LSP client...');
 
     const client = new SimpleLSPClient({
         rootUri: 'file:///workspace',

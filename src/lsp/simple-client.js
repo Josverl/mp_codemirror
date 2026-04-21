@@ -99,6 +99,7 @@ export class SimpleLSPClient {
         this.notify('initialized', {});
 
         // Send settings to Pyright (typeshed paths, python config)
+        // ref: https://micropython-stubs.readthedocs.io/en/main/22_vscode.html
         this.notify('workspace/didChangeConfiguration', {
             settings: {
                 python: {

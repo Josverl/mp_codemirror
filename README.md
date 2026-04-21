@@ -119,9 +119,8 @@ mp_codemirror/
 ├── src/
 │   ├── lsp/                # LSP client implementation
 │   │   ├── client.js       # Main LSP client setup
-│   │   ├── websocket-transport.js  # WebSocket transport (dev only)
-│   │   ├── worker-transport.js     # Web Worker transport (default)
-│   │   ├── transport-factory.js    # Selects transport based on URL params
+│   │   ├── worker-transport.js     # Web Worker transport
+│   │   ├── transport-factory.js    # Transport factory
 │   │   ├── diagnostics.js  # Diagnostics extension for CodeMirror
 │   │   ├── completion.js   # Autocompletion integration
 │   │   ├── hover.js        # Hover tooltips integration
@@ -144,8 +143,6 @@ mp_codemirror/
 ├── scripts/
 │   ├── pack-typeshed.mjs   # Pack typeshed for browser use
 │   └── pack-stubs.mjs      # Pack MicroPython stubs per board
-├── server/
-│   └── pyright-lsp-bridge/ # Git submodule (dev/debug only)
 ├── tests/
 │   ├── conftest.py         # Pytest configuration and fixtures
 │   ├── test_editor.py      # Editor UI tests (Playwright)
@@ -247,7 +244,6 @@ For architecture diagrams, integration guide, and detailed documentation see the
 
 - **No Build Step for UI:** CodeMirror loaded via ES modules from CDN (esm.sh)
 - **Web Worker for LSP:** Pyright runs in a Web Worker (`dist/pyright_worker.js`), built via webpack
-- **Two Transport Modes:** Worker (default/production) and WebSocket (dev-only via `?lsp=websocket`)
 - **Board Switching:** ESP32, RP2040, STM32 stubs, switchable via dropdown
 - **Static Deployment:** Full LSP features work on GitHub Pages — no server needed
 - **Module-based:** Modern ES6+ JavaScript with imports

@@ -1,7 +1,7 @@
 """
 Tests for the Worker Transport Layer (Phase 3).
 Verifies that the WorkerTransport correctly wraps the Pyright Web Worker
-and provides the same interface as WebSocketTransport.
+and provides the same transport interface.
 """
 
 from pathlib import Path

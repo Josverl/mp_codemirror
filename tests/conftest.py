@@ -43,31 +43,6 @@ def _detect_server_base_url() -> str | None:
     return None
 
 
-# Evaluate at collection time so skipif decorators work correctly.
-_lsp_available = is_port_open("localhost", 9011)
-
-
-@pytest.fixture(scope="session")
-def lsp_available() -> bool:
-    """Return True when the Pyright LSP bridge is reachable on port 9011."""
-    return _lsp_available
-
-
-@pytest.fixture(scope="session")
-def lsp_server(lsp_available):
-    """
-    Skip (not fail) when the LSP bridge is not running.
-    Start the bridge with: Run Task > 'Start LSP Bridge'
-    """
-    if not lsp_available:
-        pytest.skip(
-            "LSP bridge not running on port 9011. "
-            "Start with: Run Task > 'Start LSP Bridge' or "
-            "'npm start' in server/pyright-lsp-bridge/"
-        )
-    yield "ws://localhost:9011/lsp"
-
-
 @pytest.fixture(scope="session")
 def live_server():
     """

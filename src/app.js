@@ -113,7 +113,6 @@ async function handleBoardChange(event) {
         const result = await switchBoard(
             { client: lspClient, transport: lspTransport },
             {
-                mode: 'worker',
                 workerUrl,
                 timeout: 15000,
                 boardStubs: stubs,
@@ -319,12 +318,8 @@ async function initializeEditor() {
     const defaultFile = exampleFiles.length > 0 ? exampleFiles[0].file : 'blink_led.py';
     await loadSampleFromFile(defaultFile);
 
-    // Initialize LSP client — use in-browser Pyright worker by default
+    // Initialize LSP client — Pyright runs in a Web Worker
     try {
-        // Use ?lsp=websocket in URL to fall back to the old WebSocket bridge
-        const params = new URLSearchParams(window.location.search);
-        const mode = params.get('lsp') || 'worker';
-
         // In dev, pyright_worker.js lives at /dist/pyright_worker.js;
         // in production (deploy) it's alongside index.html.
         const workerUrl = window.location.pathname.includes('/src/')
@@ -333,16 +328,14 @@ async function initializeEditor() {
 
         window.__lspReady = false;
         window.__lspFailed = false;
-        console.log(`Initializing LSP client (mode: ${mode})...`);
+        console.log('Initializing LSP client...');
         const lspResult = await createLSPClient({
-            mode,
             workerUrl,
-            wsUrl: 'ws://localhost:9011/lsp',
             timeout: 15000,
         });
         lspClient = lspResult.client;
         lspTransport = lspResult.transport;
-        console.log(`LSP client ready (${mode} transport).`);
+        console.log('LSP client ready.');
         window.__lspReady = true;
     } catch (error) {
         console.error('Failed to initialize LSP client:', error);

@@ -250,21 +250,21 @@ This project implements a **custom LSP (Language Server Protocol) client** for C
           ┌────────▼─────────┐   ┌──────────▼──────────┐
           │ worker-           │   │ websocket-           │
           │ transport.js      │   │ transport.js         │
-          │ (default)         │   │ (dev: ?lsp=websocket)│
-          └────────┬──────────┘   └──────────┬───────────┘
-                   │                         │
-          ┌────────▼──────────┐   ┌──────────▼───────────┐
-          │  Pyright Worker   │   │  Pyright LSP Bridge  │
-          │  (dist/pyright_worker.js) │   │  (WebSocket :9011)   │
-          │  In-browser       │   │  Dev/debug only      │
-          └───────────────────┘   └──────────────────────┘
+          │ (default)         │   │ (fallback)           │
+          └────────┬──────────┘   └──────────────────────┘
+                   │
+          ┌────────▼──────────┐
+          │  Pyright Worker   │
+          │  (dist/pyright_worker.js) │
+          │  In-browser       │
+          └───────────────────┘
 ```
 
 ### Transport Selection
 
 The transport is selected at runtime by `transport-factory.js`:
 - **Default (worker):** Pyright runs in a Web Worker (`dist/pyright_worker.js`). No server needed. Used in production and GitHub Pages.
-- **WebSocket (`?lsp=websocket`):** Routes LSP messages to `pyright-lsp-bridge` on port 9011. Dev/debug only.
+- **WebSocket:** Available as a transport option but requires an external LSP server.
 
 ### Component Responsibilities
 
@@ -310,39 +310,18 @@ client.notify('textDocument/didChange', {
 });
 ```
 
-#### `websocket-transport.js` - WebSocket Communication
-
-**Purpose:** Handles WebSocket connection to Pyright LSP bridge server.
-
-**Key Features:**
-- Connection management (connect, disconnect, reconnect)
-- Message framing (LSP over WebSocket)
-- Subscription-based message delivery
-- Error handling and connection state tracking
-
-**Core Methods:**
-```javascript
-class WebSocketTransport {
-  async connect()                // Open WebSocket connection
-  send(message)                  // Send string message
-  subscribe(handler)             // Register message handler
-  disconnect()                   // Close connection
-}
-```
-
 #### `client.js` - Factory and Configuration
 
-**Purpose:** Creates and configures LSP client with appropriate transport.
+**Purpose:** Creates and configures LSP client with the Web Worker transport.
 
 **Key Features:**
 - Simplified API for creating LSP client
-- WebSocket URL configuration
 - Async initialization with proper error handling
 
 **Example:**
 ```javascript
 const { client, transport } = await createLSPClient({
-  wsUrl: 'ws://localhost:9011/lsp'
+  workerUrl: '../dist/pyright_worker.js'
 });
 ```
 
@@ -368,7 +347,7 @@ notifyDocumentClose(client, uri)          // Send textDocument/didClose
 
 #### Initialization Sequence
 ```
-Browser                SimpleLSPClient         WebSocketTransport      Pyright Server
+Browser                SimpleLSPClient         WorkerTransport         Pyright Worker
    │                          │                        │                     │
    │  createLSPClient()       │                        │                     │
    ├─────────────────────────>│                        │                     │
@@ -460,19 +439,9 @@ User clicks         app.js              diagnostics.js      SimpleLSPClient     
 
 ### Testing the LSP Client
 
-**Start the Pyright Bridge Server:**
-```powershell
-# Option 1: Using VSCode tasks (recommended)
-Run Task: "Start All Servers"
-
-# Option 2: Manual start
-cd server/pyright-lsp-bridge
-npm start -- --bot-root ../.. --jesse-root ../../src
-```
-
 **Verify Connection:**
 1. Open browser DevTools console
-2. Look for: `"LSP client ready! Connected to Pyright via WebSocket."`
+2. Look for LSP client initialization messages
 3. Check server capabilities: `client.serverCapabilities`
 
 **Test Type Checking:**

@@ -8,6 +8,26 @@
 import { lintGutter, setDiagnostics } from '@codemirror/lint';
 
 /**
+ * Update the diagnostics status bar below the editor
+ */
+export function updateDiagnosticsStatus(diagnostics = []) {
+    const el = document.getElementById('diagnostics-status');
+    if (!el) return;
+
+    let errors = 0, warnings = 0, info = 0;
+    for (const d of diagnostics) {
+        if (d.severity === 'error') errors++;
+        else if (d.severity === 'warning') warnings++;
+        else info++;
+    }
+
+    el.innerHTML =
+        `Errors: <span class="count-error">${errors}</span>` +
+        ` | Warnings: <span class="count-warning">${warnings}</span>` +
+        ` | Info: <span class="count-info">${info}</span>`;
+}
+
+/**
  * Create a diagnostic linter that receives diagnostics from LSP
  */
 export function createLSPDiagnostics(client, fileUri, view) {
@@ -31,6 +51,7 @@ export function createLSPDiagnostics(client, fileUri, view) {
                 // Use setDiagnostics to update the editor
                 view.dispatch(setDiagnostics(view.state, cmDiagnostics));
                 console.log('Dispatched setDiagnostics');
+                updateDiagnosticsStatus(cmDiagnostics);
             }
         }
     });

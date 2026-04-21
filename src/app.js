@@ -8,8 +8,8 @@ import { Compartment } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
 import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
-import { notifyDocumentChange, updateDiagnosticsStatus } from './lsp/diagnostics.js';
 import { restoreFromUrl, initShareDropdown } from './share.js';
+import { notifyDocumentChange, updateDiagnosticsStatus, lintKeymapExtension } from './lsp/diagnostics.js';
 
 // Sample Python code - will be loaded from file
 let sampleCode = '# Loading example...\n';
@@ -458,8 +458,9 @@ async function initializeEditor() {
     const extensions = [
         basicSetup,
         python(),
-        createUpdateListener(),  // Add real-time diagnostics listener
-        lspCompartment.of([])    // Start with empty LSP extensions
+        lintKeymapExtension,      // F8 / Shift-F8 diagnostic navigation
+        createUpdateListener(),   // Add real-time diagnostics listener
+        lspCompartment.of([])     // Start with empty LSP extensions
     ];
 
     // Create the editor view first

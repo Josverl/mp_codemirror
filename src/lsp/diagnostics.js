@@ -9,6 +9,13 @@ import { lintGutter, lintKeymap, setDiagnostics } from '@codemirror/lint';
 import { keymap } from '@codemirror/view';
 
 /**
+ * Lint keyboard navigation extension (F8 / Shift-F8).
+ * Exported separately so it can be included in the base editor extensions,
+ * independent of whether the LSP client is connected.
+ */
+export const lintKeymapExtension = keymap.of(lintKeymap);
+
+/**
  * Update the diagnostics status bar below the editor
  */
 export function updateDiagnosticsStatus(diagnostics = []) {
@@ -57,8 +64,8 @@ export function createLSPDiagnostics(client, fileUri, view) {
         }
     });
 
-    // Return linter extension with gutter and keyboard navigation (F8 / Shift-F8)
-    return [lintGutter(), keymap.of(lintKeymap)];
+    // Return linter extension with gutter
+    return [lintGutter()];
 }
 
 /**

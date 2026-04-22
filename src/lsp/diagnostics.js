@@ -111,23 +111,25 @@ function convertLSPDiagnostic(lspDiag, doc) {
 
 /**
  * Convert LSP position (line, character) to CodeMirror offset.
- * Clamps the result to [0, doc.length] so that stale diagnostics arriving
- * after the user has edited the document never produce an out-of-bounds
- * position (which would otherwise throw a RangeError inside CodeMirror).
+ * Clamps the result to valid document bounds so that stale diagnostics
+ * arriving after the user has edited the document never produce an
+ * out-of-bounds position (which would otherwise throw a RangeError
+ * inside CodeMirror). LSP line numbers are 0-based (valid range: 0 to
+ * doc.lines-1); CodeMirror line numbers are 1-based.
  */
 function positionToOffset(doc, position) {
     try {
-        if (position.line + 1 > doc.lines) {
-            // Line no longer exists — diagnostics are from a previous document version.
-            console.info('positionToOffset: line out of bounds (stale diagnostics), clamping to end of document');
+        if (position.line >= doc.lines) {
+            // Line no longer exists — stale diagnostics from a previous document version.
             return doc.length;
         }
-        const line = doc.line(position.line + 1); // LSP is 0-based, CodeMirror is 1-based
-        // Clamp character offset: the character may exceed the line length when
-        // the document has been shortened since Pyright started its analysis.
-        return Math.min(line.from + position.character, doc.length);
+        const line = doc.line(position.line + 1); // convert LSP 0-based to CodeMirror 1-based
+        // Clamp to line.to (excludes newline) so a stale character offset that
+        // exceeds the current line length doesn't push the marker onto the next line.
+        return Math.min(line.from + position.character, line.to);
     } catch (error) {
-        console.info('positionToOffset: could not map position (stale diagnostics), clamping to 0:', error.message);
+        // Unexpected mapping failure; log at info level since stale positions are normal.
+        console.info('positionToOffset: could not map position (stale diagnostics):', error.message);
         return 0;
     }
 }

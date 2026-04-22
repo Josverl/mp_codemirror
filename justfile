@@ -25,7 +25,6 @@ build:
 
 # build the Pyright web worker (development, with source maps)
 build-dev:
-    just pack
     npx webpack --mode development
 
 # pack Pyright's typeshed-fallback into a zip for browser use
@@ -44,7 +43,6 @@ pack:
 # rebuild everything from scratch
 rebuild:
     npm install --ignore-scripts
-    just pack
     npx webpack --mode production
 
 # format Python code with ruff

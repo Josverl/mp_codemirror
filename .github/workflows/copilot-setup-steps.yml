@@ -20,6 +20,8 @@ jobs:
                   enable-cache: true
                   cache-dependency-glob: "pyproject.toml"
 
+            - uses: extractions/setup-just@v4
+
             # Step 4: Set up Python
             - name: Set up Python
               run: uv python install

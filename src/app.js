@@ -316,8 +316,14 @@ const darkTheme = EditorView.theme({
     "&.cm-focused .cm-selectionBackground, ::selection": {
         backgroundColor: "#264f78"
     },
+    ".cm-selectionBackground": {
+        backgroundColor: "#264f7880"
+    },
+    "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
+        backgroundColor: "#4477bb"
+    },
     ".cm-activeLine": {
-        backgroundColor: "#2a2a2a"
+        backgroundColor: "transparent"
     },
     ".cm-selectionMatch": {
         backgroundColor: "#3a3d41"
@@ -356,8 +362,14 @@ const lightTheme = EditorView.theme({
     "&.cm-focused .cm-selectionBackground, ::selection": {
         backgroundColor: "#add6ff"
     },
+    ".cm-selectionBackground": {
+        backgroundColor: "#80b4fb80"
+    },
+    "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
+        backgroundColor: "#80b4fb"
+    },
     ".cm-activeLine": {
-        backgroundColor: "#f0f0f0"
+        backgroundColor: "transparent"
     },
     ".cm-selectionMatch": {
         backgroundColor: "#e8e8e8"

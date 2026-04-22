@@ -110,14 +110,24 @@ function convertLSPDiagnostic(lspDiag, doc) {
 }
 
 /**
- * Convert LSP position (line, character) to CodeMirror offset
+ * Convert LSP position (line, character) to CodeMirror offset.
+ * Clamps the result to [0, doc.length] so that stale diagnostics arriving
+ * after the user has edited the document never produce an out-of-bounds
+ * position (which would otherwise throw a RangeError inside CodeMirror).
  */
 function positionToOffset(doc, position) {
     try {
+        if (position.line + 1 > doc.lines) {
+            // Line no longer exists — diagnostics are from a previous document version.
+            console.info('positionToOffset: line out of bounds (stale diagnostics), clamping to end of document');
+            return doc.length;
+        }
         const line = doc.line(position.line + 1); // LSP is 0-based, CodeMirror is 1-based
-        return line.from + position.character;
+        // Clamp character offset: the character may exceed the line length when
+        // the document has been shortened since Pyright started its analysis.
+        return Math.min(line.from + position.character, doc.length);
     } catch (error) {
-        console.error('Error converting position to offset:', error);
+        console.info('positionToOffset: could not map position (stale diagnostics), clamping to 0:', error.message);
         return 0;
     }
 }

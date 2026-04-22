@@ -272,7 +272,14 @@ export class SimpleLSPClient {
             try {
                 handler(method, params);
             } catch (error) {
-                console.error('Error in message handler:', error);
+                // A RangeError here means stale diagnostics referenced positions
+                // that no longer exist after the user edited the document.
+                // This is an expected race condition, not a programming error.
+                if (error instanceof RangeError) {
+                    console.info('Notification handler skipped (stale document positions):', error.message);
+                } else {
+                    console.error('Error in message handler:', error);
+                }
             }
         });
 

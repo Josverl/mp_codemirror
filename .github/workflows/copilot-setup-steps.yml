@@ -32,7 +32,7 @@ jobs:
             - name: Install project dependencies
               run: |
                   echo "📦 Installing dependencies with uv..."
-                  uv sync --extras test
+                  uv sync --extra test
 
             # Step 8: Install MicroPython stubs
             - name: Install MicroPython stubs

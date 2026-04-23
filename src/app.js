@@ -489,10 +489,11 @@ async function initializeEditor() {
                         return indentMore(view);
                     }
                     // Single cursor or inline selection: insert 4 spaces
-                    view.dispatch(state.update(state.replaceSelection("    "), {
+                    view.dispatch({
+                        ...state.replaceSelection("    "),
                         scrollIntoView: true,
                         userEvent: "input"
-                    }));
+                    });
                     return true;
                 },
                 shift: indentLess

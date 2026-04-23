@@ -6,6 +6,8 @@
 import { python } from '@codemirror/lang-python';
 import { Compartment } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
+import { keymap } from '@codemirror/view';
+import { indentLess, indentMore } from '@codemirror/commands';
 import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
 import { restoreFromUrl, initShareDropdown } from './share.js';
@@ -473,6 +475,29 @@ async function initializeEditor() {
     const extensions = [
         basicSetup,
         python(),
+        // Tab inserts 4 spaces and stays in editor; Shift-Tab dedents
+        keymap.of([
+            {
+                key: "Tab",
+                run: (view) => {
+                    const { state } = view;
+                    const sel = state.selection.main;
+                    const fromLine = state.doc.lineAt(sel.from).number;
+                    const toLine = state.doc.lineAt(sel.to).number;
+                    if (fromLine < toLine) {
+                        // Multi-line selection: indent each selected line by 4 spaces
+                        return indentMore(view);
+                    }
+                    // Single cursor or inline selection: insert 4 spaces
+                    view.dispatch(state.update(state.replaceSelection("    "), {
+                        scrollIntoView: true,
+                        userEvent: "input"
+                    }));
+                    return true;
+                },
+                shift: indentLess
+            }
+        ]),
         themeCompartment.of(isDarkTheme ? darkTheme : lightTheme),
         lintKeymapExtension,      // F8 / Shift-F8 diagnostic navigation
         createUpdateListener(),   // Add real-time diagnostics listener

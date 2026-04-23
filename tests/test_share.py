@@ -190,6 +190,30 @@ def test_url_restores_board(page, live_server):
     assert board == "esp32"
 
 
+def test_url_board_preloads_matching_stubs(page, live_server):
+    """URL board selection must preload stubs for the same board before LSP init."""
+    _goto_editor(page, live_server)
+    compressed = page.evaluate("""async () => {
+        const { compressCode } = await import('./share.js');
+        return await compressCode('from machine import CAN');
+    }""")
+
+    page.goto(f"{live_server}/index.html?board=stm32&code={compressed}")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    page.wait_for_function("() => document.getElementById('boardSelect').value === 'stm32'")
+
+    page.wait_for_function(
+        "() => performance.getEntriesByType('resource').some(e => e.name.includes('stubs-stm32.zip'))",
+        timeout=5000,
+    )
+    fetched_resources = page.evaluate(
+        "() => performance.getEntriesByType('resource').map(e => e.name)"
+    )
+    assert any("stubs-stm32.zip" in url for url in fetched_resources), (
+        "Expected STM32 stubs to be fetched during URL-based board restore."
+    )
+
+
 def test_url_restores_typecheck_mode(page, live_server):
     """Loading a URL with typeCheckMode param selects that mode."""
     _goto_editor(page, live_server)

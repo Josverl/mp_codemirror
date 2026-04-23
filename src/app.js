@@ -432,6 +432,14 @@ async function initializeEditor() {
         const workerUrl = window.location.pathname.includes('/src/')
             ? '../dist/pyright_worker.js'
             : './pyright_worker.js';
+        let initialBoardStubs;
+        if (currentBoardId && boardManifest) {
+            try {
+                initialBoardStubs = await fetchBoardStubs(currentBoardId);
+            } catch (error) {
+                console.warn(`Could not preload stubs for board "${currentBoardId}":`, error);
+            }
+        }
 
         window.__lspReady = false;
         window.__lspFailed = false;
@@ -439,6 +447,7 @@ async function initializeEditor() {
         const lspResult = await createLSPClient({
             workerUrl,
             timeout: 15000,
+            boardStubs: initialBoardStubs,
             typeCheckingMode: currentTypeCheckMode,
         });
         lspClient = lspResult.client;
@@ -729,4 +738,3 @@ document.body.classList.add('light-theme');
 
 // Export the view for testing purposes
 export { view };
-

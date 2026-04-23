@@ -97,33 +97,17 @@ mp_codemirror/
 └── README.md            # Project documentation
 ```
 
-## Phase 1: Basic CodeMirror Setup (COMPLETE)
+## Basic CodeMirror Setup 
 
-Delivered: Static HTML5 page with CodeMirror 6 loaded via CDN (esm.sh), Python syntax highlighting, line numbers, dark/light theme toggle, bracket matching, code folding, auto-indentation. Deploys to GitHub Pages as static files.
-
-## Phase 2: LSP Integration (COMPLETE)
-
-Delivered: Pyright runs in a **Web Worker** (`dist/pyright_worker.js`, built via webpack). No server required.
-
-### What was built:
+- Static HTML5 page with CodeMirror 6 loaded via CDN (esm.sh),
+- Python syntax highlighting, line numbers, dark/light theme toggle, bracket matching, code folding, auto-indentation.
+- Deploys to GitHub Pages as static files.
 - **Web Worker transport** (`src/lsp/worker-transport.js`) — runs Pyright in-browser
 - **Transport factory** (`src/lsp/transport-factory.js`) — creates the worker transport
 - **LSP client** (`src/lsp/simple-client.js`) — JSON-RPC 2.0, transport-agnostic
 - **Real-time diagnostics** — errors/warnings as you type (300ms debounce)
 - **Autocompletion** — context-aware completions from Pyright
 - **Hover tooltips** — type info, docstrings, MicroPython docs
-
-### Build step:
-```bash
-just build          # or: npm run build:worker
-# Produces dist/pyright_worker.js
-```
-
-## Phase 3: MicroPython Type Stubs (COMPLETE)
-
-Delivered: Board-specific MicroPython stubs with live switching.
-
-### What was built:
 - **Board selector dropdown** — ESP32, RP2040, STM32
 - **Per-board stub packing** (`scripts/pack-stubs.mjs`) — stubs bundled as zip files
 - **Dynamic stub loading** — worker loads/unloads stubs on board switch
@@ -175,7 +159,7 @@ pytest tests/ -v                  # All tests
 
 ### Performance Considerations
 
-- Lazy-load LSP features (Phase 2+)
+- Lazy-load LSP features
 - Debounce expensive operations (diagnostics, completions)
 - Use Web Workers for background processing
 - Minimize bundle size (use CDN for CodeMirror)
@@ -191,14 +175,11 @@ pytest tests/ -v                  # All tests
 ### Existing Projects
 - Monaco Editor (reference for LSP integration)
 - JupyterLab CodeMirror (Python editor example)
-- Browser-based Python IDEs (Pyodide, Skulpt)
 
 ## Notes for AI Agent
 
-- Start with Phase 1 only - simple, working solution
 - Use CDN links to avoid build complexity
 - Prioritize GitHub Pages compatibility
 - Document all design decisions
 - Keep code modular for future LSP integration
 - Test in multiple browsers (Chrome, Firefox, Safari)
-- When implementing LSP, research current browser-based solutions first

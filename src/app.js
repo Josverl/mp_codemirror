@@ -437,7 +437,7 @@ async function initializeEditor() {
             try {
                 initialBoardStubs = await fetchBoardStubs(currentBoardId);
             } catch (error) {
-                console.warn(`Could not preload stubs for board "${currentBoardId}":`, error);
+                console.warn('Could not preload stubs for board:', currentBoardId, error);
             }
         }
 

@@ -4,8 +4,10 @@
  */
 
 import { python } from '@codemirror/lang-python';
-import { Compartment } from '@codemirror/state';
+import { indentUnit } from '@codemirror/language';
+import { Compartment, Prec } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
+import { keymap } from '@codemirror/view';
 import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
 import { restoreFromUrl, initShareDropdown } from './share.js';
@@ -469,10 +471,99 @@ async function initializeEditor() {
         }
     });
 
+    const INDENT = '    ';
+
+    function selectedLineNumbers(state) {
+        const lineNumbers = new Set();
+        for (const range of state.selection.ranges) {
+            const startLine = state.doc.lineAt(range.from).number;
+            let endLine = state.doc.lineAt(range.to).number;
+            if (range.to > range.from && state.doc.lineAt(range.to).from === range.to) {
+                endLine -= 1;
+            }
+            for (let lineNo = startLine; lineNo <= endLine; lineNo++) {
+                lineNumbers.add(lineNo);
+            }
+        }
+        return Array.from(lineNumbers).sort((a, b) => a - b);
+    }
+
+    function indentWithFourSpaces(view) {
+        const { state } = view;
+        const hasMultiline = state.selection.ranges.some((range) => (
+            state.doc.lineAt(range.from).number < state.doc.lineAt(range.to).number
+        ));
+
+        if (!hasMultiline) {
+            view.dispatch({
+                ...state.replaceSelection(INDENT),
+                scrollIntoView: true,
+                userEvent: 'input.indent'
+            });
+            return true;
+        }
+
+        const changes = selectedLineNumbers(state).map((lineNo) => {
+            const line = state.doc.line(lineNo);
+            return { from: line.from, insert: INDENT };
+        });
+
+        view.dispatch({
+            changes,
+            scrollIntoView: true,
+            userEvent: 'input.indent'
+        });
+        return true;
+    }
+
+    function dedentFourSpaces(view) {
+        const { state } = view;
+        const changes = [];
+
+        for (const lineNo of selectedLineNumbers(state)) {
+            const line = state.doc.line(lineNo);
+            const text = line.text;
+            let removeCount = 0;
+
+            if (text.startsWith(INDENT)) {
+                removeCount = 4;
+            } else if (text.startsWith('\t')) {
+                removeCount = 1;
+            } else {
+                const match = text.match(/^ {1,3}/);
+                removeCount = match ? match[0].length : 0;
+            }
+
+            if (removeCount > 0) {
+                changes.push({
+                    from: line.from,
+                    to: line.from + removeCount
+                });
+            }
+        }
+
+        if (!changes.length) {
+            return true;
+        }
+
+        view.dispatch({
+            changes,
+            scrollIntoView: true,
+            userEvent: 'input.indent'
+        });
+        return true;
+    }
+
     // Build editor extensions
     const extensions = [
         basicSetup,
+        indentUnit.of(INDENT),
         python(),
+        // Enforce literal 4-space tab stops for both single and multiline selections.
+        Prec.high(keymap.of([
+            { key: 'Tab', run: indentWithFourSpaces },
+            { key: 'Shift-Tab', run: dedentFourSpaces }
+        ])),
         themeCompartment.of(isDarkTheme ? darkTheme : lightTheme),
         lintKeymapExtension,      // F8 / Shift-F8 diagnostic navigation
         createUpdateListener(),   // Add real-time diagnostics listener

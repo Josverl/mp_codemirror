@@ -183,6 +183,63 @@ def test_editor_accepts_keyboard_input(page, live_server):
     assert "Hello, MicroPython!" in page.locator(".cm-content").inner_text()
 
 
+def test_tab_inserts_4_spaces_and_keeps_focus(page, live_server):
+    """Tab inserts 4 spaces and keeps keyboard focus in the editor."""
+    _goto_editor(page, live_server)
+
+    page.locator("#clearBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('.cm-content').innerText.trim() === ''",
+        timeout=5000,
+    )
+
+    page.locator(".cm-content").click()
+    page.keyboard.type("x=1")
+    page.keyboard.press("Tab")
+    page.keyboard.type("y=2")
+
+    content = page.locator(".cm-content").inner_text()
+    assert "x=1    y=2" in content, "Tab should insert exactly 4 spaces"
+
+    focused_in_editor = page.evaluate(
+        """() => {
+            const active = document.activeElement;
+            return Boolean(active && (active.classList.contains('cm-content') || active.closest('.cm-editor')));
+        }"""
+    )
+    assert focused_in_editor, "Focus should remain inside CodeMirror after pressing Tab"
+
+
+def test_tab_and_shift_tab_indent_dedent_multiline_selection(page, live_server):
+    """Tab indents selected lines by 4 spaces and Shift-Tab dedents them back."""
+    _goto_editor(page, live_server)
+
+    page.locator("#clearBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('.cm-content').innerText.trim() === ''",
+        timeout=5000,
+    )
+
+    page.locator(".cm-content").click()
+    page.keyboard.type("a\nb")
+
+    page.keyboard.press("Control+a")
+    page.keyboard.press("Tab")
+
+    indented = page.evaluate(
+        "() => Array.from(document.querySelectorAll('.cm-line')).map(line => line.textContent)"
+    )
+    assert indented[0].startswith("    a"), "First line should be indented by 4 spaces"
+    assert indented[1].startswith("    b"), "Second line should be indented by 4 spaces"
+
+    page.keyboard.press("Shift+Tab")
+    dedented = page.evaluate(
+        "() => Array.from(document.querySelectorAll('.cm-line')).map(line => line.textContent)"
+    )
+    assert dedented[0] == "a", "First line should dedent back with Shift-Tab"
+    assert dedented[1] == "b", "Second line should dedent back with Shift-Tab"
+
+
 def test_sample_selector_populated(editor_page):
     """Example select dropdown is populated with at least one option after init."""
     # Wait for JS to populate the select with example options

@@ -41,13 +41,14 @@ export async function createLSPClient(config = {}) {
     await client.connect(transport);
     console.log('LSP Client initialized:', client.serverCapabilities);
 
-    return { client, transport };
+    return { client, transport, pyrightVersion: transport.pyrightVersion || "" };
 }
 
 /**
  * Create an LSP plugin extension for an editor
+ * @param {string} [pyrightVersion] - Pyright version to show in the diagnostics status bar
  */
-export function createLSPPlugin(client, view, fileUri = 'file:///workspace/document.py', languageId = 'python', initialContent = '') {
+export function createLSPPlugin(client, view, fileUri = 'file:///workspace/document.py', languageId = 'python', initialContent = '', pyrightVersion = '') {
     // Store client reference for later use
     if (!window.lspClients) {
         window.lspClients = new Map();
@@ -58,7 +59,7 @@ export function createLSPPlugin(client, view, fileUri = 'file:///workspace/docum
     notifyDocumentOpen(client, fileUri, languageId, initialContent, 1);
 
     // Create diagnostics extension with the view
-    const diagnosticsExtensions = createLSPDiagnostics(client, fileUri, view);
+    const diagnosticsExtensions = createLSPDiagnostics(client, fileUri, view, pyrightVersion);
 
     // Create completion source
     const completionSource = createCompletionSource(client, fileUri);

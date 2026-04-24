@@ -8,7 +8,9 @@
  * 4. LSP messages flow through BrowserMessageReader/Writer
  */
 
-// Polyfills must be imported first, in order
+// Injected at build time by webpack DefinePlugin
+declare const __PYRIGHT_VERSION__: string;
+
 import "./polyfills/process-patch";
 import "./polyfills/fs-patch";
 import "./polyfills/timeout-patch";
@@ -162,7 +164,7 @@ async function handleInitServer(msg: MsgInitServer) {
         const server = new PyrightServer(connection as any, 0);
 
         console.log("[pyright-worker] Pyright server created, signaling ready");
-        ctx.postMessage({ type: "serverInitialized" } as WorkerMessage);
+        ctx.postMessage({ type: "serverInitialized", pyrightVersion: __PYRIGHT_VERSION__ } as WorkerMessage);
     } catch (err: any) {
         console.error("[pyright-worker] Init failed:", err);
         ctx.postMessage({

@@ -30,6 +30,9 @@ let currentBoardId = null;
 let boardManifest = null;
 let stubsCache = new Map(); // boardId → ArrayBuffer
 
+// Pyright version (received from worker on init)
+let pyrightVersion = "";
+
 // Type checking mode
 let currentTypeCheckMode = localStorage.getItem('mp_typeCheckMode') || 'standard';
 
@@ -61,7 +64,14 @@ async function initBoardSelector() {
         for (const board of boardManifest.boards) {
             const opt = document.createElement('option');
             opt.value = board.id;
-            opt.textContent = board.name;
+            // Virtual boards (file === null) show their name; real boards show package — version
+            if (board.file === null) {
+                opt.textContent = board.package || board.id;
+            } else {
+                opt.textContent = board.package_version
+                    ? `${board.package} — ${board.package_version}`
+                    : board.package;
+            }
             select.appendChild(opt);
         }
 
@@ -144,12 +154,12 @@ async function handleBoardChange(event) {
         if (view) {
             // Clear stale gutter markers from previous LSP instance
             view.dispatch(setDiagnostics(view.state, []));
-            updateDiagnosticsStatus([]);
+            updateDiagnosticsStatus([], pyrightVersion);
 
             // Reconfigure the compartment with extensions bound to the new client
             const content = view.state.doc.toString();
             documentVersion = 1;
-            const newExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', content);
+            const newExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', content, pyrightVersion);
             view.dispatch({
                 effects: lspCompartment.reconfigure(newExtensions)
             });
@@ -206,10 +216,10 @@ async function handleTypeCheckModeChange(event) {
 
         if (view) {
             view.dispatch(setDiagnostics(view.state, []));
-            updateDiagnosticsStatus([]);
+            updateDiagnosticsStatus([], pyrightVersion);
             const content = view.state.doc.toString();
             documentVersion = 1;
-            const newExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', content);
+            const newExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', content, pyrightVersion);
             view.dispatch({
                 effects: lspCompartment.reconfigure(newExtensions)
             });
@@ -452,6 +462,7 @@ async function initializeEditor() {
         });
         lspClient = lspResult.client;
         lspTransport = lspResult.transport;
+        pyrightVersion = lspResult.pyrightVersion || "";
         console.log('LSP client ready.');
         window.__lspReady = true;
     } catch (error) {
@@ -589,7 +600,7 @@ async function initializeEditor() {
     // Add LSP plugin if client is available
     if (lspClient) {
         try {
-            const lspExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', sampleCode);
+            const lspExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', sampleCode, pyrightVersion);
             // Reconfigure the LSP compartment with actual extensions
             view.dispatch({
                 effects: lspCompartment.reconfigure(lspExtensions)

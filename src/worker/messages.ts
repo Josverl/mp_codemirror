@@ -22,6 +22,7 @@ export interface MsgInitServer {
 
 export interface MsgServerInitialized {
     type: "serverInitialized";
+    pyrightVersion: string;
 }
 
 export interface MsgServerError {

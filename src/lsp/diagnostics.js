@@ -37,9 +37,11 @@ export const lintKeymapExtension = Prec.high(keymap.of([
 ]));
 
 /**
- * Update the diagnostics status bar below the editor
+ * Update the diagnostics status bar below the editor.
+ * @param {Array} diagnostics - CodeMirror diagnostics array
+ * @param {string} [pyrightVersion] - Optional pyright version to display
  */
-export function updateDiagnosticsStatus(diagnostics = []) {
+export function updateDiagnosticsStatus(diagnostics = [], pyrightVersion = "") {
     const el = document.getElementById('diagnostics-status');
     if (!el) return;
 
@@ -50,16 +52,25 @@ export function updateDiagnosticsStatus(diagnostics = []) {
         else info++;
     }
 
+    const versionSuffix = pyrightVersion
+        ? ` | <span class="pyright-version">Pyright ${pyrightVersion}</span>`
+        : "";
+
     el.innerHTML =
         `Errors: <span class="count-error">${errors}</span>` +
         ` | Warnings: <span class="count-warning">${warnings}</span>` +
-        ` | Info: <span class="count-info">${info}</span>`;
+        ` | Info: <span class="count-info">${info}</span>` +
+        versionSuffix;
 }
 
 /**
  * Create a diagnostic linter that receives diagnostics from LSP
+ * @param {Object} client - LSP client
+ * @param {string} fileUri - Document URI
+ * @param {Object} view - CodeMirror view
+ * @param {string} [pyrightVersion] - Pyright version string to display in the status bar
  */
-export function createLSPDiagnostics(client, fileUri, view) {
+export function createLSPDiagnostics(client, fileUri, view, pyrightVersion = "") {
     // Listen for diagnostic notifications from the server
     client.onNotification((method, params) => {
         if (method === 'textDocument/publishDiagnostics') {
@@ -80,7 +91,7 @@ export function createLSPDiagnostics(client, fileUri, view) {
                 // Use setDiagnostics to update the editor
                 view.dispatch(setDiagnostics(view.state, cmDiagnostics));
                 console.log('Dispatched setDiagnostics');
-                updateDiagnosticsStatus(cmDiagnostics);
+                updateDiagnosticsStatus(cmDiagnostics, pyrightVersion);
             }
         }
     });

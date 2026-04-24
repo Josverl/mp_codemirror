@@ -3,6 +3,15 @@ const webpack = require("webpack");
 const fs = require("fs");
 const os = require("os");
 
+// Extract pyright version from the git tag in package.json
+// e.g. "git+https://github.com/microsoft/pyright.git#1.1.386" → "1.1.386"
+function getPyrightVersion() {
+    const pkgJson = require("./package.json");
+    const dep = pkgJson.devDependencies?.pyright || "";
+    const tag = dep.includes("#") ? dep.split("#").pop() : "";
+    return tag || "unknown";
+}
+
 module.exports = {
     entry: {
         pyright_worker: "./src/worker/pyright-worker.ts",
@@ -47,6 +56,7 @@ module.exports = {
         new webpack.DefinePlugin({
             __fs_constants: JSON.stringify(fs.constants),
             __os_constants: JSON.stringify(os.constants),
+            __PYRIGHT_VERSION__: JSON.stringify(getPyrightVersion()),
         }),
     ],
     module: {

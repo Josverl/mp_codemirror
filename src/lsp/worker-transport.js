@@ -17,6 +17,7 @@ export class WorkerTransport {
         this._connectReject = null;
         this._boardStubs = options.boardStubs; // ArrayBuffer | false | undefined
         this._typeCheckingMode = options.typeCheckingMode; // string | undefined
+        this.pyrightVersion = ""; // set when serverInitialized is received
     }
 
     /**
@@ -66,6 +67,7 @@ export class WorkerTransport {
                     clearTimeout(timeout);
                     this.connected = true;
                     this._connectReject = null;
+                    this.pyrightVersion = msg.pyrightVersion || "";
 
                     // Replace onmessage with the steady-state handler
                     this.worker.onmessage = this._onSteadyStateMessage.bind(this);

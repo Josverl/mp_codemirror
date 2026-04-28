@@ -95,16 +95,36 @@ class OPFSBackend {
     }
 
     async renameFile(oldPath, newPath) {
+        if (oldPath === newPath) return;
+
         // Non-atomic: read → write → delete. On partial failure the new copy
         // may exist alongside the old. Callers should close any open editor
         // tab for oldPath before calling rename to avoid stale state.
+        let hadDestinationFile = false;
+        let destinationContent = '';
+        try {
+            destinationContent = await this.readFile(newPath);
+            hadDestinationFile = true;
+        } catch {
+            // Destination may not exist or may be a directory; both are fine.
+        }
+
         const content = await this.readFile(oldPath);
         await this.writeFile(newPath, content);
         try {
             await this.deleteFile(oldPath);
         } catch (err) {
-            // Best-effort cleanup: remove the new copy to avoid duplicates.
-            try { await this.deleteFile(newPath); } catch { /* ignore */ }
+            // Best-effort rollback. If destination existed before rename,
+            // restore it; otherwise remove the newly created copy.
+            try {
+                if (hadDestinationFile) {
+                    await this.writeFile(newPath, destinationContent);
+                } else {
+                    await this.deleteFile(newPath);
+                }
+            } catch {
+                // Ignore rollback failures and surface the original error.
+            }
             throw err;
         }
     }
@@ -196,13 +216,32 @@ class LocalStorageBackend {
     async createDirectory(_path) { /* no-op — dirs are implicit */ }
 
     async renameFile(oldPath, newPath) {
+        if (oldPath === newPath) return;
+
         // Non-atomic: read → write → delete. See OPFS backend for details.
+        let hadDestinationFile = false;
+        let destinationContent = '';
+        try {
+            destinationContent = await this.readFile(newPath);
+            hadDestinationFile = true;
+        } catch {
+            // Destination missing is expected in most rename flows.
+        }
+
         const content = await this.readFile(oldPath);
         await this.writeFile(newPath, content);
         try {
             await this.deleteFile(oldPath);
         } catch (err) {
-            try { await this.deleteFile(newPath); } catch { /* ignore */ }
+            try {
+                if (hadDestinationFile) {
+                    await this.writeFile(newPath, destinationContent);
+                } else {
+                    await this.deleteFile(newPath);
+                }
+            } catch {
+                // Ignore rollback failures and surface the original error.
+            }
             throw err;
         }
     }

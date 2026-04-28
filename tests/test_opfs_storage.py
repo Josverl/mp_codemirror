@@ -112,6 +112,49 @@ class TestOPFSStorage:
         assert not result['oldExists'], "old_name.py should be gone"
         assert result['content'] == '# renamed'
 
+    def test_rename_rollback_preserves_existing_destination(self, page, live_server):
+        """If old-path delete fails during rename, pre-existing destination content is restored."""
+        _load_editor(page, live_server)
+        _import_opfs(page)
+
+        result = page.evaluate("""
+            async () => {
+                await window.OPFSProject.writeFile('rollback_old.py', '# old-content');
+                await window.OPFSProject.writeFile('rollback_new.py', '# existing-destination');
+
+                const originalRemoveEntry = FileSystemDirectoryHandle.prototype.removeEntry;
+                let simulated = false;
+
+                FileSystemDirectoryHandle.prototype.removeEntry = async function(name, options) {
+                    if (!simulated && name === 'rollback_old.py') {
+                        simulated = true;
+                        throw new DOMException('simulated failure', 'NoModificationAllowedError');
+                    }
+                    return originalRemoveEntry.call(this, name, options);
+                };
+
+                let renameError = null;
+                try {
+                    await window.OPFSProject.renameFile('rollback_old.py', 'rollback_new.py');
+                } catch (err) {
+                    renameError = err && err.name ? err.name : String(err);
+                } finally {
+                    FileSystemDirectoryHandle.prototype.removeEntry = originalRemoveEntry;
+                }
+
+                const oldExists = await window.OPFSProject.exists('rollback_old.py');
+                const newExists = await window.OPFSProject.exists('rollback_new.py');
+                const newContent = newExists ? await window.OPFSProject.readFile('rollback_new.py') : null;
+
+                return { renameError, oldExists, newExists, newContent };
+            }
+        """)
+
+        assert result['renameError'], "rename should fail when delete old is forced to fail"
+        assert result['oldExists'], "old file should still exist after failed rename"
+        assert result['newExists'], "destination should still exist after rollback"
+        assert result['newContent'] == '# existing-destination', "destination content should be restored"
+
     def test_last_active_file_persists(self, page, live_server):
         """setLastActiveFile persists across calls within same session."""
         _load_editor(page, live_server)

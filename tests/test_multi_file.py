@@ -112,7 +112,7 @@ class TestMultiFileDocumentManagement:
         # Edit file A (main.py) — clear and type unique content
         page.locator("#clearBtn").click()
         time.sleep(0.2)
-        page.locator(".cm-content").click()
+        page.locator(".editor-pane--active .cm-content").click()
         page.keyboard.type("# unique content in file A")
         time.sleep(0.3)
 
@@ -137,7 +137,7 @@ class TestMultiFileDocumentManagement:
         time.sleep(0.5)
 
         # Content should be preserved
-        content = page.locator(".cm-content").inner_text()
+        content = page.locator(".editor-pane--active .cm-content").inner_text()
         assert "unique content in file A" in content, \
             f"File A's content should be preserved after switching, got: {content[:200]!r}"
 

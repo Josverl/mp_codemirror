@@ -123,11 +123,16 @@ function writeWorkspaceFiles(files: Record<string, string> = {}) {
  * Create pyrightconfig.json in the virtual workspace
  */
 function writePyrightConfig(typeCheckingMode: string = "standard") {
+    // Pyright requires `include`/`extraPaths` in pyrightconfig.json to be
+    // RELATIVE to the config file's location (here: /workspace). Absolute
+    // paths are silently dropped with "Ignoring path … because it is not
+    // relative", which makes Pyright report "No source files found" and
+    // breaks cross-file import resolution (e.g. `from helpers import answer`).
     const config = {
         typeshedPath: "/typeshed-fallback",
         stubPath: "/typings",
-        include: ["/workspace"],
-        extraPaths: ["/workspace"],
+        include: ["."],
+        extraPaths: ["."],
         pythonPlatform: "Linux",
         typeCheckingMode,
         reportMissingModuleSource: "none",

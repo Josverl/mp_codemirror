@@ -11,6 +11,7 @@
  */
 
 import { OPFSProject } from '../storage/opfs-project.js';
+import { Events, dispatch } from '../events.js';
 
 const EXPANDED_KEY = 'mp_tree_expanded';
 
@@ -315,6 +316,7 @@ export class FileTree {
         if (!name) return;
         const fullPath = dirPath ? `${dirPath}/${name}` : name;
         await OPFSProject.writeFile(fullPath, '');
+        dispatch(Events.FILE_CREATED, { path: fullPath });
         await this.refresh();
         this._onOpen(fullPath);
         if (this._onRefresh) this._onRefresh();
@@ -329,6 +331,7 @@ export class FileTree {
         if (!newName || newName === oldName) return;
         const newPath = [...parts.slice(0, -1), newName].join('/');
         await OPFSProject.renameFile(path, newPath);
+        dispatch(Events.FILE_RENAMED, { oldPath: path, newPath });
         if (this._onRename) await this._onRename(path, newPath);
         await this.refresh();
         if (this._onRefresh) this._onRefresh();
@@ -340,6 +343,7 @@ export class FileTree {
         const confirmed = await this._showInlineConfirm(li, `Delete?`);
         if (!confirmed) return;
         await OPFSProject.deleteFile(path);
+        dispatch(Events.FILE_DELETED, { path });
         if (this._onDelete) await this._onDelete(path);
         await this.refresh();
         if (this._onRefresh) this._onRefresh();

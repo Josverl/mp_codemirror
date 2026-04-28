@@ -189,6 +189,12 @@ async function handleInitServer(msg: MsgInitServer) {
         // are routed to the filesystem (and to the LSP transport when needed)
         // before falling through to the JSON-RPC reader.
         const lspOnMessage = ctx.onmessage;
+        if (!lspOnMessage) {
+            console.warn(
+                "[pyright-worker] BrowserMessageReader did not expose ctx.onmessage; " +
+                "custom message interception may break with future vscode-languageserver versions."
+            );
+        }
         ctx.onmessage = (event: MessageEvent) => {
             const data = event.data as WorkerMessage | undefined;
             if (data && typeof data === "object" && "type" in data) {

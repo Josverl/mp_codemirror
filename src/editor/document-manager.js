@@ -1,34 +1,37 @@
 /**
  * Document Manager
  *
- * Manages multiple open CodeMirror documents. Each open file gets its own
- * EditorState. The single EditorView swaps states when the user switches files.
+ * Manages multiple open files. Each open file gets its own EditorView mounted
+ * inside its own pane element. Switching tabs simply toggles which pane is
+ * visible — no state-swapping, no scroll/undo bookkeeping. This mirrors the
+ * pattern used by ViperIDE and is the recommended CodeMirror 6 idiom for
+ * multi-document editors.
  */
 
-import { EditorState } from '@codemirror/state';
 import { OPFSProject } from '../storage/opfs-project.js';
 
 export class DocumentManager {
     /**
-     * @param {import('@codemirror/view').EditorView} view
-     * @param {() => import('@codemirror/state').Extension[]} getBaseExtensions
-     *   Returns the base set of extensions to use for every new EditorState.
+     * @param {HTMLElement} containerEl
+     *   The DOM element that will host one editor pane per open file.
+     * @param {(path: string, content: string, paneEl: HTMLElement) => import('@codemirror/view').EditorView} createView
+     *   Factory that creates a fully-configured EditorView mounted into paneEl.
      */
-    constructor(view, getBaseExtensions) {
-        this._view = view;
-        this._getBaseExtensions = getBaseExtensions;
+    constructor(containerEl, createView) {
+        this._container = containerEl;
+        this._createView = createView;
 
-        /** @type {Map<string, { state: EditorState, scrollTop: number, dirty: boolean }>} */
+        /** @type {Map<string, { view: import('@codemirror/view').EditorView, paneEl: HTMLElement, dirty: boolean }>} */
         this._docs = new Map();
 
         /** @type {string|null} */
         this._activeFile = null;
 
-        /** @type {Array<(path: string) => void>} */
+        /** @type {Array<(path: string|null) => void>} */
         this._changeListeners = [];
     }
 
-    /** Register a listener called whenever the active file changes. */
+    /** Register a listener invoked whenever the active file changes. */
     onActiveChange(fn) { this._changeListeners.push(fn); }
 
     _notifyListeners(path) {
@@ -38,7 +41,7 @@ export class DocumentManager {
     }
 
     /**
-     * Open a file (read from OPFS if not yet cached) and activate it.
+     * Open a file (creating a fresh EditorView if not yet open) and activate it.
      * @param {string} path
      */
     async openFile(path) {
@@ -49,43 +52,33 @@ export class DocumentManager {
             } catch (err) {
                 console.warn(`DocumentManager: could not read ${path}:`, err.message);
             }
-            const shouldAdoptExistingViewState = (
-                !this._activeFile
-                && this._view
-                && this._view.state.doc.toString() === content
-            );
-            const state = shouldAdoptExistingViewState
-                ? this._view.state
-                : EditorState.create({
-                    doc: content,
-                    extensions: this._getBaseExtensions(),
-                });
-            this._docs.set(path, { state, scrollTop: 0, dirty: false });
+
+            const paneEl = document.createElement('div');
+            paneEl.className = 'editor-pane';
+            paneEl.dataset.path = path;
+            this._container.appendChild(paneEl);
+
+            const view = this._createView(path, content, paneEl);
+            this._docs.set(path, { view, paneEl, dirty: false });
         }
 
-        // Save scroll of current before switching
-        if (this._activeFile && this._view) {
-            const cur = this._docs.get(this._activeFile);
-            if (cur) cur.scrollTop = this._view.scrollDOM.scrollTop;
+        // Toggle visibility of all panes
+        for (const [p, entry] of this._docs) {
+            entry.paneEl.classList.toggle('editor-pane--active', p === path);
         }
 
         this._activeFile = path;
         OPFSProject.setLastActiveFile(path);
 
+        // Focus the newly-active editor on the next frame so layout has settled
         const entry = this._docs.get(path);
-        if (this._view && this._view.state !== entry.state) {
-            this._view.setState(entry.state);
-            // Restore scroll after state swap (next frame)
-            requestAnimationFrame(() => {
-                this._view.scrollDOM.scrollTop = entry.scrollTop;
-            });
-        }
+        requestAnimationFrame(() => entry.view.focus());
 
         this._notifyListeners(path);
     }
 
     /**
-     * Save current in-memory state of a file back to OPFS.
+     * Persist a file's current in-memory content to OPFS.
      * @param {string} [path] — defaults to active file
      */
     async saveFile(path) {
@@ -94,27 +87,37 @@ export class DocumentManager {
         const entry = this._docs.get(target);
         if (!entry) return;
 
-        // If saving active file, sync EditorView → EditorState first
-        if (target === this._activeFile && this._view) {
-            entry.state = this._view.state;
-        }
-
-        const content = entry.state.doc.toString();
+        const content = entry.view.state.doc.toString();
         await OPFSProject.writeFile(target, content);
         entry.dirty = false;
-        this._notifyListeners(target);
+        this._notifyListeners(this._activeFile);
     }
 
     /**
-     * Close a file (auto-saves first).
-     * @param {string} path
+     * Drop unsaved changes for a file so the next closeFile() won't persist
+     * them. Disk content is left untouched.
+     */
+    discard(path) {
+        const entry = this._docs.get(path);
+        if (entry) entry.dirty = false;
+    }
+
+    /**
+     * Close a file. Auto-saves first if dirty (unless discard() was called).
      */
     async closeFile(path) {
-        await this.saveFile(path);
+        const entry = this._docs.get(path);
+        if (!entry) return;
+
+        if (entry.dirty) {
+            await this.saveFile(path);
+        }
+
+        entry.view.destroy();
+        entry.paneEl.remove();
         this._docs.delete(path);
 
         if (this._activeFile === path) {
-            // Activate the next open file if any
             const remaining = [...this._docs.keys()];
             if (remaining.length > 0) {
                 await this.openFile(remaining[remaining.length - 1]);
@@ -125,24 +128,18 @@ export class DocumentManager {
         }
     }
 
-    /**
-     * Get the current text content for a path.
-     * If it's the active file, reads from the live EditorView.
-     * @param {string} path
-     * @returns {string}
-     */
-    getCurrentContent(path) {
-        if (path === this._activeFile && this._view) {
-            return this._view.state.doc.toString();
+    /** Iterate every currently-open EditorView. */
+    forEachView(fn) {
+        for (const [path, entry] of this._docs) {
+            fn(entry.view, path);
         }
-        const entry = this._docs.get(path);
-        return entry ? entry.state.doc.toString() : '';
     }
 
-    /** Mark the active file as dirty (unsaved changes). */
-    markDirty() {
-        if (!this._activeFile) return;
-        const entry = this._docs.get(this._activeFile);
+    /** Mark a file as dirty (unsaved changes). Defaults to the active file. */
+    markDirty(path) {
+        const target = path || this._activeFile;
+        if (!target) return;
+        const entry = this._docs.get(target);
         if (entry && !entry.dirty) {
             entry.dirty = true;
             this._notifyListeners(this._activeFile);
@@ -152,6 +149,11 @@ export class DocumentManager {
     /** @returns {string|null} */
     get activeFile() { return this._activeFile; }
 
+    /** @returns {import('@codemirror/view').EditorView|null} */
+    get activeView() {
+        return this._activeFile ? (this._docs.get(this._activeFile)?.view ?? null) : null;
+    }
+
     /** @returns {string[]} All currently open file paths. */
     get openFiles() { return [...this._docs.keys()]; }
 
@@ -160,15 +162,15 @@ export class DocumentManager {
         return this._docs.get(path)?.dirty ?? false;
     }
 
-    /**
-     * Sync the EditorState back from the view (called before switching tabs).
-     */
-    syncFromView() {
-        if (this._activeFile && this._view) {
-            const entry = this._docs.get(this._activeFile);
-            if (entry) {
-                entry.state = this._view.state;
-            }
-        }
+    /** Read the current text of a file (uses the live EditorView if open). */
+    getCurrentContent(path) {
+        const entry = this._docs.get(path);
+        return entry ? entry.view.state.doc.toString() : '';
     }
+
+    /**
+     * Backward-compat shim used by older callers; per-tab views never need
+     * an explicit sync because each view owns its own state.
+     */
+    syncFromView() { /* no-op */ }
 }

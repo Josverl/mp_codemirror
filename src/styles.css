@@ -276,6 +276,26 @@ body.light-theme #file-tree-panel {
     border-radius: 0 4px 4px 0;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Per-tab editor panes — only the active one is shown. */
+.editor-pane {
+    display: none;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.editor-pane--active {
+    display: flex;
+    flex-direction: column;
+}
+.editor-pane > .cm-editor {
+    flex: 1;
+    min-height: 0;
 }
 
 /* Tab bar */

@@ -27,7 +27,23 @@ let exampleFiles = [];
 let lspClient = null;
 let lspTransport = null;
 let documentUri = 'file:///workspace/main.py'; // updated dynamically
-let documentVersion = 1;
+
+// Per-URI document version tracker. Each tab maintains its own monotonically
+// increasing version so that an in-flight didChange for the previously-active
+// URI cannot be invalidated when the user switches tabs.
+const documentVersions = new Map();
+function bumpDocumentVersion(uri) {
+    const next = (documentVersions.get(uri) || 0) + 1;
+    documentVersions.set(uri, next);
+    return next;
+}
+function resetDocumentVersion(uri) {
+    documentVersions.set(uri, 1);
+    return 1;
+}
+function forgetDocumentVersion(uri) {
+    documentVersions.delete(uri);
+}
 
 // Board stub state
 let currentBoardId = null;
@@ -48,11 +64,8 @@ let docManager = null;
 let tabBar = null;
 let fileTree = null;
 
-// Theme compartment — reconfigured on theme toggle
-let themeCompartment = new Compartment();
+// Theme + LSP compartments are now created per-view in viewMeta (see below).
 
-// LSP compartment — reconfigured on board switch
-let lspCompartment = new Compartment();
 const CHANGE_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
 const STARTUP_REANALYZE_DELAY_MS = 50;
 
@@ -108,8 +121,8 @@ function scheduleActiveDocumentRefresh(activeUri, content) {
 
     window.setTimeout(() => {
         if (!lspClient || documentUri !== activeUri) return;
-        documentVersion += 1;
-        notifyDocumentChange(lspClient, activeUri, content, documentVersion);
+        const v = bumpDocumentVersion(activeUri);
+        notifyDocumentChange(lspClient, activeUri, content, v);
     }, STARTUP_REANALYZE_DELAY_MS);
 }
 
@@ -221,21 +234,14 @@ async function handleBoardChange(event) {
         currentBoardId = newBoardId;
         localStorage.setItem('mp_board', newBoardId);
 
-        // Clear old diagnostics and rebind LSP extensions to the new client
-        if (view) {
-            // Clear stale gutter markers from previous LSP instance
-            view.dispatch(setDiagnostics(view.state, []));
+        // Clear old diagnostics and rebind LSP for every open view.
+        if (docManager) {
             updateDiagnosticsStatus([], pyrightVersion);
-
-            // Reconfigure the compartment with extensions bound to the new client
-            const content = view.state.doc.toString();
-            documentVersion = 1;
-            const activeUri = docManager ? `file:///workspace/${docManager.activeFile}` : documentUri;
-            await syncWorkspaceToLSP({ openDocuments: true, activeUri: activeUri, workspaceFiles });
-            const newExtensions = createLSPPlugin(lspClient, view, activeUri, 'python', content, pyrightVersion);
-            view.dispatch({
-                effects: lspCompartment.reconfigure(newExtensions)
-            });
+            // Worker was restarted — every URI starts over.
+            documentVersions.clear();
+            const activeUri = `file:///workspace/${docManager.activeFile}`;
+            await syncWorkspaceToLSP({ openDocuments: false, activeUri, workspaceFiles });
+            rebindLSPAllViews();
         }
 
         console.log(`Switched to board: ${newBoardId}`);
@@ -291,17 +297,12 @@ async function handleTypeCheckModeChange(event) {
         currentTypeCheckMode = newMode;
         localStorage.setItem('mp_typeCheckMode', newMode);
 
-        if (view) {
-            view.dispatch(setDiagnostics(view.state, []));
+        if (docManager) {
             updateDiagnosticsStatus([], pyrightVersion);
-            const content = view.state.doc.toString();
-            documentVersion = 1;
-            const activeUri = docManager ? `file:///workspace/${docManager.activeFile}` : documentUri;
-            await syncWorkspaceToLSP({ openDocuments: true, activeUri: activeUri, workspaceFiles });
-            const newExtensions = createLSPPlugin(lspClient, view, activeUri, 'python', content, pyrightVersion);
-            view.dispatch({
-                effects: lspCompartment.reconfigure(newExtensions)
-            });
+            documentVersions.clear();
+            const activeUri = `file:///workspace/${docManager.activeFile}`;
+            await syncWorkspaceToLSP({ openDocuments: false, activeUri, workspaceFiles });
+            rebindLSPAllViews();
         }
 
         console.log(`Switched to type checking mode: ${newMode}`);
@@ -483,6 +484,180 @@ const lightTheme = EditorView.theme({
 // Initialize the editor with basic setup and Python language support
 let view;
 
+// ---------------------------------------------------------------------------
+// Editor helpers (module-level so board/type-check handlers can rebind views)
+// ---------------------------------------------------------------------------
+
+const INDENT = '    ';
+
+function selectedLineNumbers(state) {
+    const lineNumbers = new Set();
+    for (const range of state.selection.ranges) {
+        const startLine = state.doc.lineAt(range.from).number;
+        let endLine = state.doc.lineAt(range.to).number;
+        if (range.to > range.from && state.doc.lineAt(range.to).from === range.to) {
+            endLine -= 1;
+        }
+        for (let lineNo = startLine; lineNo <= endLine; lineNo++) {
+            lineNumbers.add(lineNo);
+        }
+    }
+    return Array.from(lineNumbers).sort((a, b) => a - b);
+}
+
+function indentWithFourSpaces(targetView) {
+    const { state } = targetView;
+    const hasMultiline = state.selection.ranges.some((range) => (
+        state.doc.lineAt(range.from).number < state.doc.lineAt(range.to).number
+    ));
+
+    if (!hasMultiline) {
+        targetView.dispatch({
+            ...state.replaceSelection(INDENT),
+            scrollIntoView: true,
+            userEvent: 'input.indent'
+        });
+        return true;
+    }
+
+    const changes = selectedLineNumbers(state).map((lineNo) => {
+        const line = state.doc.line(lineNo);
+        return { from: line.from, insert: INDENT };
+    });
+
+    targetView.dispatch({
+        changes,
+        scrollIntoView: true,
+        userEvent: 'input.indent'
+    });
+    return true;
+}
+
+function dedentFourSpaces(targetView) {
+    const { state } = targetView;
+    const changes = [];
+
+    for (const lineNo of selectedLineNumbers(state)) {
+        const line = state.doc.line(lineNo);
+        const text = line.text;
+        let removeCount = 0;
+
+        if (text.startsWith(INDENT)) {
+            removeCount = 4;
+        } else if (text.startsWith('\t')) {
+            removeCount = 1;
+        } else {
+            const match = text.match(/^ {1,3}/);
+            removeCount = match ? match[0].length : 0;
+        }
+
+        if (removeCount > 0) {
+            changes.push({
+                from: line.from,
+                to: line.from + removeCount
+            });
+        }
+    }
+
+    if (!changes.length) {
+        return true;
+    }
+
+    targetView.dispatch({
+        changes,
+        scrollIntoView: true,
+        userEvent: 'input.indent'
+    });
+    return true;
+}
+
+/**
+ * Per-view bookkeeping for theme/LSP compartments so we can reconfigure each
+ * view independently on theme toggle / board switch.
+ * @type {WeakMap<import('@codemirror/view').EditorView, {themeC: Compartment, lspC: Compartment, path: string}>}
+ */
+const viewMeta = new WeakMap();
+
+function buildExtensions(path, themeC, lspC) {
+    const uri = `file:///workspace/${path}`;
+    const updateListener = EditorView.updateListener.of((update) => {
+        if (!update.docChanged) return;
+        docManager?.markDirty(path);
+        if (!lspClient) return;
+        if (changeDebounceTimer) clearTimeout(changeDebounceTimer);
+        changeDebounceTimer = setTimeout(() => {
+            const c = update.state.doc.toString();
+            const v = bumpDocumentVersion(uri);
+            console.log(`Sending didChange ${path} (version ${v})`);
+            notifyDocumentChange(lspClient, uri, c, v);
+            if (lspTransport?.worker) {
+                lspTransport.worker.postMessage({ type: 'syncFile', path, content: c });
+            }
+        }, CHANGE_DEBOUNCE_MS);
+    });
+
+    return [
+        basicSetup,
+        indentUnit.of(INDENT),
+        python(),
+        Prec.high(keymap.of([
+            { key: 'Tab', run: indentWithFourSpaces },
+            { key: 'Shift-Tab', run: dedentFourSpaces },
+            { key: 'Mod-s', run: () => { docManager?.saveFile(); return true; } },
+        ])),
+        themeC.of(isDarkTheme ? darkTheme : lightTheme),
+        lintKeymapExtension,
+        updateListener,
+        lspC.of([]),
+    ];
+}
+
+function createViewForPath(path, content, paneEl) {
+    const themeC = new Compartment();
+    const lspC = new Compartment();
+    const v = new EditorView({
+        doc: content,
+        extensions: buildExtensions(path, themeC, lspC),
+        parent: paneEl,
+    });
+    viewMeta.set(v, { themeC, lspC, path });
+    if (lspClient) bindLSPToView(v);
+    return v;
+}
+
+function bindLSPToView(v) {
+    const meta = viewMeta.get(v);
+    if (!meta || !lspClient) return;
+    const uri = `file:///workspace/${meta.path}`;
+    const content = v.state.doc.toString();
+    resetDocumentVersion(uri);
+    const ext = createLSPPlugin(lspClient, v, uri, 'python', content, pyrightVersion);
+    v.dispatch({ effects: meta.lspC.reconfigure(ext) });
+}
+
+function clearLSPOnView(v) {
+    const meta = viewMeta.get(v);
+    if (!meta) return;
+    v.dispatch(setDiagnostics(v.state, []));
+    v.dispatch({ effects: meta.lspC.reconfigure([]) });
+}
+
+function reconfigureThemeOnAllViews() {
+    const themeExt = isDarkTheme ? darkTheme : lightTheme;
+    docManager?.forEachView((v) => {
+        const meta = viewMeta.get(v);
+        if (meta) v.dispatch({ effects: meta.themeC.reconfigure(themeExt) });
+    });
+}
+
+function rebindLSPAllViews() {
+    docManager?.forEachView((v) => {
+        clearLSPOnView(v);
+        bindLSPToView(v);
+    });
+    updateDiagnosticsStatus([], pyrightVersion);
+}
+
 // Initialize editor after loading sample
 async function initializeEditor() {
     // Check URL parameters first (shareable link)
@@ -572,140 +747,20 @@ async function initializeEditor() {
         window.__lspFailed = true;
     }
 
-    // Create update listener for real-time diagnostics
-    const createUpdateListener = () => EditorView.updateListener.of((update) => {
-        // Only send notifications if document content changed
-        if (update.docChanged && lspClient) {
-            if (docManager) docManager.markDirty();
-            // Clear existing debounce timer
-            if (changeDebounceTimer) {
-                clearTimeout(changeDebounceTimer);
-            }
+    // Per-view update listeners are wired inside buildExtensions(); no
+    // module-level update listener is needed.
 
-            // Debounce the change notification to avoid overwhelming the LSP server
-            changeDebounceTimer = setTimeout(() => {
-                const content = update.state.doc.toString();
-                documentVersion++;
-                
-                console.log(`Sending didChange notification (version ${documentVersion})`);
-                notifyDocumentChange(lspClient, documentUri, content, documentVersion);
-                // Sync file to ZenFS so Pyright resolves cross-file imports
-                if (lspTransport?.worker) {
-                    lspTransport.worker.postMessage({ type: 'syncFile', path: documentUri.replace('file:///workspace/', ''), content });
-                }
-            }, CHANGE_DEBOUNCE_MS);
-        }
+    // Create document manager rooted at the editor container
+    const editorContainerEl = document.getElementById('editor-container');
+    docManager = new DocumentManager(editorContainerEl, createViewForPath);
+    docManager.onActiveChange((path) => {
+        // Keep the module-level `view` and `documentUri` in sync with whichever
+        // pane is active so existing callsites (share, export, triggerTypeCheck,
+        // etc.) keep working unchanged.
+        view = docManager.activeView;
+        if (path) documentUri = `file:///workspace/${path}`;
     });
 
-    const INDENT = '    ';
-
-    function selectedLineNumbers(state) {
-        const lineNumbers = new Set();
-        for (const range of state.selection.ranges) {
-            const startLine = state.doc.lineAt(range.from).number;
-            let endLine = state.doc.lineAt(range.to).number;
-            if (range.to > range.from && state.doc.lineAt(range.to).from === range.to) {
-                endLine -= 1;
-            }
-            for (let lineNo = startLine; lineNo <= endLine; lineNo++) {
-                lineNumbers.add(lineNo);
-            }
-        }
-        return Array.from(lineNumbers).sort((a, b) => a - b);
-    }
-
-    function indentWithFourSpaces(view) {
-        const { state } = view;
-        const hasMultiline = state.selection.ranges.some((range) => (
-            state.doc.lineAt(range.from).number < state.doc.lineAt(range.to).number
-        ));
-
-        if (!hasMultiline) {
-            view.dispatch({
-                ...state.replaceSelection(INDENT),
-                scrollIntoView: true,
-                userEvent: 'input.indent'
-            });
-            return true;
-        }
-
-        const changes = selectedLineNumbers(state).map((lineNo) => {
-            const line = state.doc.line(lineNo);
-            return { from: line.from, insert: INDENT };
-        });
-
-        view.dispatch({
-            changes,
-            scrollIntoView: true,
-            userEvent: 'input.indent'
-        });
-        return true;
-    }
-
-    function dedentFourSpaces(view) {
-        const { state } = view;
-        const changes = [];
-
-        for (const lineNo of selectedLineNumbers(state)) {
-            const line = state.doc.line(lineNo);
-            const text = line.text;
-            let removeCount = 0;
-
-            if (text.startsWith(INDENT)) {
-                removeCount = 4;
-            } else if (text.startsWith('\t')) {
-                removeCount = 1;
-            } else {
-                const match = text.match(/^ {1,3}/);
-                removeCount = match ? match[0].length : 0;
-            }
-
-            if (removeCount > 0) {
-                changes.push({
-                    from: line.from,
-                    to: line.from + removeCount
-                });
-            }
-        }
-
-        if (!changes.length) {
-            return true;
-        }
-
-        view.dispatch({
-            changes,
-            scrollIntoView: true,
-            userEvent: 'input.indent'
-        });
-        return true;
-    }
-
-    // Build base extensions factory (called per new EditorState)
-    const getBaseExtensions = () => [
-        basicSetup,
-        indentUnit.of(INDENT),
-        python(),
-        Prec.high(keymap.of([
-            { key: 'Tab', run: indentWithFourSpaces },
-            { key: 'Shift-Tab', run: dedentFourSpaces },
-            { key: 'Mod-s', run: () => { docManager?.saveFile(); return true; } },
-        ])),
-        themeCompartment.of(isDarkTheme ? darkTheme : lightTheme),
-        lintKeymapExtension,
-        createUpdateListener(),
-        lspCompartment.of([]),
-    ];
-
-    // Create the editor view first
-    view = new EditorView({
-        doc: initialContent,
-        extensions: getBaseExtensions(),
-        parent: document.getElementById('editor-container')
-    });
-
-    // Create document manager
-    docManager = new DocumentManager(view, getBaseExtensions);
-    // Seed active file cache without re-reading from disk
     await docManager.openFile(initialFile);
 
     // Create tab bar
@@ -713,20 +768,21 @@ async function initializeEditor() {
     tabBar = new TabBar(tabBarEl, {
         onSelect: async (path) => {
             if (path === docManager.activeFile) return;
-            docManager.syncFromView();
-            await docManager.saveFile();
-            documentUri = `file:///workspace/${path}`;
-            documentVersion = 1;
             await docManager.openFile(path);
-            rebindLSP();
             refreshTabBar();
         },
         onClose: async (path) => {
-            await docManager.closeFile(path);
-            if (docManager.activeFile) {
-                documentUri = `file:///workspace/${docManager.activeFile}`;
-                rebindLSP();
+            if (docManager.isDirty(path)) {
+                const filename = path.split('/').pop();
+                if (!confirm(`${filename} has unsaved changes. Close without saving?`)) {
+                    return;
+                }
+                // User chose to discard — drop the dirty flag so closeFile
+                // doesn't auto-save the unwanted edits back to OPFS.
+                docManager.discard(path);
             }
+            await docManager.closeFile(path);
+            forgetDocumentVersion(`file:///workspace/${path}`);
             refreshTabBar();
         },
     });
@@ -735,36 +791,27 @@ async function initializeEditor() {
     const fileTreeEl = document.getElementById('file-tree');
     fileTree = new FileTree(fileTreeEl, {
         onOpen: async (path) => {
-                if (path === docManager.activeFile) return;
-                docManager.syncFromView();
-                await docManager.saveFile();
-            documentUri = `file:///workspace/${path}`;
-            documentVersion = 1;
+            if (path === docManager.activeFile) return;
             await docManager.openFile(path);
-            rebindLSP();
             refreshTabBar();
             fileTree.setActiveFile(path);
         },
         onDelete: async (path) => {
             if (docManager.openFiles.includes(path)) {
+                docManager.discard(path);
                 await docManager.closeFile(path);
-                if (docManager.activeFile) {
-                    documentUri = `file:///workspace/${docManager.activeFile}`;
-                    rebindLSP();
-                }
+                forgetDocumentVersion(`file:///workspace/${path}`);
             }
             refreshTabBar();
         },
         onRename: async (oldPath, newPath) => {
             if (docManager.openFiles.includes(oldPath)) {
-                // Close old, open new
                 const content = docManager.getCurrentContent(oldPath);
+                docManager.discard(oldPath);
                 await docManager.closeFile(oldPath);
+                forgetDocumentVersion(`file:///workspace/${oldPath}`);
                 await OPFSProject.writeFile(newPath, content);
-                documentUri = `file:///workspace/${newPath}`;
-                documentVersion = 1;
                 await docManager.openFile(newPath);
-                rebindLSP();
             }
             refreshTabBar();
         },
@@ -787,37 +834,19 @@ async function initializeEditor() {
     }
     refreshTabBar();
 
-    // Helper: rebind LSP plugin after active file changes
-    function rebindLSP() {
-        if (!lspClient || !view) return;
-        try {
-            const content = view.state.doc.toString();
-            documentVersion = 1;
-            view.dispatch(setDiagnostics(view.state, []));
-            updateDiagnosticsStatus([], pyrightVersion);
-            const ext = createLSPPlugin(lspClient, view, documentUri, 'python', content, pyrightVersion);
-            view.dispatch({ effects: lspCompartment.reconfigure(ext) });
-            // Sync new file to ZenFS
-            if (lspTransport?.worker) {
-                lspTransport.worker.postMessage({ type: 'syncFile', path: documentUri.replace('file:///workspace/', ''), content });
-            }
-        } catch (err) {
-            console.error('rebindLSP error:', err);
-        }
-    }
-
-    // Add LSP plugin if client is available
+    // Bind LSP to any views that were opened before the LSP client was ready.
     if (lspClient) {
         try {
-            await syncWorkspaceToLSP({ openDocuments: true, activeUri: documentUri, workspaceFiles: initialWorkspaceFiles });
-            const lspExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', initialContent, pyrightVersion);
-            view.dispatch({
-                effects: lspCompartment.reconfigure(lspExtensions)
+            await syncWorkspaceToLSP({
+                openDocuments: false,
+                activeUri: documentUri,
+                workspaceFiles: initialWorkspaceFiles,
             });
-            console.log('LSP plugin added to editor');
+            docManager.forEachView((v) => bindLSPToView(v));
+            console.log('LSP plugin bound to all open views');
             scheduleActiveDocumentRefresh(documentUri, initialContent);
         } catch (error) {
-            console.error('Failed to add LSP plugin:', error);
+            console.error('Failed to bind LSP plugin:', error);
         }
     }
 
@@ -950,12 +979,8 @@ function toggleTheme() {
     document.body.classList.toggle('light-theme', !isDarkTheme);
     document.body.classList.toggle('dark-theme', isDarkTheme);
 
-    // Reconfigure the editor theme
-    if (view) {
-        view.dispatch({
-            effects: themeCompartment.reconfigure(isDarkTheme ? darkTheme : lightTheme)
-        });
-    }
+    // Reconfigure the editor theme on every open view
+    reconfigureThemeOnAllViews();
 }
 
 // Clear editor content
@@ -977,10 +1002,10 @@ function triggerTypeCheck() {
 
     try {
         const content = view.state.doc.toString();
-        documentVersion++;
+        const v = bumpDocumentVersion(documentUri);
 
         console.log('Triggering type check...');
-        notifyDocumentChange(lspClient, documentUri, content, documentVersion);
+        notifyDocumentChange(lspClient, documentUri, content, v);
         console.log('Type check notification sent');
 
         // Visual feedback

@@ -128,11 +128,15 @@ function writePyrightConfig(typeCheckingMode: string = "standard") {
     // paths are silently dropped with "Ignoring path … because it is not
     // relative", which makes Pyright report "No source files found" and
     // breaks cross-file import resolution (e.g. `from helpers import answer`).
+    //
+    // `lib` and `libs` are added to extraPaths to mirror MicroPython runtime
+    // behaviour, where `/lib` is on sys.path and a file like `lib/foo.py` can
+    // be imported as `from foo import ...` (not just `from lib.foo import ...`).
     const config = {
         typeshedPath: "/typeshed-fallback",
         stubPath: "/typings",
         include: ["."],
-        extraPaths: ["."],
+        extraPaths: [".", "lib", "libs"],
         pythonPlatform: "Linux",
         typeCheckingMode,
         reportMissingModuleSource: "none",

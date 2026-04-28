@@ -33,7 +33,15 @@ export class DocumentManager {
     }
 
     /** Register a listener invoked whenever the active file changes. */
-    onActiveChange(fn) { this._changeListeners.push(fn); }
+    onActiveChange(fn) {
+        this._changeListeners.push(fn);
+        return () => this.offActiveChange(fn);
+    }
+
+    /** Remove a previously registered active-file listener. */
+    offActiveChange(fn) {
+        this._changeListeners = this._changeListeners.filter((listener) => listener !== fn);
+    }
 
     _notifyListeners(path) {
         for (const fn of this._changeListeners) {

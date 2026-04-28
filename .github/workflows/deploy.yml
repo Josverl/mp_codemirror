@@ -38,7 +38,7 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Pack typeshed
         run: uv run scripts/pack-typeshed.py

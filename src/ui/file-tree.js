@@ -244,8 +244,74 @@ export class FileTree {
 
     // ---- Mutations ----
 
+    /**
+     * Show an inline text input in the tree for new-file or rename operations.
+     * Resolves with the entered value or null if cancelled (Escape / blur).
+     */
+    _showInlineInput(parentEl, defaultValue = '') {
+        return new Promise((resolve) => {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'file-tree__inline-input';
+            input.value = defaultValue;
+            parentEl.appendChild(input);
+            input.focus();
+            input.select();
+
+            let settled = false;
+            const finish = (value) => {
+                if (settled) return;
+                settled = true;
+                input.remove();
+                resolve(value);
+            };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); finish(input.value.trim()); }
+                if (e.key === 'Escape') { e.preventDefault(); finish(null); }
+                e.stopPropagation();
+            });
+            input.addEventListener('blur', () => finish(null));
+        });
+    }
+
+    /**
+     * Show an inline confirm element for destructive actions.
+     * Resolves true (confirmed) or false (cancelled).
+     */
+    _showInlineConfirm(parentEl, message) {
+        return new Promise((resolve) => {
+            const wrap = document.createElement('span');
+            wrap.className = 'file-tree__inline-confirm';
+
+            const label = document.createElement('span');
+            label.textContent = message;
+
+            const yesBtn = document.createElement('button');
+            yesBtn.className = 'file-tree__icon-btn file-tree__icon-btn--danger';
+            yesBtn.textContent = '✓';
+            yesBtn.title = 'Confirm delete';
+
+            const noBtn = document.createElement('button');
+            noBtn.className = 'file-tree__icon-btn';
+            noBtn.textContent = '✕';
+            noBtn.title = 'Cancel';
+
+            wrap.appendChild(label);
+            wrap.appendChild(yesBtn);
+            wrap.appendChild(noBtn);
+            parentEl.appendChild(wrap);
+
+            let settled = false;
+            const finish = (val) => { if (!settled) { settled = true; wrap.remove(); resolve(val); } };
+            yesBtn.addEventListener('click', (e) => { e.stopPropagation(); finish(true); });
+            noBtn.addEventListener('click', (e) => { e.stopPropagation(); finish(false); });
+        });
+    }
+
     async _promptNewFile(dirPath) {
-        const name = prompt('New file name (e.g. helpers.py):');
+        const li = this._list.querySelector(`[data-path="${dirPath}"]`) || this._list;
+        const name = await this._showInlineInput(li, '');
         if (!name) return;
         const fullPath = dirPath ? `${dirPath}/${name}` : name;
         await OPFSProject.writeFile(fullPath, '');
@@ -255,9 +321,11 @@ export class FileTree {
     }
 
     async _promptRename(path) {
+        const li = this._list.querySelector(`[data-path="${path}"]`);
+        if (!li) return;
         const parts = path.split('/');
         const oldName = parts[parts.length - 1];
-        const newName = prompt('New name:', oldName);
+        const newName = await this._showInlineInput(li, oldName);
         if (!newName || newName === oldName) return;
         const newPath = [...parts.slice(0, -1), newName].join('/');
         await OPFSProject.renameFile(path, newPath);
@@ -267,7 +335,10 @@ export class FileTree {
     }
 
     async _deleteEntry(path) {
-        if (!confirm(`Delete "${path}"?`)) return;
+        const li = this._list.querySelector(`[data-path="${path}"]`);
+        if (!li) return;
+        const confirmed = await this._showInlineConfirm(li, `Delete?`);
+        if (!confirmed) return;
         await OPFSProject.deleteFile(path);
         if (this._onDelete) await this._onDelete(path);
         await this.refresh();

@@ -635,11 +635,14 @@ function createViewForPath(path, content, paneEl) {
 function bindLSPToView(v) {
     const meta = viewMeta.get(v);
     if (!meta || !lspClient) return;
+    // Guard: skip if LSP is already bound (avoids duplicate didOpen)
+    if (meta.lspBound) return;
     const uri = `file:///workspace/${meta.path}`;
     const content = v.state.doc.toString();
     resetDocumentVersion(uri);
     const ext = createLSPPlugin(lspClient, v, uri, 'python', content, pyrightVersion);
     v.dispatch({ effects: meta.lspC.reconfigure(ext) });
+    meta.lspBound = true;
 }
 
 function clearLSPOnView(v) {
@@ -647,6 +650,7 @@ function clearLSPOnView(v) {
     if (!meta) return;
     v.dispatch(setDiagnostics(v.state, []));
     v.dispatch({ effects: meta.lspC.reconfigure([]) });
+    meta.lspBound = false;
 }
 
 function reconfigureThemeOnAllViews() {

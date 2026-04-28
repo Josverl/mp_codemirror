@@ -129,6 +129,11 @@ function writePyrightConfig(typeCheckingMode: string = "standard") {
     // relative", which makes Pyright report "No source files found" and
     // breaks cross-file import resolution (e.g. `from helpers import answer`).
     //
+    // `include: ["."]` tells Pyright what source tree to analyze under
+    // /workspace; `extraPaths: [".", "libs"]` tells import resolution where
+    // bare imports may originate. Keeping "." in BOTH fields is intentional:
+    // one controls analysis scope, the other controls import search roots.
+    //
     // `libs` is added to extraPaths so files in `libs/` can be imported by
     // bare module name (e.g. `from foo import ...`). `lib/` is intentionally
     // NOT on extraPaths: it remains a regular package, so its contents are

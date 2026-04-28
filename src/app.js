@@ -11,7 +11,7 @@ import { keymap } from '@codemirror/view';
 import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
 import { restoreFromUrl, initShareDropdown } from './share.js';
-import { notifyDocumentChange, updateDiagnosticsStatus, lintKeymapExtension } from './lsp/diagnostics.js';
+import { notifyDocumentChange, notifyDocumentOpen, updateDiagnosticsStatus, lintKeymapExtension } from './lsp/diagnostics.js';
 import { OPFSProject } from './storage/opfs-project.js';
 import { DocumentManager } from './editor/document-manager.js';
 import { TabBar } from './ui/tab-bar.js';
@@ -54,6 +54,64 @@ let themeCompartment = new Compartment();
 // LSP compartment — reconfigured on board switch
 let lspCompartment = new Compartment();
 const CHANGE_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
+const STARTUP_REANALYZE_DELAY_MS = 50;
+
+async function collectWorkspaceFiles(activePath = null, activeContentOverride = null) {
+    const workspaceFiles = {};
+    const allFiles = await OPFSProject.listFiles();
+
+    for (const entry of allFiles) {
+        if (entry.type !== 'file') continue;
+
+        if (activePath && activeContentOverride !== null && entry.path === activePath) {
+            workspaceFiles[entry.path] = activeContentOverride;
+            continue;
+        }
+
+        try {
+            workspaceFiles[entry.path] = await OPFSProject.readFile(entry.path);
+        } catch {
+            // Ignore files that disappear during collection.
+        }
+    }
+
+    if (activePath && activeContentOverride !== null && !workspaceFiles[activePath]) {
+        workspaceFiles[activePath] = activeContentOverride;
+    }
+
+    return workspaceFiles;
+}
+
+async function syncWorkspaceToLSP({ openDocuments = false, activeUri = documentUri, workspaceFiles = null } = {}) {
+    if (!lspClient) return;
+
+    try {
+        const files = workspaceFiles || await collectWorkspaceFiles();
+        for (const [filePath, content] of Object.entries(files)) {
+            const fileUri = `file:///workspace/${filePath}`;
+
+            if (!workspaceFiles && lspTransport?.worker) {
+                lspTransport.worker.postMessage({ type: 'syncFile', path: filePath, content });
+            }
+
+            if (openDocuments && fileUri !== activeUri) {
+                notifyDocumentOpen(lspClient, fileUri, 'python', content, 1);
+            }
+        }
+    } catch (err) {
+        console.warn('Workspace sync failed:', err);
+    }
+}
+
+function scheduleActiveDocumentRefresh(activeUri, content) {
+    if (!lspClient) return;
+
+    window.setTimeout(() => {
+        if (!lspClient || documentUri !== activeUri) return;
+        documentVersion += 1;
+        notifyDocumentChange(lspClient, activeUri, content, documentVersion);
+    }, STARTUP_REANALYZE_DELAY_MS);
+}
 
 // Resolve base path for assets (stubs, manifest)
 function getAssetsBase() {
@@ -138,6 +196,9 @@ async function handleBoardChange(event) {
         select.disabled = true;
 
         const stubs = await fetchBoardStubs(newBoardId);
+        const activePath = docManager?.activeFile || documentUri.replace('file:///workspace/', '');
+        const activeContent = view ? view.state.doc.toString() : null;
+        const workspaceFiles = await collectWorkspaceFiles(activePath, activeContent);
 
         // Determine worker URL
         const workerUrl = window.location.pathname.includes('/src/')
@@ -150,6 +211,7 @@ async function handleBoardChange(event) {
                 workerUrl,
                 timeout: 15000,
                 boardStubs: stubs,
+                workspaceFiles,
                 typeCheckingMode: currentTypeCheckMode,
             }
         );
@@ -169,6 +231,7 @@ async function handleBoardChange(event) {
             const content = view.state.doc.toString();
             documentVersion = 1;
             const activeUri = docManager ? `file:///workspace/${docManager.activeFile}` : documentUri;
+            await syncWorkspaceToLSP({ openDocuments: true, activeUri: activeUri, workspaceFiles });
             const newExtensions = createLSPPlugin(lspClient, view, activeUri, 'python', content, pyrightVersion);
             view.dispatch({
                 effects: lspCompartment.reconfigure(newExtensions)
@@ -205,6 +268,9 @@ async function handleTypeCheckModeChange(event) {
         select.disabled = true;
 
         const stubs = await fetchBoardStubs(currentBoardId);
+        const activePath = docManager?.activeFile || documentUri.replace('file:///workspace/', '');
+        const activeContent = view ? view.state.doc.toString() : null;
+        const workspaceFiles = await collectWorkspaceFiles(activePath, activeContent);
         const workerUrl = window.location.pathname.includes('/src/')
             ? '../dist/pyright_worker.js'
             : './pyright_worker.js';
@@ -215,6 +281,7 @@ async function handleTypeCheckModeChange(event) {
                 workerUrl,
                 timeout: 15000,
                 boardStubs: stubs,
+                workspaceFiles,
                 typeCheckingMode: newMode,
             }
         );
@@ -230,6 +297,7 @@ async function handleTypeCheckModeChange(event) {
             const content = view.state.doc.toString();
             documentVersion = 1;
             const activeUri = docManager ? `file:///workspace/${docManager.activeFile}` : documentUri;
+            await syncWorkspaceToLSP({ openDocuments: true, activeUri: activeUri, workspaceFiles });
             const newExtensions = createLSPPlugin(lspClient, view, activeUri, 'python', content, pyrightVersion);
             view.dispatch({
                 effects: lspCompartment.reconfigure(newExtensions)
@@ -446,6 +514,27 @@ async function initializeEditor() {
         await loadSampleFromFile(defaultFile);
     }
 
+    // Initialize OPFS storage before starting LSP so the worker can preload the project.
+    await OPFSProject.init();
+
+    // If loaded from a shareable URL, put the code in main.py.
+    if (urlState.code) {
+        await OPFSProject.writeFile('main.py', urlState.code);
+    }
+
+    // Determine the initial file and content before the worker starts.
+    const initialFile = OPFSProject.getLastActiveFile();
+    documentUri = `file:///workspace/${initialFile}`;
+
+    let initialContent;
+    try {
+        initialContent = await OPFSProject.readFile(initialFile);
+    } catch {
+        initialContent = sampleCode;
+    }
+
+    const initialWorkspaceFiles = await collectWorkspaceFiles(initialFile, initialContent);
+
     // Initialize LSP client — Pyright runs in a Web Worker
     try {
         // In dev, pyright_worker.js lives at /dist/pyright_worker.js;
@@ -469,6 +558,7 @@ async function initializeEditor() {
             workerUrl,
             timeout: 15000,
             boardStubs: initialBoardStubs,
+            workspaceFiles: initialWorkspaceFiles,
             typeCheckingMode: currentTypeCheckMode,
         });
         lspClient = lspResult.client;
@@ -590,26 +680,6 @@ async function initializeEditor() {
         return true;
     }
 
-    // Initialize OPFS storage
-    await OPFSProject.init();
-
-    // If loaded from a shareable URL, put the code in main.py
-    if (urlState.code) {
-        await OPFSProject.writeFile('main.py', urlState.code);
-    }
-
-    // Determine initial file
-    const initialFile = OPFSProject.getLastActiveFile();
-    documentUri = `file:///workspace/${initialFile}`;
-
-    // Read initial content from OPFS (may have been seeded above)
-    let initialContent;
-    try {
-        initialContent = await OPFSProject.readFile(initialFile);
-    } catch {
-        initialContent = sampleCode;
-    }
-
     // Build base extensions factory (called per new EditorState)
     const getBaseExtensions = () => [
         basicSetup,
@@ -665,11 +735,9 @@ async function initializeEditor() {
     const fileTreeEl = document.getElementById('file-tree');
     fileTree = new FileTree(fileTreeEl, {
         onOpen: async (path) => {
-            if (docManager.openFiles.includes(path)) {
-                // Just switch to it
+                if (path === docManager.activeFile) return;
                 docManager.syncFromView();
                 await docManager.saveFile();
-            }
             documentUri = `file:///workspace/${path}`;
             documentVersion = 1;
             await docManager.openFile(path);
@@ -741,23 +809,13 @@ async function initializeEditor() {
     // Add LSP plugin if client is available
     if (lspClient) {
         try {
+            await syncWorkspaceToLSP({ openDocuments: true, activeUri: documentUri, workspaceFiles: initialWorkspaceFiles });
             const lspExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', initialContent, pyrightVersion);
             view.dispatch({
                 effects: lspCompartment.reconfigure(lspExtensions)
             });
             console.log('LSP plugin added to editor');
-            // Sync all project files to ZenFS worker
-            if (lspTransport?.worker) {
-                const allFiles = await OPFSProject.listFiles();
-                for (const entry of allFiles) {
-                    if (entry.type === 'file') {
-                        try {
-                            const c = await OPFSProject.readFile(entry.path);
-                            lspTransport.worker.postMessage({ type: 'syncFile', path: entry.path, content: c });
-                        } catch { /* ignore */ }
-                    }
-                }
-            }
+            scheduleActiveDocumentRefresh(documentUri, initialContent);
         } catch (error) {
             console.error('Failed to add LSP plugin:', error);
         }

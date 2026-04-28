@@ -36,7 +36,7 @@ LSP_TIMEOUT = 20_000  # ms – time for Pyright worker to process and push diagn
 
 def _load_editor(page, base_url: str):
     """Navigate to the editor and wait for CodeMirror to be ready."""
-    page.goto(f"{base_url}/index.html")
+    page.goto(f"{base_url}/index.html?cb={time.time_ns()}")
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
 
 
@@ -49,6 +49,18 @@ def _type_in_editor(page, text: str):
     editor = page.locator(".cm-content[contenteditable='true']")
     editor.click()
     editor.press_sequentially(text, delay=30)
+
+
+def _import_opfs(page):
+    page.evaluate("""
+        async () => {
+            if (!window._opfsReady) {
+                const mod = await import('./storage/opfs-project.js');
+                window.OPFSProject = mod.OPFSProject;
+                window._opfsReady = true;
+            }
+        }
+    """)
 
 
 # ---------------------------------------------------------------------------
@@ -223,3 +235,55 @@ def test_clean_code_produces_no_errors(page, live_server):
 
     error_markers = page.locator(".cm-lint-marker-error, .cm-lint-marker-warning")
     assert error_markers.count() == 0, "No error/warning markers expected for valid Python"
+
+
+@requires_lsp
+def test_cross_file_import_resolves_without_diagnostics(page, live_server):
+    """Workspace files must be visible to Pyright so local imports resolve cleanly."""
+    setup_url = f"{live_server}/tests/worker-transport-test.html?test-cross-file=setup&cb={time.time_ns()}"
+    verify_url = f"{live_server}/index.html?test-cross-file=verify&cb={time.time_ns()}"
+
+    page.goto(setup_url, wait_until="domcontentloaded")
+    page.wait_for_load_state("load", timeout=10_000)
+
+    page.evaluate(r"""
+        async () => {
+            const mod = await import('../storage/opfs-project.js');
+            window.OPFSProject = mod.OPFSProject;
+            await window.OPFSProject.init();
+
+            const entries = await window.OPFSProject.listFiles();
+            const paths = entries
+                .map((entry) => entry.path)
+                .sort((left, right) => right.length - left.length);
+
+            for (const path of paths) {
+                await window.OPFSProject.deleteFile(path);
+            }
+
+            await window.OPFSProject.writeFile(
+                'helpers.py',
+                ['def answer() -> int:', '    return 42', ''].join('\n')
+            );
+            await window.OPFSProject.writeFile(
+                'main.py',
+                ['from helpers import answer', 'x: int = answer()', ''].join('\n')
+            );
+            window.OPFSProject.setLastActiveFile('main.py');
+        }
+    """)
+
+    page.goto(verify_url, wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=30_000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
+    time.sleep(2.5)
+
+    diagnostics_text = page.locator("#diagnostics-status").inner_text()
+    lint_markers = page.locator(".cm-lint-marker-error, .cm-lint-marker-warning")
+    editor_text = page.locator(".cm-content").inner_text()
+
+    assert "from helpers import answer" in editor_text, "main.py should load the cross-file import example"
+    assert "Errors: 0" in diagnostics_text and "Warnings: 0" in diagnostics_text, (
+        f"Expected clean diagnostics for local import, got: {diagnostics_text!r}"
+    )
+    assert lint_markers.count() == 0, "No lint markers expected when local imports resolve"

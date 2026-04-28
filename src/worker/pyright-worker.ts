@@ -111,6 +111,14 @@ function createUserFiles(parentPath: string, folder: UserFolder) {
     }
 }
 
+function writeWorkspaceFiles(files: Record<string, string> = {}) {
+    for (const [relativePath, content] of Object.entries(files)) {
+        const fullPath = path.join('/workspace', relativePath);
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        fs.writeFileSync(fullPath, content);
+    }
+}
+
 /**
  * Create pyrightconfig.json in the virtual workspace
  */
@@ -119,6 +127,7 @@ function writePyrightConfig(typeCheckingMode: string = "standard") {
         typeshedPath: "/typeshed-fallback",
         stubPath: "/typings",
         include: ["/workspace"],
+        extraPaths: ["/workspace"],
         pythonPlatform: "Linux",
         typeCheckingMode,
         reportMissingModuleSource: "none",
@@ -144,6 +153,10 @@ async function handleInitServer(msg: MsgInitServer) {
         // Write user type stubs
         if (msg.userFiles && Object.keys(msg.userFiles).length > 0) {
             createUserFiles("/typings", msg.userFiles);
+        }
+
+        if (msg.workspaceFiles && Object.keys(msg.workspaceFiles).length > 0) {
+            writeWorkspaceFiles(msg.workspaceFiles);
         }
 
         // Write pyrightconfig

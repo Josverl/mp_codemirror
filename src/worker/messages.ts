@@ -30,8 +30,17 @@ export interface MsgServerError {
     error: string;
 }
 
+export interface MsgSyncFile {
+    type: "syncFile";
+    /** File path relative to /workspace (e.g. "helpers.py" or "lib/utils.py") */
+    path: string;
+    /** File text content */
+    content: string;
+}
+
 export type WorkerMessage =
     | MsgServerLoaded
     | MsgInitServer
     | MsgServerInitialized
-    | MsgServerError;
+    | MsgServerError
+    | MsgSyncFile;

@@ -95,9 +95,18 @@ class OPFSBackend {
     }
 
     async renameFile(oldPath, newPath) {
+        // Non-atomic: read → write → delete. On partial failure the new copy
+        // may exist alongside the old. Callers should close any open editor
+        // tab for oldPath before calling rename to avoid stale state.
         const content = await this.readFile(oldPath);
         await this.writeFile(newPath, content);
-        await this.deleteFile(oldPath);
+        try {
+            await this.deleteFile(oldPath);
+        } catch (err) {
+            // Best-effort cleanup: remove the new copy to avoid duplicates.
+            try { await this.deleteFile(newPath); } catch { /* ignore */ }
+            throw err;
+        }
     }
 
     async exists(path) {
@@ -174,9 +183,15 @@ class LocalStorageBackend {
     async createDirectory(_path) { /* no-op — dirs are implicit */ }
 
     async renameFile(oldPath, newPath) {
+        // Non-atomic: read → write → delete. See OPFS backend for details.
         const content = await this.readFile(oldPath);
         await this.writeFile(newPath, content);
-        await this.deleteFile(oldPath);
+        try {
+            await this.deleteFile(oldPath);
+        } catch (err) {
+            try { await this.deleteFile(newPath); } catch { /* ignore */ }
+            throw err;
+        }
     }
 
     async exists(path) {

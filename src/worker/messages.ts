@@ -12,6 +12,8 @@ export interface MsgInitServer {
     type: "initServer";
     /** User type stubs as nested folder structure */
     userFiles: UserFolder;
+    /** Project files written into /workspace before Pyright starts */
+    workspaceFiles?: Record<string, string>;
     /** Custom typeshed override (zip ArrayBuffer), or false to use bundled */
     typeshedFallback: ArrayBuffer | false | undefined;
     /** Board stubs zip (ArrayBuffer), or false to skip, or undefined to use bundled default */

@@ -18,12 +18,14 @@ import { createTransport } from './transport-factory.js';
  * @param {string} [config.workerUrl] - Worker script URL
  * @param {number} [config.timeout=5000] - Request timeout in ms
  * @param {ArrayBuffer} [config.boardStubs] - Board stubs zip (undefined = use bundled default)
+ * @param {Object.<string, string>} [config.workspaceFiles] - Project files to preload into /workspace
  * @param {string} [config.typeCheckingMode] - Pyright type checking mode
  */
 export async function createLSPClient(config = {}) {
     const transport = createTransport({
         workerUrl: config.workerUrl,
         boardStubs: config.boardStubs,
+        workspaceFiles: config.workspaceFiles,
         typeCheckingMode: config.typeCheckingMode,
     });
 

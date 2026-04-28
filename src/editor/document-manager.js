@@ -49,10 +49,17 @@ export class DocumentManager {
             } catch (err) {
                 console.warn(`DocumentManager: could not read ${path}:`, err.message);
             }
-            const state = EditorState.create({
-                doc: content,
-                extensions: this._getBaseExtensions(),
-            });
+            const shouldAdoptExistingViewState = (
+                !this._activeFile
+                && this._view
+                && this._view.state.doc.toString() === content
+            );
+            const state = shouldAdoptExistingViewState
+                ? this._view.state
+                : EditorState.create({
+                    doc: content,
+                    extensions: this._getBaseExtensions(),
+                });
             this._docs.set(path, { state, scrollTop: 0, dirty: false });
         }
 
@@ -66,7 +73,7 @@ export class DocumentManager {
         OPFSProject.setLastActiveFile(path);
 
         const entry = this._docs.get(path);
-        if (this._view) {
+        if (this._view && this._view.state !== entry.state) {
             this._view.setState(entry.state);
             // Restore scroll after state swap (next frame)
             requestAnimationFrame(() => {

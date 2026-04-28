@@ -32,6 +32,7 @@ export class SimpleLSPClient {
                         typeshedPaths: ['/typeshed-fallback'],
                         stubPath: '/typings',
                         include: ['/workspace'],
+                        extraPaths: ['/workspace'],
                         typeCheckingMode: mode,
                         diagnosticSeverityOverrides: {
                             reportMissingModuleSource: 'none',
@@ -80,9 +81,12 @@ export class SimpleLSPClient {
      * Send initialize request to server
      */
     async initialize() {
+        const rootUri = this.config.rootUri || 'file:///workspace';
         const response = await this.request('initialize', {
             processId: null,
-            rootUri: this.config.rootUri || 'file:///workspace',
+            rootUri,
+            rootPath: '/workspace',
+            workspaceFolders: [{ uri: rootUri, name: 'workspace' }],
             capabilities: {
                 workspace: {
                     configuration: true,
@@ -132,6 +136,7 @@ export class SimpleLSPClient {
                     typeshedPaths: ['/typeshed-fallback'],
                     stubPath: '/typings',
                     include: ['/workspace'],
+                    extraPaths: ['/workspace'],
                     typeCheckingMode: this.config.typeCheckingMode || 'standard',
                     diagnosticSeverityOverrides: {
                         reportMissingModuleSource: 'none',

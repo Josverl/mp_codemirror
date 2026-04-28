@@ -17,6 +17,7 @@ export class WorkerTransport {
         this._connectReject = null;
         this._boardStubs = options.boardStubs; // ArrayBuffer | false | undefined
         this._typeCheckingMode = options.typeCheckingMode; // string | undefined
+        this._workspaceFiles = options.workspaceFiles || {};
         this.pyrightVersion = ""; // set when serverInitialized is received
     }
 
@@ -56,6 +57,7 @@ export class WorkerTransport {
                     this.worker.postMessage({
                         type: 'initServer',
                         userFiles: {},
+                        workspaceFiles: this._workspaceFiles,
                         typeshedFallback: undefined, // use bundled typeshed
                         boardStubs: this._boardStubs, // use bundled default or override
                         typeCheckingMode: this._typeCheckingMode,

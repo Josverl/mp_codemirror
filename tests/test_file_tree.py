@@ -60,22 +60,55 @@ class TestFileTreeUI:
         assert handle.count() > 0, "#sidebar-resize-handle should be in DOM"
 
     def test_new_file_via_tree_header_button(self, page, live_server):
-        """Clicking the + button in the tree header opens a prompt; confirming creates the file."""
+        """Clicking the + button in the tree header opens inline input; Enter creates the file."""
         _load_editor(page, live_server)
         page.wait_for_function(
             "() => document.querySelector('.file-tree__header') !== null",
             timeout=5000,
         )
 
-        # Handle the prompt dialog
-        page.on("dialog", lambda d: d.accept("tree_created.py"))
         page.locator(".file-tree__header .file-tree__icon-btn").first.click()
+        page.wait_for_selector(".file-tree__inline-input", timeout=3000)
+        page.locator(".file-tree__inline-input").fill("tree_created.py")
+        page.keyboard.press("Enter")
         time.sleep(0.5)
 
         # The file should now appear in the tree
         tree_text = page.locator(".file-tree__list").inner_text()
         assert "tree_created.py" in tree_text, \
             f"tree_created.py should appear in tree after creation: {tree_text!r}"
+
+    def test_rename_handles_selector_special_chars(self, page, live_server):
+        """Rename flow works for file paths containing selector-significant characters."""
+        _load_editor(page, live_server)
+
+        result = page.evaluate("""
+            async () => {
+                const mod = await import('./storage/opfs-project.js');
+                await mod.OPFSProject.writeFile('a"b].py', '# special');
+                location.reload();
+                return true;
+            }
+        """)
+        assert result is True
+
+        page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+        page.wait_for_selector(".file-tree__list", timeout=5000)
+        time.sleep(0.6)
+
+        rename_result = page.evaluate("""
+            () => {
+                const items = [...document.querySelectorAll('.file-tree__file')];
+                const row = items.find((node) => node.dataset.path === 'a"b].py');
+                if (!row) return { ok: false, reason: 'row-not-found' };
+                const btn = row.querySelector('button[title="Rename"]');
+                if (!btn) return { ok: false, reason: 'rename-button-not-found' };
+                btn.click();
+                const input = document.querySelector('.file-tree__inline-input');
+                return { ok: !!input };
+            }
+        """)
+        assert rename_result["ok"], f"rename input should open for special-char path: {rename_result}"
 
     def test_export_button_exists(self, page, live_server):
         """Export button is present in the header."""

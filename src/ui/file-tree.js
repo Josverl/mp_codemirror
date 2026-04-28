@@ -310,8 +310,16 @@ export class FileTree {
         });
     }
 
+    _findPathNode(path) {
+        const nodes = this._list.querySelectorAll('[data-path]');
+        for (const node of nodes) {
+            if (node.dataset.path === path) return node;
+        }
+        return null;
+    }
+
     async _promptNewFile(dirPath) {
-        const li = this._list.querySelector(`[data-path="${dirPath}"]`) || this._list;
+        const li = this._findPathNode(dirPath) || this._list;
         const name = await this._showInlineInput(li, '');
         if (!name) return;
         const fullPath = dirPath ? `${dirPath}/${name}` : name;
@@ -323,7 +331,7 @@ export class FileTree {
     }
 
     async _promptRename(path) {
-        const li = this._list.querySelector(`[data-path="${path}"]`);
+        const li = this._findPathNode(path);
         if (!li) return;
         const parts = path.split('/');
         const oldName = parts[parts.length - 1];
@@ -338,7 +346,7 @@ export class FileTree {
     }
 
     async _deleteEntry(path) {
-        const li = this._list.querySelector(`[data-path="${path}"]`);
+        const li = this._findPathNode(path);
         if (!li) return;
         const confirmed = await this._showInlineConfirm(li, `Delete?`);
         if (!confirmed) return;

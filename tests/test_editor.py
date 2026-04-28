@@ -58,6 +58,22 @@ def test_editor_container_exists(editor_page):
     expect(editor_page.locator("#editor-container")).to_be_visible()
 
 
+def test_footer_has_github_star_buttons_with_counts(editor_page):
+    """Footer includes both GitHub star buttons configured to show star counts."""
+    stars = editor_page.locator("footer .github-button")
+    expect(stars).to_have_count(2)
+
+    micropython = editor_page.locator(
+        'footer .github-button[href="https://github.com/Josverl/micropython-stubs"]'
+    )
+    mp_codemirror = editor_page.locator(
+        'footer .github-button[href="https://github.com/Josverl/mp_codemirror"]'
+    )
+
+    expect(micropython).to_have_attribute("data-show-count", "true")
+    expect(mp_codemirror).to_have_attribute("data-show-count", "true")
+
+
 # ---------------------------------------------------------------------------
 # CodeMirror initialisation
 # ---------------------------------------------------------------------------

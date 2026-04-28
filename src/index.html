@@ -78,11 +78,27 @@
     </main>
 
     <footer>
-        <p>
+        <p class="footer-links">
             <a href="https://github.com/josverl/micropython-stubs" target="_blank" rel="noopener">MicroPython-Stubs</a> & 
             <a href="https://github.com/microsoft/pyright" target="_blank" rel="noopener">Pyright (LSP) </a> & 
             <a href="https://codemirror.net/6/" target="_blank" rel="noopener">CodeMirror 6</a>
         </p>
+        <div class="github-stars" aria-label="GitHub star links">
+            <a
+                class="github-button"
+                href="https://github.com/Josverl/micropython-stubs"
+                data-icon="octicon-star"
+                data-show-count="true"
+                aria-label="Star Josverl/micropython-stubs on GitHub"
+            >Star</a>
+            <a
+                class="github-button"
+                href="https://github.com/Josverl/mp_codemirror"
+                data-icon="octicon-star"
+                data-show-count="true"
+                aria-label="Star Josverl/mp_codemirror on GitHub"
+            >Star</a>
+        </div>
     </footer>
 
     <!-- Import map for CodeMirror modules - using esm.sh with explicit shared dependency versions -->
@@ -101,6 +117,15 @@
     }
     </script>
 
+    <script>
+        if (!['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+            const githubButtonsScript = document.createElement('script');
+            githubButtonsScript.async = true;
+            githubButtonsScript.defer = true;
+            githubButtonsScript.src = 'https://buttons.github.io/buttons.js';
+            document.body.appendChild(githubButtonsScript);
+        }
+    </script>
     <!-- Main application script -->
     <script type="module" src="app.js"></script>
 </body>

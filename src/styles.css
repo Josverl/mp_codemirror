@@ -11,7 +11,7 @@
 
 :root {
     --header-height: 80px;
-    --footer-height: 40px;
+    --footer-height: 64px;
 }
 
 body {
@@ -252,18 +252,32 @@ main {
 
 /* Footer */
 footer {
-    height: var(--footer-height);
+    min-height: var(--footer-height);
     padding: 10px 30px;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
+    gap: 8px;
     font-size: 13px;
     flex-shrink: 0;
+}
+
+.footer-links {
+    text-align: center;
 }
 
 footer a {
     text-decoration: none;
     margin-left: 5px;
+}
+
+.github-stars {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 footer a:hover {

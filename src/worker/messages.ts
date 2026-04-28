@@ -40,9 +40,16 @@ export interface MsgSyncFile {
     content: string;
 }
 
+export interface MsgDeleteFile {
+    type: "deleteFile";
+    /** File path relative to /workspace */
+    path: string;
+}
+
 export type WorkerMessage =
     | MsgServerLoaded
     | MsgInitServer
     | MsgServerInitialized
     | MsgServerError
-    | MsgSyncFile;
+    | MsgSyncFile
+    | MsgDeleteFile;

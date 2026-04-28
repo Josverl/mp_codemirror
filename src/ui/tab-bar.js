@@ -34,6 +34,20 @@ export class TabBar {
     _render() {
         this._container.innerHTML = '';
 
+        if (this._tabs.length === 0) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'tab-bar__tab tab-bar__tab--placeholder tab-bar__tab--active';
+            placeholder.title = 'No file open';
+
+            const label = document.createElement('span');
+            label.className = 'tab-bar__label';
+            label.textContent = 'Untitled';
+
+            placeholder.appendChild(label);
+            this._container.appendChild(placeholder);
+            return;
+        }
+
         for (const { path, dirty } of this._tabs) {
             const tab = document.createElement('div');
             tab.className = 'tab-bar__tab' + (path === this._active ? ' tab-bar__tab--active' : '');

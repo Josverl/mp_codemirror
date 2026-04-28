@@ -372,6 +372,11 @@ body.light-theme .tab-bar__tab--active {
 
 .tab-bar__close:hover { opacity: 1; background: rgba(128,128,128,0.2); }
 
+.tab-bar__tab--placeholder {
+    cursor: default;
+    opacity: 0.8;
+}
+
 /* File tree component */
 .file-tree {
     display: flex;

@@ -30,7 +30,6 @@ ENV/
 
 # Node (if used for development)
 node_modules/
-package-lock.json
 yarn.lock
 
 # Build outputs (if we ever add a build step)

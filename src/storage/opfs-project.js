@@ -135,28 +135,39 @@ class OPFSBackend {
 const LS_PREFIX = 'opfs_fallback:';
 
 class LocalStorageBackend {
+    constructor() {
+        /** @type {Array|null} Cached listFiles result; null = stale */
+        this._listCache = null;
+    }
+
     _key(path) { return `${LS_PREFIX}${path}`; }
+    _invalidate() { this._listCache = null; }
 
     async listFiles(path = '') {
-        const entries = [];
-        const seen = new Set();
-        for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (!k.startsWith(LS_PREFIX)) continue;
-            const filePath = k.slice(LS_PREFIX.length);
-            if (path && !filePath.startsWith(path + '/') && filePath !== path) continue;
-            const parts = filePath.split('/');
-            // Collect intermediate dirs
-            for (let d = 1; d < parts.length; d++) {
-                const dirPath = parts.slice(0, d).join('/');
-                if (!seen.has(dirPath)) {
-                    seen.add(dirPath);
-                    entries.push({ path: dirPath, name: parts[d - 1], type: 'directory' });
+        // Return cached full listing when available; filter by path afterward.
+        if (!this._listCache) {
+            const entries = [];
+            const seen = new Set();
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (!k.startsWith(LS_PREFIX)) continue;
+                const filePath = k.slice(LS_PREFIX.length);
+                const parts = filePath.split('/');
+                for (let d = 1; d < parts.length; d++) {
+                    const dirPath = parts.slice(0, d).join('/');
+                    if (!seen.has(dirPath)) {
+                        seen.add(dirPath);
+                        entries.push({ path: dirPath, name: parts[d - 1], type: 'directory' });
+                    }
                 }
+                entries.push({ path: filePath, name: parts[parts.length - 1], type: 'file' });
             }
-            entries.push({ path: filePath, name: parts[parts.length - 1], type: 'file' });
+            this._listCache = entries;
         }
-        return entries;
+        if (!path) return [...this._listCache];
+        return this._listCache.filter(e =>
+            e.path === path || e.path.startsWith(path + '/')
+        );
     }
 
     async readFile(path) {
@@ -167,6 +178,7 @@ class LocalStorageBackend {
 
     async writeFile(path, content) {
         localStorage.setItem(this._key(path), content);
+        this._invalidate();
     }
 
     async deleteFile(path) {
@@ -178,6 +190,7 @@ class LocalStorageBackend {
             if (k === prefix || k.startsWith(prefix + '/')) toRemove.push(k);
         }
         toRemove.forEach(k => localStorage.removeItem(k));
+        this._invalidate();
     }
 
     async createDirectory(_path) { /* no-op — dirs are implicit */ }

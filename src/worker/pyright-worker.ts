@@ -38,7 +38,7 @@ import { createConnection } from "vscode-languageserver/node";
 
 import { PyrightServer } from "pyright/packages/pyright-internal/src/server";
 
-import type { MsgInitServer, UserFolder, WorkerMessage } from "./messages";
+import type { MsgInitServer, MsgSyncFile, UserFolder, WorkerMessage } from "./messages";
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -183,6 +183,19 @@ ctx.onmessage = (event: MessageEvent) => {
         case "initServer":
             handleInitServer(msg as MsgInitServer);
             break;
+        case "syncFile": {
+            const { path: filePath, content } = msg as MsgSyncFile;
+            try {
+                const fullPath = `/workspace/${filePath}`;
+                // Ensure parent directories exist
+                const dir = path.dirname(fullPath);
+                fs.mkdirSync(dir, { recursive: true });
+                fs.writeFileSync(fullPath, content);
+            } catch (err: any) {
+                console.warn(`[pyright-worker] syncFile failed for ${filePath}:`, err?.message);
+            }
+            break;
+        }
         default:
             // LSP messages are handled by BrowserMessageReader automatically
             break;

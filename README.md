@@ -1,6 +1,29 @@
-# CodeMirror 6 MicroPython Editor
+# MicroPython-stubs Playground
 
-A static HTML5 application featuring a CodeMirror 6 editor with full LSP support via Pyright running in a Web Worker. Includes MicroPython board-specific type stubs (ESP32, RP2040, STM32) with live switching. Deploys to GitHub Pages as static files — no server needed for LSP features.
+This site provides a *Codemirror 6* editor with full _LSP support via Pyright_ running in a Web Worker. 
+The Typechecker uses the included MicroPython board-specific type stubs (ESP32, RP2040, STM32) with live switching between different MCU families. 
+The App is deployed to GitHub Pages as static files — no active server needed, no code shared - all runs in the user's browser.
+
+## Goals
+
+The goal of this repo is two-pronged:
+- A simple to use tool to show the usability of static typing for MicroPython
+- Serve as a Proof of Concept for other MicroPython editors to implement something similar.
+
+I have used Pyright as an LSP, but in principle that is replacable by any other type-checker that can be made to run in a web-worker. All Python type-chekers will be able to "understand" MicroPython, with just a little configuration. 
+Second you need a good set of **MicroPython stubs**, for the ports/boards that you want to support.  These can be installed/fetched from PyPI or the micropython-stubs repo.
+
+Non goals:
+- This app does not aim to provide a live connection to an physical or emulated board.
+
+## AI Use
+
+Indeed I used AI 🔮 to create this. I have spend multiple years gradually and manually building the micropython-stubs and associated toolset, and I learned a great deal through that.  
+
+I had suggested this approach (CM6 + LSP + Stubs) a few times before - but it was not seen as an achievable goal.
+For me that was a hill to climb - and I failed in earlier (manual) attempts due to my lack of web dev skills combined with a lack of time.
+So that is where I "hired some AI Agents" to do that part of the work for me.
+As for the boring design - that is proably me tough.
 
 ## Features
 
@@ -19,7 +42,7 @@ A static HTML5 application featuring a CodeMirror 6 editor with full LSP support
 - ✅ **MicroPython** syntax highlighting
 - ✅ **LSP Integration** - Pyright running in a Web Worker (no server needed)
 - ✅ **Real-time Diagnostics** - Errors and warnings as you type (debounced 300ms)
-- ✅ **Type Checking** - Full Python type analysis
+- ✅ **Type Checking** - Full **MicroPython** type analysis
 - ✅ **Document Versioning** - Automatic version tracking for LSP updates
 - ✅ **Board Selector** - Switch between ESP32, RP2040, STM32 stubs
 

@@ -231,3 +231,133 @@ class TestMultiFileDocumentManagement:
         placeholder = page.locator(".tab-bar__tab--placeholder .tab-bar__label")
         assert placeholder.count() == 1, "Untitled placeholder tab should be shown"
         assert placeholder.inner_text().strip() == "Untitled"
+
+    def test_dirty_close_cancel_and_discard(self, page, live_server):
+        """Dirty close prompt supports cancel (stay open) and discard (close without save)."""
+        _load_editor(page, live_server)
+        _import_opfs(page)
+
+        page.evaluate("""
+            async () => {
+                await window.OPFSProject.writeFile('dirty_close.py', '# baseline');
+            }
+        """)
+        page.reload()
+        page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+        time.sleep(1.2)
+
+        # Open dirty_close.py
+        tree_items = page.locator(".file-tree__file")
+        for i in range(tree_items.count()):
+            item = tree_items.nth(i)
+            if "dirty_close.py" in item.inner_text():
+                item.locator(".file-tree__row").click()
+                break
+        time.sleep(0.4)
+
+        # Make unsaved edit
+        page.locator(".editor-pane--active .cm-content").click()
+        page.keyboard.type("\n# unsaved")
+        time.sleep(0.2)
+
+        # First close attempt: cancel
+        page.once("dialog", lambda d: d.dismiss())
+        tabs = page.locator(".tab-bar__tab")
+        for i in range(tabs.count()):
+            tab = tabs.nth(i)
+            if "dirty_close.py" in tab.inner_text():
+                tab.locator(".tab-bar__close").click()
+                break
+        time.sleep(0.4)
+
+        # Tab should still be open after cancel
+        labels_after_cancel = [
+            page.locator(".tab-bar__tab .tab-bar__label").nth(i).inner_text()
+            for i in range(page.locator(".tab-bar__tab .tab-bar__label").count())
+        ]
+        assert any("dirty_close.py" in lbl for lbl in labels_after_cancel), "Tab should remain after cancel"
+
+        # Second close attempt: discard/confirm
+        page.once("dialog", lambda d: d.accept())
+        tabs = page.locator(".tab-bar__tab")
+        for i in range(tabs.count()):
+            tab = tabs.nth(i)
+            if "dirty_close.py" in tab.inner_text():
+                tab.locator(".tab-bar__close").click()
+                break
+        time.sleep(0.5)
+
+        # Reopen file and verify unsaved change was not persisted.
+        tree_items = page.locator(".file-tree__file")
+        for i in range(tree_items.count()):
+            item = tree_items.nth(i)
+            if "dirty_close.py" in item.inner_text():
+                item.locator(".file-tree__row").click()
+                break
+        time.sleep(0.4)
+        content = page.locator(".editor-pane--active .cm-content").inner_text()
+        assert "unsaved" not in content, "Discard close should not persist unsaved edits"
+
+    def test_directory_delete_cascades_open_tabs(self, page, live_server):
+        """Deleting a directory closes any open tabs inside that directory."""
+        _load_editor(page, live_server)
+        _import_opfs(page)
+
+        page.evaluate("""
+            async () => {
+                await window.OPFSProject.createDirectory('lib_cascade');
+                await window.OPFSProject.writeFile('lib_cascade/file_a.py', '# cascade');
+            }
+        """)
+        page.reload()
+        page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+        time.sleep(1.2)
+
+        # Expand lib_cascade directory if collapsed.
+        page.evaluate("""
+            () => {
+                const dirNode = [...document.querySelectorAll('.file-tree__dir')]
+                    .find((n) => n.dataset.path === 'lib_cascade');
+                if (dirNode && !dirNode.classList.contains('file-tree__dir--expanded')) {
+                    dirNode.querySelector('.file-tree__row').click();
+                }
+            }
+        """)
+        time.sleep(0.3)
+
+        # Open nested file tab first.
+        opened = page.evaluate("""
+            () => {
+                const fileNode = [...document.querySelectorAll('.file-tree__file')]
+                    .find((n) => n.dataset.path === 'lib_cascade/file_a.py');
+                if (!fileNode) return false;
+                fileNode.querySelector('.file-tree__row').click();
+                return true;
+            }
+        """)
+        assert opened, "file_a.py should be present in file tree"
+        time.sleep(0.4)
+
+        # Delete the directory via file-tree actions and confirm inline dialog.
+        deleted = page.evaluate("""
+            () => {
+                const dirNode = [...document.querySelectorAll('.file-tree__dir')]
+                    .find((n) => n.dataset.path === 'lib_cascade');
+                if (!dirNode) return false;
+                const delBtn = dirNode.querySelector('button[title="Delete"]');
+                if (!delBtn) return false;
+                delBtn.click();
+                const confirmBtn = document.querySelector('.file-tree__inline-confirm button[title="Confirm delete"]');
+                if (!confirmBtn) return false;
+                confirmBtn.click();
+                return true;
+            }
+        """)
+        assert deleted is True, "Directory delete flow should be triggerable"
+        time.sleep(0.7)
+
+        tab_labels = [
+            page.locator(".tab-bar__tab .tab-bar__label").nth(i).inner_text()
+            for i in range(page.locator(".tab-bar__tab .tab-bar__label").count())
+        ]
+        assert all("file_a.py" not in lbl for lbl in tab_labels), "Nested file tab should be closed on dir delete"

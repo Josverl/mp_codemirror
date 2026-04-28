@@ -45,6 +45,7 @@ jobs:
             # Step 9: Verify setup
             - name: Verify environment
               run: |
+                  npm install
                   echo "✅ Environment Setup Complete"
                   echo ""
                   echo "📍 UV Version:"

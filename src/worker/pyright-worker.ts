@@ -38,7 +38,7 @@ import { createConnection } from "vscode-languageserver/node";
 
 import { PyrightServer } from "pyright/packages/pyright-internal/src/server";
 
-import type { MsgInitServer, MsgSyncFile, UserFolder, WorkerMessage } from "./messages";
+import type { MsgInitServer, MsgSyncFile, MsgDeleteFile, UserFolder, WorkerMessage } from "./messages";
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -173,6 +173,29 @@ async function handleInitServer(msg: MsgInitServer) {
         const reader = new BrowserMessageReader(ctx);
         const writer = new BrowserMessageWriter(ctx);
 
+        // BrowserMessageReader's constructor assigns `ctx.onmessage`, which
+        // replaces our top-level handler that processes custom worker messages
+        // such as `syncFile`. Re-wrap `ctx.onmessage` here so custom messages
+        // are routed to the filesystem (and to the LSP transport when needed)
+        // before falling through to the JSON-RPC reader.
+        const lspOnMessage = ctx.onmessage;
+        ctx.onmessage = (event: MessageEvent) => {
+            const data = event.data as WorkerMessage | undefined;
+            if (data && typeof data === "object" && "type" in data) {
+                if (data.type === "syncFile") {
+                    handleSyncFile(data as MsgSyncFile);
+                    return;
+                }
+                if (data.type === "deleteFile") {
+                    handleDeleteFile(data as MsgDeleteFile);
+                    return;
+                }
+            }
+            if (lspOnMessage) {
+                (lspOnMessage as (ev: MessageEvent) => void).call(ctx, event);
+            }
+        };
+
         // Note: createConnection from vscode-languageserver/node is used
         // because PyrightServer expects a Node-style connection.
         // The BrowserMessageReader/Writer bridge the gap.
@@ -192,6 +215,28 @@ async function handleInitServer(msg: MsgInitServer) {
     }
 }
 
+function handleSyncFile(msg: MsgSyncFile) {
+    try {
+        const fullPath = `/workspace/${msg.path}`;
+        const dir = path.dirname(fullPath);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(fullPath, msg.content);
+    } catch (err: any) {
+        console.warn(`[pyright-worker] syncFile failed for ${msg.path}:`, err?.message);
+    }
+}
+
+function handleDeleteFile(msg: MsgDeleteFile) {
+    try {
+        const fullPath = `/workspace/${msg.path}`;
+        if (fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+        }
+    } catch (err: any) {
+        console.warn(`[pyright-worker] deleteFile failed for ${msg.path}:`, err?.message);
+    }
+}
+
 // --- Worker entry point ---
 
 ctx.onmessage = (event: MessageEvent) => {
@@ -201,21 +246,15 @@ ctx.onmessage = (event: MessageEvent) => {
         case "initServer":
             handleInitServer(msg as MsgInitServer);
             break;
-        case "syncFile": {
-            const { path: filePath, content } = msg as MsgSyncFile;
-            try {
-                const fullPath = `/workspace/${filePath}`;
-                // Ensure parent directories exist
-                const dir = path.dirname(fullPath);
-                fs.mkdirSync(dir, { recursive: true });
-                fs.writeFileSync(fullPath, content);
-            } catch (err: any) {
-                console.warn(`[pyright-worker] syncFile failed for ${filePath}:`, err?.message);
-            }
+        case "syncFile":
+            handleSyncFile(msg as MsgSyncFile);
             break;
-        }
+        case "deleteFile":
+            handleDeleteFile(msg as MsgDeleteFile);
+            break;
         default:
-            // LSP messages are handled by BrowserMessageReader automatically
+            // LSP messages will be handled by BrowserMessageReader once the
+            // server is initialized (it replaces ctx.onmessage at that point).
             break;
     }
 };

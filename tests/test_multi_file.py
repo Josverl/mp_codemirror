@@ -218,3 +218,16 @@ class TestMultiFileDocumentManagement:
         tab_count_after = page.locator(".tab-bar__tab").count()
         assert tab_count_after < tab_count_before, \
             f"Tab count should decrease after close: {tab_count_before} → {tab_count_after}"
+
+    def test_closing_last_tab_shows_untitled_placeholder(self, page, live_server):
+        """Closing the last real tab should leave a visible Untitled placeholder tab."""
+        _load_editor(page, live_server)
+
+        # Close all tabs that have close buttons.
+        while page.locator(".tab-bar__close").count() > 0:
+            page.locator(".tab-bar__close").first.click()
+            time.sleep(0.2)
+
+        placeholder = page.locator(".tab-bar__tab--placeholder .tab-bar__label")
+        assert placeholder.count() == 1, "Untitled placeholder tab should be shown"
+        assert placeholder.inner_text().strip() == "Untitled"

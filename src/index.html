@@ -48,6 +48,11 @@
             <button id="themeToggle" aria-label="dark/light theme">🌓</button>
             <button id="typeCheckBtn" aria-label="type check with Pyright">👀</button>
             <button id="clearBtn" aria-label="Clear">Clear</button>
+            <button id="exportBtn" aria-label="Export project as ZIP" title="Export project as ZIP">Export</button>
+            <label id="importLabel" class="import-label" title="Import ZIP or .py file">
+                Import
+                <input id="importFile" type="file" accept=".zip,.py" style="display:none">
+            </label>
             <button id="helpBtn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">⌨</button>
             <div class="sample-selector">
                 <select id="sampleSelect" aria-label="Select example file">
@@ -59,22 +64,34 @@
     </header>
 
     <main>
-        <div id="editor-container"></div>
-        <div id="keyboard-help" hidden>
-            <table>
-                <thead><tr><th>Key</th><th>Action</th></tr></thead>
-                <tbody>
-                    <tr><td><kbd>F8</kbd></td><td>Next diagnostic &amp; open panel</td></tr>
-                    <tr><td><kbd>Shift</kbd>+<kbd>F8</kbd></td><td>Previous diagnostic</td></tr>
-                    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Toggle diagnostics panel</td></tr>
-                    <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Autocomplete</td></tr>
-                    <tr><td><kbd>Ctrl</kbd>+<kbd>/</kbd></td><td>Toggle comment</td></tr>
-                    <tr><td><kbd>Ctrl</kbd>+<kbd>[</kbd> / <kbd>]</kbd></td><td>Indent / Dedent</td></tr>
-                    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd></td><td>Fold / Unfold</td></tr>
-                </tbody>
-            </table>
+        <div id="workspace">
+            <!-- File tree sidebar -->
+            <div id="file-tree-panel">
+                <div id="file-tree"></div>
+            </div>
+            <!-- Resize handle between sidebar and editor -->
+            <div id="sidebar-resize-handle" title="Drag to resize"></div>
+            <!-- Editor column -->
+            <div id="editor-column">
+                <div id="tab-bar"></div>
+                <div id="editor-container"></div>
+                <div id="keyboard-help" hidden>
+                    <table>
+                        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+                        <tbody>
+                            <tr><td><kbd>F8</kbd></td><td>Next diagnostic &amp; open panel</td></tr>
+                            <tr><td><kbd>Shift</kbd>+<kbd>F8</kbd></td><td>Previous diagnostic</td></tr>
+                            <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Toggle diagnostics panel</td></tr>
+                            <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Autocomplete</td></tr>
+                            <tr><td><kbd>Ctrl</kbd>+<kbd>/</kbd></td><td>Toggle comment</td></tr>
+                            <tr><td><kbd>Ctrl</kbd>+<kbd>[</kbd> / <kbd>]</kbd></td><td>Indent / Dedent</td></tr>
+                            <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd></td><td>Fold / Unfold</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="diagnostics-status">Errors: 0 | Warnings: 0 | Info: 0</div>
+            </div>
         </div>
-        <div id="diagnostics-status">Errors: 0 | Warnings: 0 | Info: 0</div>
     </main>
 
     <footer>

@@ -34,6 +34,43 @@ def _import_opfs(page):
 
 
 class TestMultiFileDocumentManagement:
+    def test_on_active_change_unsubscribe(self, page, live_server):
+        """onActiveChange returns an unsubscribe function that detaches listeners."""
+        _load_editor(page, live_server)
+
+        result = page.evaluate("""
+            async () => {
+                const { DocumentManager } = await import('./editor/document-manager.js');
+                const { OPFSProject } = await import('./storage/opfs-project.js');
+
+                await OPFSProject.writeFile('listener_a.py', '# a');
+                await OPFSProject.writeFile('listener_b.py', '# b');
+
+                const host = document.createElement('div');
+                document.body.appendChild(host);
+
+                const createView = (_path, content) => ({
+                    state: { doc: { toString: () => content } },
+                    focus() {},
+                    destroy() {},
+                    dispatch() {},
+                });
+
+                const dm = new DocumentManager(host, createView);
+                let calls = 0;
+                const unsubscribe = dm.onActiveChange(() => { calls += 1; });
+
+                await dm.openFile('listener_a.py');
+                unsubscribe();
+                await dm.openFile('listener_b.py');
+
+                host.remove();
+                return { calls };
+            }
+        """)
+
+        assert result["calls"] == 1, f"Listener should only fire before unsubscribe: {result}"
+
     def test_initial_file_is_active_in_tab_bar(self, page, live_server):
         """The initially active file is shown as an active tab."""
         _load_editor(page, live_server)

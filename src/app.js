@@ -16,6 +16,7 @@ import { OPFSProject } from './storage/opfs-project.js';
 import { DocumentManager } from './editor/document-manager.js';
 import { TabBar } from './ui/tab-bar.js';
 import { FileTree } from './ui/file-tree.js';
+import { Events } from './events.js';
 
 // Sample Python code - will be loaded from file
 let sampleCode = '# Loading example...\n';
@@ -69,30 +70,36 @@ let fileTree = null;
 const CHANGE_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
 const STARTUP_REANALYZE_DELAY_MS = 50;
 
+// Cache for collectWorkspaceFiles — invalidated on file mutations.
+let _workspaceFilesCache = null;
+
+function invalidateWorkspaceFilesCache() { _workspaceFilesCache = null; }
+
+// TODO: The worker already holds a copy in ZenFS. A future optimisation could
+// pass only deltas on board-switch / type-check-mode change instead of
+// re-reading every file from OPFS each time.
 async function collectWorkspaceFiles(activePath = null, activeContentOverride = null) {
-    const workspaceFiles = {};
-    const allFiles = await OPFSProject.listFiles();
+    if (!_workspaceFilesCache) {
+        const workspaceFiles = {};
+        const allFiles = await OPFSProject.listFiles();
 
-    for (const entry of allFiles) {
-        if (entry.type !== 'file') continue;
-
-        if (activePath && activeContentOverride !== null && entry.path === activePath) {
-            workspaceFiles[entry.path] = activeContentOverride;
-            continue;
+        for (const entry of allFiles) {
+            if (entry.type !== 'file') continue;
+            try {
+                workspaceFiles[entry.path] = await OPFSProject.readFile(entry.path);
+            } catch {
+                // Ignore files that disappear during collection.
+            }
         }
-
-        try {
-            workspaceFiles[entry.path] = await OPFSProject.readFile(entry.path);
-        } catch {
-            // Ignore files that disappear during collection.
-        }
+        _workspaceFilesCache = workspaceFiles;
     }
 
-    if (activePath && activeContentOverride !== null && !workspaceFiles[activePath]) {
-        workspaceFiles[activePath] = activeContentOverride;
+    // Return a shallow copy with the active document's live content overlaid.
+    const result = { ..._workspaceFilesCache };
+    if (activePath && activeContentOverride !== null) {
+        result[activePath] = activeContentOverride;
     }
-
-    return workspaceFiles;
+    return result;
 }
 
 async function syncWorkspaceToLSP({ openDocuments = false, activeUri = documentUri, workspaceFiles = null } = {}) {
@@ -822,6 +829,11 @@ async function initializeEditor() {
 
     // Wire sidebar resize handle
     initSidebarResize();
+
+    // Invalidate workspace-files cache on any file mutation
+    for (const evt of [Events.FILE_CREATED, Events.FILE_RENAMED, Events.FILE_DELETED, Events.FILE_SAVED]) {
+        document.addEventListener(evt, invalidateWorkspaceFilesCache);
+    }
 
     // Helper: update tab bar display
     function refreshTabBar() {

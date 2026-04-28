@@ -474,6 +474,31 @@ body.light-theme .file-tree__file--active .file-tree__row { background: #cce5ff;
 .file-tree__icon-btn:hover { opacity: 1; background: rgba(128,128,128,0.2); }
 .file-tree__icon-btn--danger:hover { color: #f44; }
 
+/* Inline input for new-file / rename */
+.file-tree__inline-input {
+    display: block;
+    width: calc(100% - 8px);
+    margin: 2px 4px;
+    padding: 2px 4px;
+    font-size: 12px;
+    font-family: inherit;
+    border: 1px solid #888;
+    border-radius: 3px;
+    background: var(--bg-color-edit, #fff);
+    color: inherit;
+    outline: none;
+}
+.file-tree__inline-input:focus { border-color: #4fc3f7; }
+
+/* Inline confirm for delete */
+.file-tree__inline-confirm {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 2px 4px;
+    font-size: 12px;
+}
+
 /* Import label styled like a button */
 .import-label {
     padding: 8px 16px;

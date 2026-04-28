@@ -287,3 +287,73 @@ def test_close_tab_cancels_pending_did_change(page, live_server):
 
     stale_logs = [m for m in console if "Sending didChange debounce_close.py" in m]
     assert not stale_logs, f"No didChange should fire after closing tab: {stale_logs}"
+
+
+@requires_lsp
+def test_document_version_does_not_drift_across_tab_switches(page, live_server):
+    """Each per-URI version must increment monotonically; switching tabs must not reset it."""
+    console: list[str] = []
+    page.on("console", lambda m: console.append(m.text))
+
+    _load_and_wait(page, live_server)
+
+    page.evaluate("""
+        async () => {
+            const mod = await import('./storage/opfs-project.js');
+            await mod.OPFSProject.writeFile('drift_a.py', '# a')
+            await mod.OPFSProject.writeFile('drift_b.py', '# b')
+            location.reload();
+        }
+    """)
+    page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
+    time.sleep(1.0)
+
+    assert _open_tree_file(page, "drift_a.py"), "drift_a.py should be in tree"
+    time.sleep(0.3)
+
+    # Edit A twice
+    _type_in_editor(page, "\n# edit-a-1", delay=15)
+    time.sleep((DEBOUNCE_MS + 400) / 1000)
+    _type_in_editor(page, "\n# edit-a-2", delay=15)
+    time.sleep((DEBOUNCE_MS + 400) / 1000)
+
+    # Switch to B and edit
+    assert _open_tree_file(page, "drift_b.py"), "drift_b.py should be in tree"
+    time.sleep(0.4)
+    _type_in_editor(page, "\n# edit-b-1", delay=15)
+    time.sleep((DEBOUNCE_MS + 400) / 1000)
+
+    # Switch back to A and edit again
+    tabs = page.locator(".tab-bar__tab")
+    for i in range(tabs.count()):
+        tab = tabs.nth(i)
+        if "drift_a.py" in tab.inner_text():
+            tab.click()
+            break
+    time.sleep(0.4)
+    _type_in_editor(page, "\n# edit-a-3", delay=15)
+    time.sleep((DEBOUNCE_MS + 400) / 1000)
+
+    # Collect versions per file from console logs
+    version_re = re.compile(r"Sending didChange (\S+) \(version (\d+)\)")
+    versions_a: list[int] = []
+    versions_b: list[int] = []
+    for msg in console:
+        m = version_re.search(msg)
+        if not m:
+            continue
+        path, ver = m.group(1), int(m.group(2))
+        if path == "drift_a.py":
+            versions_a.append(ver)
+        elif path == "drift_b.py":
+            versions_b.append(ver)
+
+    assert len(versions_a) >= 2, f"Expected multiple didChange for drift_a.py, got {versions_a}"
+    assert versions_a == sorted(versions_a) and len(set(versions_a)) == len(versions_a), (
+        f"drift_a.py versions must strictly increase across tab switches: {versions_a}"
+    )
+    if versions_b:
+        assert versions_b == sorted(versions_b) and len(set(versions_b)) == len(versions_b), (
+            f"drift_b.py versions must strictly increase: {versions_b}"
+        )

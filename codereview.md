@@ -88,6 +88,16 @@ Note: irrelevant review items have been removed.
 18. **Tests gaps**: no coverage for rename, dir-cascade-delete, dirty-on-close, or version drift across tab switches.
    **Status: Completed - no further action needed.**
 
+### Test Failures Found During Full Run
+
+19. **`test_sample_code_loads` asserts `def` in editor content** (tests/test_editor.py). The test was written against `blink_led.py` which has a function definition. With the OPFS-backed project, the default loaded file is `main.py` (a simple while-loop blink example without `def`). The assertion is a stale implementation detail. Fix: remove the `assert "def" in content` line.
+   **Status: Completed - no further action needed.**
+
+20. **Test suite fails when HTTP server has stale CLOSE_WAIT connections** (tests/conftest.py). `_detect_server_base_url` probes both candidate URLs with `urllib.request.urlopen(timeout=2)`. When the server has CLOSE_WAIT connections filling the backlog, new connections time out and both probes fail, causing the fixture to fall back to `http://localhost:8888` (project root) instead of `http://localhost:8888/src`. Tests that navigate to `{live_server}/index.html` then hit a 404 and time out. Fix: increase probe resilience or restart the server between runs.
+
+21. **`test_did_change_notification_sent_on_typing` and `test_document_version_increments` use stale log pattern** (tests/test_lsp_realtime.py). These tests filter console messages by `"didChange notification"`, but `app.js` now logs `"Sending didChange <path> (version N)"`. The filter never matches so the assertions always fail. Fix: update the filter string to `"Sending didChange"` in all three places.
+   **Status: Completed - no further action needed.**
+
 ---
 
 ## Recommended ports from ViperIDE (priority order)

@@ -101,9 +101,9 @@ def test_did_change_notification_sent_on_typing(page, live_server):
     # Wait for debounce + a small margin
     time.sleep((DEBOUNCE_MS + 500) / 1000)
 
-    didchange_msgs = [m for m in console if "didChange notification" in m]
+    didchange_msgs = [m for m in console if "Sending didChange" in m]
     assert didchange_msgs, (
-        f"Expected 'didChange notification' in console after typing. "
+        f"Expected 'Sending didChange' in console after typing. "
         f"Console: {[m for m in console if 'did' in m.lower()]}"
     )
 
@@ -164,7 +164,7 @@ def test_did_change_is_debounced(page, live_server):
     # Wait for the debounce window to flush
     time.sleep((DEBOUNCE_MS + 400) / 1000)
 
-    didchange_count = sum(1 for m in console if "didChange notification" in m)
+    didchange_count = sum(1 for m in console if "Sending didChange" in m)
     assert didchange_count <= 2, f"Debouncer must coalesce rapid keystrokes; got {didchange_count} notifications"
 
 
@@ -191,7 +191,7 @@ def test_document_version_increments(page, live_server):
     time.sleep((DEBOUNCE_MS + 400) / 1000)
 
     versions = [
-        int(m.group(1)) for msg in console if "didChange notification" in msg for m in [version_re.search(msg)] if m
+        int(m.group(1)) for msg in console if "Sending didChange" in msg for m in [version_re.search(msg)] if m
     ]
 
     assert len(versions) >= 1, (

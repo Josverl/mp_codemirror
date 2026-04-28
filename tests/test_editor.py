@@ -101,7 +101,6 @@ def test_sample_code_loads(editor_page):
     )
     content = editor_page.locator(".cm-content").inner_text()
     assert "machine" in content, "Sample code should contain MicroPython imports"
-    assert "def" in content, "Sample code should contain function definitions"
 
 
 def test_python_syntax_highlighting(editor_page):

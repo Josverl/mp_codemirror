@@ -105,12 +105,14 @@ class OPFSBackend {
             const { dir, name } = await this._resolve(path);
             await dir.getFileHandle(name);
             return true;
-        } catch {
+        } catch (err) {
+            if (err.name !== 'NotFoundError' && err.name !== 'TypeMismatchError') throw err;
             try {
                 const { dir, name } = await this._resolve(path);
                 await dir.getDirectoryHandle(name);
                 return true;
-            } catch {
+            } catch (err2) {
+                if (err2.name !== 'NotFoundError') throw err2;
                 return false;
             }
         }

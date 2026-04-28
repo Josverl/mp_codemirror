@@ -1,7 +1,7 @@
 # MicroPython-stubs Playground
 
 This site provides a *Codemirror 6* editor with full _LSP support via Pyright_ running in a Web Worker. 
-The Typechecker uses the included MicroPython board-specific type stubs (ESP32, RP2040, STM32) with live switching between different MCU families. 
+The Typechecker uses the included **MicroPython board-specific type stubs** (ESP32, RP2040, STM32) with live switching between different MCU families. 
 The App is deployed to GitHub Pages as static files — no active server needed, no code shared - all runs in the user's browser.
 
 ## Goals

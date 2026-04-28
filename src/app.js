@@ -12,6 +12,10 @@ import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
 import { restoreFromUrl, initShareDropdown } from './share.js';
 import { notifyDocumentChange, updateDiagnosticsStatus, lintKeymapExtension } from './lsp/diagnostics.js';
+import { OPFSProject } from './storage/opfs-project.js';
+import { DocumentManager } from './editor/document-manager.js';
+import { TabBar } from './ui/tab-bar.js';
+import { FileTree } from './ui/file-tree.js';
 
 // Sample Python code - will be loaded from file
 let sampleCode = '# Loading example...\n';
@@ -22,7 +26,7 @@ let exampleFiles = [];
 // LSP client and related state
 let lspClient = null;
 let lspTransport = null;
-const documentUri = 'file:///workspace/document.py';
+let documentUri = 'file:///workspace/main.py'; // updated dynamically
 let documentVersion = 1;
 
 // Board stub state
@@ -38,6 +42,11 @@ let currentTypeCheckMode = localStorage.getItem('mp_typeCheckMode') || 'standard
 
 // Debounce timer for didChange notifications
 let changeDebounceTimer = null;
+
+// Multi-file state
+let docManager = null;
+let tabBar = null;
+let fileTree = null;
 
 // Theme compartment — reconfigured on theme toggle
 let themeCompartment = new Compartment();
@@ -159,7 +168,8 @@ async function handleBoardChange(event) {
             // Reconfigure the compartment with extensions bound to the new client
             const content = view.state.doc.toString();
             documentVersion = 1;
-            const newExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', content, pyrightVersion);
+            const activeUri = docManager ? `file:///workspace/${docManager.activeFile}` : documentUri;
+            const newExtensions = createLSPPlugin(lspClient, view, activeUri, 'python', content, pyrightVersion);
             view.dispatch({
                 effects: lspCompartment.reconfigure(newExtensions)
             });
@@ -219,7 +229,8 @@ async function handleTypeCheckModeChange(event) {
             updateDiagnosticsStatus([], pyrightVersion);
             const content = view.state.doc.toString();
             documentVersion = 1;
-            const newExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', content, pyrightVersion);
+            const activeUri = docManager ? `file:///workspace/${docManager.activeFile}` : documentUri;
+            const newExtensions = createLSPPlugin(lspClient, view, activeUri, 'python', content, pyrightVersion);
             view.dispatch({
                 effects: lspCompartment.reconfigure(newExtensions)
             });
@@ -475,6 +486,7 @@ async function initializeEditor() {
     const createUpdateListener = () => EditorView.updateListener.of((update) => {
         // Only send notifications if document content changed
         if (update.docChanged && lspClient) {
+            if (docManager) docManager.markDirty();
             // Clear existing debounce timer
             if (changeDebounceTimer) {
                 clearTimeout(changeDebounceTimer);
@@ -487,6 +499,10 @@ async function initializeEditor() {
                 
                 console.log(`Sending didChange notification (version ${documentVersion})`);
                 notifyDocumentChange(lspClient, documentUri, content, documentVersion);
+                // Sync file to ZenFS so Pyright resolves cross-file imports
+                if (lspTransport?.worker) {
+                    lspTransport.worker.postMessage({ type: 'syncFile', path: documentUri.replace('file:///workspace/', ''), content });
+                }
             }, CHANGE_DEBOUNCE_MS);
         }
     });
@@ -574,38 +590,174 @@ async function initializeEditor() {
         return true;
     }
 
-    // Build editor extensions
-    const extensions = [
+    // Initialize OPFS storage
+    await OPFSProject.init();
+
+    // If loaded from a shareable URL, put the code in main.py
+    if (urlState.code) {
+        await OPFSProject.writeFile('main.py', urlState.code);
+    }
+
+    // Determine initial file
+    const initialFile = OPFSProject.getLastActiveFile();
+    documentUri = `file:///workspace/${initialFile}`;
+
+    // Read initial content from OPFS (may have been seeded above)
+    let initialContent;
+    try {
+        initialContent = await OPFSProject.readFile(initialFile);
+    } catch {
+        initialContent = sampleCode;
+    }
+
+    // Build base extensions factory (called per new EditorState)
+    const getBaseExtensions = () => [
         basicSetup,
         indentUnit.of(INDENT),
         python(),
-        // Enforce literal 4-space tab stops for both single and multiline selections.
         Prec.high(keymap.of([
             { key: 'Tab', run: indentWithFourSpaces },
-            { key: 'Shift-Tab', run: dedentFourSpaces }
+            { key: 'Shift-Tab', run: dedentFourSpaces },
+            { key: 'Mod-s', run: () => { docManager?.saveFile(); return true; } },
         ])),
         themeCompartment.of(isDarkTheme ? darkTheme : lightTheme),
-        lintKeymapExtension,      // F8 / Shift-F8 diagnostic navigation
-        createUpdateListener(),   // Add real-time diagnostics listener
-        lspCompartment.of([])     // Start with empty LSP extensions
+        lintKeymapExtension,
+        createUpdateListener(),
+        lspCompartment.of([]),
     ];
 
     // Create the editor view first
     view = new EditorView({
-        doc: sampleCode,
-        extensions,
+        doc: initialContent,
+        extensions: getBaseExtensions(),
         parent: document.getElementById('editor-container')
     });
+
+    // Create document manager
+    docManager = new DocumentManager(view, getBaseExtensions);
+    // Seed active file cache without re-reading from disk
+    await docManager.openFile(initialFile);
+
+    // Create tab bar
+    const tabBarEl = document.getElementById('tab-bar');
+    tabBar = new TabBar(tabBarEl, {
+        onSelect: async (path) => {
+            if (path === docManager.activeFile) return;
+            docManager.syncFromView();
+            await docManager.saveFile();
+            documentUri = `file:///workspace/${path}`;
+            documentVersion = 1;
+            await docManager.openFile(path);
+            rebindLSP();
+            refreshTabBar();
+        },
+        onClose: async (path) => {
+            await docManager.closeFile(path);
+            if (docManager.activeFile) {
+                documentUri = `file:///workspace/${docManager.activeFile}`;
+                rebindLSP();
+            }
+            refreshTabBar();
+        },
+    });
+
+    // Create file tree
+    const fileTreeEl = document.getElementById('file-tree');
+    fileTree = new FileTree(fileTreeEl, {
+        onOpen: async (path) => {
+            if (docManager.openFiles.includes(path)) {
+                // Just switch to it
+                docManager.syncFromView();
+                await docManager.saveFile();
+            }
+            documentUri = `file:///workspace/${path}`;
+            documentVersion = 1;
+            await docManager.openFile(path);
+            rebindLSP();
+            refreshTabBar();
+            fileTree.setActiveFile(path);
+        },
+        onDelete: async (path) => {
+            if (docManager.openFiles.includes(path)) {
+                await docManager.closeFile(path);
+                if (docManager.activeFile) {
+                    documentUri = `file:///workspace/${docManager.activeFile}`;
+                    rebindLSP();
+                }
+            }
+            refreshTabBar();
+        },
+        onRename: async (oldPath, newPath) => {
+            if (docManager.openFiles.includes(oldPath)) {
+                // Close old, open new
+                const content = docManager.getCurrentContent(oldPath);
+                await docManager.closeFile(oldPath);
+                await OPFSProject.writeFile(newPath, content);
+                documentUri = `file:///workspace/${newPath}`;
+                documentVersion = 1;
+                await docManager.openFile(newPath);
+                rebindLSP();
+            }
+            refreshTabBar();
+        },
+        onRefresh: () => refreshTabBar(),
+    });
+    await fileTree.refresh();
+    fileTree.setActiveFile(initialFile);
+
+    // Wire sidebar resize handle
+    initSidebarResize();
+
+    // Helper: update tab bar display
+    function refreshTabBar() {
+        tabBar.update({
+            openFiles: docManager.openFiles,
+            activeFile: docManager.activeFile,
+            isDirty: (p) => docManager.isDirty(p),
+        });
+        if (docManager.activeFile) fileTree.setActiveFile(docManager.activeFile);
+    }
+    refreshTabBar();
+
+    // Helper: rebind LSP plugin after active file changes
+    function rebindLSP() {
+        if (!lspClient || !view) return;
+        try {
+            const content = view.state.doc.toString();
+            documentVersion = 1;
+            view.dispatch(setDiagnostics(view.state, []));
+            updateDiagnosticsStatus([], pyrightVersion);
+            const ext = createLSPPlugin(lspClient, view, documentUri, 'python', content, pyrightVersion);
+            view.dispatch({ effects: lspCompartment.reconfigure(ext) });
+            // Sync new file to ZenFS
+            if (lspTransport?.worker) {
+                lspTransport.worker.postMessage({ type: 'syncFile', path: documentUri.replace('file:///workspace/', ''), content });
+            }
+        } catch (err) {
+            console.error('rebindLSP error:', err);
+        }
+    }
 
     // Add LSP plugin if client is available
     if (lspClient) {
         try {
-            const lspExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', sampleCode, pyrightVersion);
-            // Reconfigure the LSP compartment with actual extensions
+            const lspExtensions = createLSPPlugin(lspClient, view, documentUri, 'python', initialContent, pyrightVersion);
             view.dispatch({
                 effects: lspCompartment.reconfigure(lspExtensions)
             });
             console.log('LSP plugin added to editor');
+            // Sync all project files to ZenFS worker
+            if (lspTransport?.worker) {
+                const allFiles = await OPFSProject.listFiles();
+                for (const entry of allFiles) {
+                    if (entry.type === 'file') {
+                        try {
+                            const c = await OPFSProject.readFile(entry.path);
+                            lspTransport.worker.postMessage({ type: 'syncFile', path: entry.path, content: c });
+                        } catch { /* ignore */ }
+                    }
+                }
+            }
         } catch (error) {
             console.error('Failed to add LSP plugin:', error);
         }
@@ -621,8 +773,10 @@ async function initializeEditor() {
         () => currentTypeCheckMode,
     );
 
-    // If loaded from a shareable link, clear URL params to keep the
-    // address bar clean without triggering a reload.
+    // Wire Export / Import buttons
+    initExportImport();
+
+    // If loaded from a shareable link, clear URL params
     if (urlState.code) {
         const cleanUrl = window.location.pathname + window.location.hash;
         window.history.replaceState(null, '', cleanUrl);
@@ -634,7 +788,105 @@ async function initializeEditor() {
 // Start initialization
 initializeEditor();
 
-// Theme toggle functionality
+// Sidebar resize handle
+function initSidebarResize() {
+    const handle = document.getElementById('sidebar-resize-handle');
+    const panel = document.getElementById('file-tree-panel');
+    if (!handle || !panel) return;
+
+    let dragging = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+        dragging = true;
+        startX = e.clientX;
+        startWidth = panel.offsetWidth;
+        handle.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const delta = e.clientX - startX;
+        const newWidth = Math.max(100, Math.min(600, startWidth + delta));
+        panel.style.width = `${newWidth}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+}
+
+// Export/Import wiring
+function initExportImport() {
+    const exportBtn = document.getElementById('exportBtn');
+    const importFile = document.getElementById('importFile');
+
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportProjectAsZip);
+    }
+
+    if (importFile) {
+        importFile.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.name.endsWith('.zip')) {
+                await importZip(file);
+            } else if (file.name.endsWith('.py')) {
+                await importPyFile(file);
+            }
+            e.target.value = '';
+        });
+    }
+}
+
+async function exportProjectAsZip() {
+    // Use fflate loaded from CDN for zero-dependency zip
+    const { strToU8, zipSync } = await import('https://esm.sh/fflate@0.8.2');
+    const files = await OPFSProject.listFiles();
+    const zipFiles = {};
+    for (const entry of files) {
+        if (entry.type === 'file') {
+            const content = await OPFSProject.readFile(entry.path);
+            zipFiles[entry.path] = strToU8(content);
+        }
+    }
+    const zipped = zipSync(zipFiles);
+    const blob = new Blob([zipped], { type: 'application/zip' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mp_project.zip';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+async function importZip(file) {
+    const { unzipSync, strFromU8 } = await import('https://esm.sh/fflate@0.8.2');
+    const buf = await file.arrayBuffer();
+    const unzipped = unzipSync(new Uint8Array(buf));
+    for (const [path, data] of Object.entries(unzipped)) {
+        if (path.endsWith('/')) continue; // directory entry
+        const content = strFromU8(data);
+        await OPFSProject.writeFile(path, content);
+    }
+    if (fileTree) await fileTree.refresh();
+    console.log('Imported ZIP:', file.name);
+}
+
+async function importPyFile(file) {
+    const content = await file.text();
+    await OPFSProject.writeFile(file.name, content);
+    if (fileTree) await fileTree.refresh();
+    if (docManager) await docManager.openFile(file.name);
+}
+
+
 function toggleTheme() {
     isDarkTheme = !isDarkTheme;
     document.body.classList.toggle('light-theme', !isDarkTheme);

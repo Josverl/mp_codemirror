@@ -57,8 +57,8 @@ let pyrightVersion = "";
 // Type checking mode
 let currentTypeCheckMode = localStorage.getItem('mp_typeCheckMode') || 'standard';
 
-// Debounce timer for didChange notifications
-let changeDebounceTimer = null;
+// Per-URI debounce timers for didChange notifications
+const changeDebounceTimers = new Map();
 
 // Multi-file state
 let docManager = null;
@@ -591,8 +591,10 @@ function buildExtensions(path, themeC, lspC) {
         if (!update.docChanged) return;
         docManager?.markDirty(path);
         if (!lspClient) return;
-        if (changeDebounceTimer) clearTimeout(changeDebounceTimer);
-        changeDebounceTimer = setTimeout(() => {
+        const prev = changeDebounceTimers.get(uri);
+        if (prev) clearTimeout(prev);
+        changeDebounceTimers.set(uri, setTimeout(() => {
+            changeDebounceTimers.delete(uri);
             const c = update.state.doc.toString();
             const v = bumpDocumentVersion(uri);
             console.log(`Sending didChange ${path} (version ${v})`);
@@ -600,7 +602,7 @@ function buildExtensions(path, themeC, lspC) {
             if (lspTransport?.worker) {
                 lspTransport.worker.postMessage({ type: 'syncFile', path, content: c });
             }
-        }, CHANGE_DEBOUNCE_MS);
+        }, CHANGE_DEBOUNCE_MS));
     });
 
     return [

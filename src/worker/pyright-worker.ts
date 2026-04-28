@@ -129,14 +129,15 @@ function writePyrightConfig(typeCheckingMode: string = "standard") {
     // relative", which makes Pyright report "No source files found" and
     // breaks cross-file import resolution (e.g. `from helpers import answer`).
     //
-    // `lib` and `libs` are added to extraPaths to mirror MicroPython runtime
-    // behaviour, where `/lib` is on sys.path and a file like `lib/foo.py` can
-    // be imported as `from foo import ...` (not just `from lib.foo import ...`).
+    // `libs` is added to extraPaths so files in `libs/` can be imported by
+    // bare module name (e.g. `from foo import ...`). `lib/` is intentionally
+    // NOT on extraPaths: it remains a regular package, so its contents are
+    // imported as `from lib.foo import ...`.
     const config = {
         typeshedPath: "/typeshed-fallback",
         stubPath: "/typings",
         include: ["."],
-        extraPaths: [".", "lib", "libs"],
+        extraPaths: [".", "libs"],
         pythonPlatform: "Linux",
         typeCheckingMode,
         reportMissingModuleSource: "none",

@@ -9,6 +9,7 @@
  */
 
 import { OPFSProject } from '../storage/opfs-project.js';
+import { Events, dispatch } from '../events.js';
 
 export class DocumentManager {
     /**
@@ -75,6 +76,7 @@ export class DocumentManager {
         requestAnimationFrame(() => entry.view.focus());
 
         this._notifyListeners(path);
+        dispatch(Events.ACTIVE_CHANGED, { path });
     }
 
     /**
@@ -91,6 +93,7 @@ export class DocumentManager {
         await OPFSProject.writeFile(target, content);
         entry.dirty = false;
         this._notifyListeners(this._activeFile);
+        dispatch(Events.FILE_SAVED, { path: target });
     }
 
     /**
@@ -116,6 +119,7 @@ export class DocumentManager {
         entry.view.destroy();
         entry.paneEl.remove();
         this._docs.delete(path);
+        dispatch(Events.FILE_CLOSED, { path });
 
         if (this._activeFile === path) {
             const remaining = [...this._docs.keys()];

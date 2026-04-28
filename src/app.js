@@ -804,10 +804,15 @@ async function initializeEditor() {
             fileTree.setActiveFile(path);
         },
         onDelete: async (path) => {
-            if (docManager.openFiles.includes(path)) {
-                docManager.discard(path);
-                await docManager.closeFile(path);
-                forgetDocumentVersion(`file:///workspace/${path}`);
+            // Cascade-close: if a directory is deleted, close all open files
+            // whose paths fall under it (e.g. deleting "lib/" closes "lib/foo.py").
+            const prefix = path.endsWith('/') ? path : path + '/';
+            for (const openPath of docManager.openFiles) {
+                if (openPath === path || openPath.startsWith(prefix)) {
+                    docManager.discard(openPath);
+                    await docManager.closeFile(openPath);
+                    forgetDocumentVersion(`file:///workspace/${openPath}`);
+                }
             }
             refreshTabBar();
         },

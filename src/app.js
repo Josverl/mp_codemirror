@@ -60,6 +60,14 @@ let currentTypeCheckMode = localStorage.getItem('mp_typeCheckMode') || 'standard
 // Per-URI debounce timers for didChange notifications
 const changeDebounceTimers = new Map();
 
+function clearPendingDidChange(path) {
+    const uri = `file:///workspace/${path}`;
+    const timer = changeDebounceTimers.get(uri);
+    if (!timer) return;
+    clearTimeout(timer);
+    changeDebounceTimers.delete(uri);
+}
+
 // Multi-file state
 let docManager = null;
 let tabBar = null;
@@ -794,6 +802,7 @@ async function initializeEditor() {
                 // doesn't auto-save the unwanted edits back to OPFS.
                 docManager.discard(path);
             }
+            clearPendingDidChange(path);
             await docManager.closeFile(path);
             forgetDocumentVersion(`file:///workspace/${path}`);
             refreshTabBar();
@@ -815,6 +824,7 @@ async function initializeEditor() {
             const prefix = path.endsWith('/') ? path : path + '/';
             for (const openPath of docManager.openFiles) {
                 if (openPath === path || openPath.startsWith(prefix)) {
+                    clearPendingDidChange(openPath);
                     docManager.discard(openPath);
                     await docManager.closeFile(openPath);
                     forgetDocumentVersion(`file:///workspace/${openPath}`);
@@ -824,6 +834,8 @@ async function initializeEditor() {
         },
         onRename: async (oldPath, newPath) => {
             if (docManager.openFiles.includes(oldPath)) {
+                clearPendingDidChange(oldPath);
+                clearPendingDidChange(newPath);
                 const content = docManager.getCurrentContent(oldPath);
                 docManager.discard(oldPath);
                 await docManager.closeFile(oldPath);

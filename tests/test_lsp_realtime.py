@@ -51,9 +51,19 @@ def _clear_editor(page):
 
 
 def _type_in_editor(page, text: str, delay: int = 50):
-    editor = page.locator(".cm-content[contenteditable='true']")
+    editor = page.locator(".editor-pane--active .cm-content[contenteditable='true']")
     editor.click()
     editor.press_sequentially(text, delay=delay)
+
+
+def _open_tree_file(page, file_name: str):
+    items = page.locator(".file-tree__file")
+    for i in range(items.count()):
+        item = items.nth(i)
+        if file_name in item.inner_text():
+            item.locator(".file-tree__row").click()
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -226,3 +236,54 @@ def test_diagnostics_update_when_code_fixed(page, live_server):
     assert any("Received diagnostics" in m for m in console), (
         "Pyright must push updated diagnostics after fixing the code"
     )
+
+
+@requires_lsp
+def test_close_tab_cancels_pending_did_change(page, live_server):
+    """Closing a tab before debounce flush must cancel pending didChange for that file."""
+    console: list[str] = []
+    page.on("console", lambda m: console.append(m.text))
+    page.on("dialog", lambda d: d.accept())
+
+    _load_and_wait(page, live_server)
+
+    page.evaluate("""
+        async () => {
+            const mod = await import('./storage/opfs-project.js');
+            await mod.OPFSProject.writeFile('debounce_close.py', '# debounce target');
+            location.reload();
+        }
+    """)
+
+    page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
+    time.sleep(1.0)
+
+    assert _open_tree_file(page, "debounce_close.py"), "debounce_close.py should be in the file tree"
+    time.sleep(0.2)
+
+    console.clear()
+    _type_in_editor(page, "\n# pending", delay=10)
+
+    # Close the edited tab before debounce timer fires.
+    tabs = page.locator(".tab-bar__tab")
+    closed = False
+    for i in range(tabs.count()):
+        tab = tabs.nth(i)
+        if "debounce_close.py" in tab.inner_text():
+            tab.locator(".tab-bar__close").click()
+            closed = True
+            break
+    assert closed, "Expected debounce_close.py tab to be closable"
+    page.wait_for_function(
+        """() => {
+            const tabs = [...document.querySelectorAll('.tab-bar__tab')];
+            return tabs.every((t) => !t.textContent.includes('debounce_close.py'));
+        }""",
+        timeout=5000,
+    )
+
+    time.sleep((DEBOUNCE_MS + 600) / 1000)
+
+    stale_logs = [m for m in console if "Sending didChange debounce_close.py" in m]
+    assert not stale_logs, f"No didChange should fire after closing tab: {stale_logs}"

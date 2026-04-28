@@ -78,10 +78,15 @@ Five Pyright/LSP fixes plus the Stage 1‑5 multi-file UX (OPFS storage, Documen
 Note: irrelevant review items have been removed.
 
 12. **`onActiveChange` has no off()** — listener leak if components are recreated.
+   **Status: Completed - no further action needed.**
 14. **No "Untitled" placeholder tab** when the last tab closes — currently the editor goes blank with no tab. ViperIDE creates an Untitled tab automatically (editor_tabs.js:155-158).
+   **Status: Completed - no further action needed.**
 16. **`writePyrightConfig` redundantly lists `"."` in both `include` and `extraPaths`** — fine but a comment clarifying *why* would help future readers (`include` is what to type-check; `extraPaths` is what to import from).
+   **Status: Completed - no further action needed.**
 17. **pyright-worker.ts interception relies on `BrowserMessageReader` reassigning `ctx.onmessage`** (pyright-worker.ts:189-203). If a future vscode-languageserver version uses `addEventListener('message', …)` instead, this silently breaks. Add a sanity warning if `lspOnMessage` is `undefined` after init.
+   **Status: Completed - no further action needed.**
 18. **Tests gaps**: no coverage for rename, dir-cascade-delete, dirty-on-close, or version drift across tab switches.
+   **Status: Completed - no further action needed.**
 
 ---
 

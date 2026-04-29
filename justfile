@@ -51,16 +51,16 @@ format:
 
 # --- Server recipes ---
 
-# start the HTTP server (port 8888)
+# start the threaded HTTP server (port 8888)
 http:
-    python -m http.server 8888
+    python tests/http_server.py 8888 .
 
 # start the HTTP server and open the browser (Unix)
 serve:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Starting HTTP server on port 8888..."
-    python -m http.server 8888 &
+    python tests/http_server.py 8888 . &
     HTTP_PID=$!
     sleep 2
     echo "Opening browser..."

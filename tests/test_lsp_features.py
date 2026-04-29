@@ -37,9 +37,7 @@ pytestmark = pytest.mark.worker
 # Helpers
 # ---------------------------------------------------------------------------
 
-EDITOR_TIMEOUT = 10_000
-LSP_TIMEOUT = 20_000
-DEBOUNCE_WAIT = 2.5  # debounce (300 ms) + Pyright round-trip margin
+from timing import EDITOR_TIMEOUT, LSP_TIMEOUT, UI_TIMEOUT, LSP_ROUND_TRIP as DEBOUNCE_WAIT, SHORT_SETTLE, POLL_INTERVAL, HOVER_WAIT
 
 
 def _load_editor(page, base_url: str, wait_for_lsp: bool = True):
@@ -100,7 +98,7 @@ def test_builtin_keyword_completion_works_without_lsp(page, live_server):
     time.sleep(1)
 
     autocomplete = page.locator(".cm-tooltip-autocomplete")
-    if autocomplete.is_visible(timeout=3_000):
+    if autocomplete.is_visible(timeout=UI_TIMEOUT):
         options = page.locator(".cm-completionLabel")
         labels = [options.nth(i).inner_text() for i in range(min(10, options.count()))]
         assert any("import" in lbl for lbl in labels), f"'import' keyword should appear in completions. Got: {labels}"
@@ -207,8 +205,8 @@ def test_completion_contains_known_sys_members(page, live_server):
     while time.time() < deadline:
         if any("Received diagnostics" in m for m in console_msgs[-5:]):
             break
-        time.sleep(0.3)
-    time.sleep(0.3)  # small extra margin
+        time.sleep(POLL_INTERVAL)
+    time.sleep(POLL_INTERVAL)  # small extra margin
 
     page.keyboard.press("Control+Space")
     page.locator(".cm-tooltip-autocomplete").wait_for(timeout=LSP_TIMEOUT)
@@ -237,8 +235,8 @@ def test_completion_for_string_methods(page, live_server):
     while time.time() < deadline:
         if any("Received diagnostics" in m for m in console_msgs[-5:]):
             break
-        time.sleep(0.3)
-    time.sleep(0.3)
+        time.sleep(POLL_INTERVAL)
+    time.sleep(POLL_INTERVAL)
 
     page.keyboard.press("Control+Space")
     page.locator(".cm-tooltip-autocomplete").wait_for(timeout=LSP_TIMEOUT)
@@ -265,7 +263,7 @@ def test_completion_lsp_request_is_logged(page, live_server):
     time.sleep(DEBOUNCE_WAIT)
 
     page.keyboard.press("Control+Space")
-    time.sleep(3)  # wait for the explicit completion round-trip
+    time.sleep(LSP_ROUND_TRIP)  # wait for the explicit completion round-trip
 
     completion_logs = [m for m in console_msgs if "completion" in m.lower()]
     assert completion_logs, (
@@ -286,7 +284,7 @@ def test_hover_does_not_crash(page, live_server):
     box = editor.bounding_box()
     if box:
         page.mouse.move(box["x"] + 50, box["y"] + 20)
-        time.sleep(1.5)
+        time.sleep(HOVER_WAIT)
 
     assert not uncaught, f"Uncaught JS error during hover: {uncaught}"
 
@@ -306,7 +304,7 @@ def test_hover_tooltip_appears_on_identifier(page, live_server):
         });
         editor.dispatchEvent(event);
     }""")
-    time.sleep(2)
+    time.sleep(HOVER_WAIT)
 
     hover_tip = page.locator(".cm-tooltip-hover, .cm-lsp-hover")
     # Hover is position-dependent; assert no crash first.

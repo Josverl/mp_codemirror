@@ -8,10 +8,9 @@ LSP-dependent tests are in test_lsp.py — this file only tests the editor UI.
 import pytest
 from playwright.sync_api import expect
 
-pytestmark = pytest.mark.editor
+from timing import CDN_TIMEOUT, UI_TIMEOUT
 
-# Timeout for CDN-loaded resources (CodeMirror modules from esm.sh)
-CDN_TIMEOUT = 15_000
+pytestmark = pytest.mark.editor
 
 
 def _goto_editor(page, live_server):
@@ -139,7 +138,7 @@ def test_theme_toggle_switches_to_dark(page, live_server):
     page.locator("#themeToggle").click()
     page.wait_for_function(
         "() => document.body.classList.contains('dark-theme')",
-        timeout=5000,
+        timeout=UI_TIMEOUT,
     )
     classes = body.get_attribute("class") or ""
     assert "dark-theme" in classes, "Body should have dark-theme after toggle"
@@ -151,9 +150,9 @@ def test_theme_toggle_cycles_back_to_light(page, live_server):
 
     body = page.locator("body")
     page.locator("#themeToggle").click()
-    page.wait_for_function("() => document.body.classList.contains('dark-theme')", timeout=5000)
+    page.wait_for_function("() => document.body.classList.contains('dark-theme')", timeout=UI_TIMEOUT)
     page.locator("#themeToggle").click()
-    page.wait_for_function("() => document.body.classList.contains('light-theme')", timeout=5000)
+    page.wait_for_function("() => document.body.classList.contains('light-theme')", timeout=UI_TIMEOUT)
     assert "light-theme" in (body.get_attribute("class") or "")
 
 
@@ -169,7 +168,7 @@ def _clear_active_editor(page):
     page.keyboard.press("Delete")
     page.wait_for_function(
         "() => document.querySelector('.cm-content').innerText.trim() === ''",
-        timeout=5000,
+        timeout=UI_TIMEOUT,
     )
 
 
@@ -199,7 +198,7 @@ def test_editor_accepts_keyboard_input(page, live_server):
 
     page.wait_for_function(
         f"() => document.querySelector('.cm-content').innerText.includes(\"Hello, MicroPython!\")",
-        timeout=5000,
+        timeout=UI_TIMEOUT,
     )
     assert "Hello, MicroPython!" in page.locator(".cm-content").inner_text()
 

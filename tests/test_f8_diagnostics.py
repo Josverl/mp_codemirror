@@ -49,7 +49,7 @@ def test_f8_opens_lint_panel(page, live_server):
     page.keyboard.press("F8")
 
     panel = page.locator(".cm-panel.cm-panel-lint")
-    expect(panel).to_be_visible(timeout=5000)
+    expect(panel).to_be_visible(timeout=UI_TIMEOUT)
 
 
 def test_lint_panel_shows_diagnostic_message(page, live_server):
@@ -62,7 +62,7 @@ def test_lint_panel_shows_diagnostic_message(page, live_server):
     page.keyboard.press("F8")
 
     panel = page.locator(".cm-panel.cm-panel-lint")
-    expect(panel).to_be_visible(timeout=5000)
+    expect(panel).to_be_visible(timeout=UI_TIMEOUT)
 
     expect(panel).to_contain_text("Test error: undefined variable")
 

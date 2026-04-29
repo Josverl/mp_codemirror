@@ -46,8 +46,18 @@ def _load_and_wait(page, base_url: str):
 
 
 def _clear_editor(page):
-    page.locator("#clearBtn").click()
-    time.sleep(0.3)
+    page.locator(".editor-pane--active .cm-content").click()
+    page.keyboard.press("Control+a")
+    page.keyboard.press("Delete")
+    page.wait_for_function(
+        "() => document.querySelector('.editor-pane--active .cm-content')?.innerText.trim() === ''",
+        timeout=5000,
+    )
+    # Wait for the 300ms debounce from the clear to fire and flush before
+    # callers call console.clear() and start typing.  Without this, the
+    # clear's debounce is cancelled by the first keystroke of the next
+    # _type_in_editor call and "Sending didChange" is never logged.
+    time.sleep(0.4)
 
 
 def _type_in_editor(page, text: str, delay: int = 50):

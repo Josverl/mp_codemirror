@@ -41,8 +41,13 @@ def _load_editor(page, base_url: str):
 
 
 def _clear_editor(page):
-    page.locator("#clearBtn").click()
-    time.sleep(0.3)
+    page.locator(".cm-content").click()
+    page.keyboard.press("Control+a")
+    page.keyboard.press("Delete")
+    page.wait_for_function(
+        "() => document.querySelector('.cm-content').innerText.trim() === ''",
+        timeout=5000,
+    )
 
 
 def _type_in_editor(page, text: str):

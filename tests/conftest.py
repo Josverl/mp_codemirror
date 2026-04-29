@@ -78,9 +78,9 @@ def live_server():
             time.sleep(0.3)
 
     project_root = Path(__file__).parent.parent
+    server_script = Path(__file__).parent / "http_server.py"
     process = subprocess.Popen(
-        ["python3", "-m", "http.server", "8888"],
-        cwd=str(project_root),
+        ["python3", str(server_script), "8888", str(project_root)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )

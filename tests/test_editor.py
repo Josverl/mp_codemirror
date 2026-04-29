@@ -16,14 +16,14 @@ CDN_TIMEOUT = 15_000
 
 def _goto_editor(page, live_server):
     """Navigate to the editor and wait for CodeMirror to initialise."""
-    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    page.goto(f"{live_server}/index.html")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
 
 @pytest.fixture(scope="module")
 def editor_page(shared_page, live_server):
     """Module-scoped page that has already loaded the editor. For read-only tests."""
-    shared_page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    shared_page.goto(f"{live_server}/index.html")
     shared_page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     return shared_page
 
@@ -39,7 +39,7 @@ def test_no_console_errors_on_load(page, live_server):
     page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
     page.on("pageerror", lambda exc: errors.append(str(exc)))
 
-    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    page.goto(f"{live_server}/index.html")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
     # Filter out known non-issues:

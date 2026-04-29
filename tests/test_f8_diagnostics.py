@@ -18,6 +18,25 @@ def _goto_editor(page, live_server):
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
 
+@pytest.fixture(scope="module")
+def editor_page(shared_page, live_server):
+    _goto_editor(shared_page, live_server)
+    return shared_page
+
+
+@pytest.fixture(autouse=True)
+def reset_diagnostics(editor_page):
+    """Ensure each test starts with no diagnostics and no open lint panel."""
+    editor_page.evaluate("""async () => {
+        const { EditorView } = await import('@codemirror/view');
+        const { setDiagnostics } = await import('@codemirror/lint');
+        const dom = document.querySelector('.cm-editor');
+        const view = EditorView.findFromDOM(dom);
+        view.dispatch(setDiagnostics(view.state, []));
+    }""")
+    return editor_page
+
+
 def _inject_diagnostics(page):
     """Inject a synthetic diagnostic into the editor via setDiagnostics."""
     page.evaluate("""async () => {
@@ -38,42 +57,39 @@ def _inject_diagnostics(page):
     }""")
 
 
-def test_f8_opens_lint_panel(page, live_server):
+def test_f8_opens_lint_panel(editor_page):
     """Pressing F8 with diagnostics present must open the lint panel."""
-    _goto_editor(page, live_server)
+    _inject_diagnostics(editor_page)
 
-    _inject_diagnostics(page)
+    editor_page.locator(".cm-content").click()
+    editor_page.keyboard.press("F8")
 
-    page.locator(".cm-content").click()
-    page.keyboard.press("F8")
-
-    panel = page.locator(".cm-panel.cm-panel-lint")
+    panel = editor_page.locator(".cm-panel.cm-panel-lint")
     expect(panel).to_be_visible(timeout=UI_TIMEOUT)
 
 
-def test_lint_panel_shows_diagnostic_message(page, live_server):
+def test_lint_panel_shows_diagnostic_message(editor_page):
     """The lint panel opened by F8 must display the diagnostic message."""
-    _goto_editor(page, live_server)
+    _inject_diagnostics(editor_page)
 
-    _inject_diagnostics(page)
+    editor_page.locator(".cm-content").click()
+    editor_page.keyboard.press("F8")
 
-    page.locator(".cm-content").click()
-    page.keyboard.press("F8")
-
-    panel = page.locator(".cm-panel.cm-panel-lint")
+    panel = editor_page.locator(".cm-panel.cm-panel-lint")
     expect(panel).to_be_visible(timeout=UI_TIMEOUT)
 
     expect(panel).to_contain_text("Test error: undefined variable")
 
 
-def test_f8_without_diagnostics_does_not_crash(page, live_server):
+def test_f8_without_diagnostics_does_not_crash(editor_page):
     """Pressing F8 without diagnostics must not cause errors."""
-    _goto_editor(page, live_server)
-
     errors = []
-    page.on("pageerror", lambda exc: errors.append(str(exc)))
+    handler = lambda exc: errors.append(str(exc))
+    editor_page.on("pageerror", handler)
 
-    page.locator(".cm-content").click()
-    page.keyboard.press("F8")
+    editor_page.locator(".cm-content").click()
+    editor_page.keyboard.press("F8")
+
+    editor_page.remove_listener("pageerror", handler)
 
     assert not errors, f"Unexpected JS errors: {errors}"

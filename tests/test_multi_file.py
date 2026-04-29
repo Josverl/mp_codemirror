@@ -15,10 +15,17 @@ from timing import CDN_TIMEOUT, UI_TIMEOUT, OPFS_TIMEOUT, OPFS_SETTLE, SHORT_SET
 pytestmark = pytest.mark.editor
 
 
+_editor_loaded = False
+
+
 def _load_editor(page, live_server):
+    global _editor_loaded
+    if _editor_loaded and page.locator(".cm-editor").count() > 0:
+        return
     page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     time.sleep(OPFS_SETTLE)  # let OPFS init settle
+    _editor_loaded = True
 
 
 def _import_opfs(page):
@@ -31,6 +38,48 @@ def _import_opfs(page):
             }
         }
     """)
+
+
+def _reset_workspace_state(page):
+    """Reset workspace and tabs through UI so app state stays consistent."""
+    clear_all = page.locator(".file-tree__clear-all-btn")
+    if clear_all.count() > 0:
+        page.once("dialog", lambda dialog: dialog.accept())
+        clear_all.click()
+
+    new_file_btn = page.locator(".file-tree__header .file-tree__icon-btn").first
+    new_file_btn.click()
+    page.wait_for_selector(".file-tree__inline-input", timeout=UI_TIMEOUT)
+    page.locator(".file-tree__inline-input").fill("main.py")
+    page.keyboard.press("Enter")
+    page.wait_for_function(
+        """() => [...document.querySelectorAll('.file-tree__file .file-tree__name')]
+            .some((node) => node.textContent.trim() === 'main.py')""",
+        timeout=UI_TIMEOUT,
+    )
+    page.evaluate("""() => {
+        const rows = [...document.querySelectorAll('.file-tree__file')];
+        const main = rows.find((node) => node.dataset.path === 'main.py');
+        if (main) {
+            const row = main.querySelector('.file-tree__row');
+            if (row) row.click();
+        }
+    }""")
+    time.sleep(SHORT_SETTLE)
+
+
+@pytest.fixture(scope="module")
+def _shared_editor_page(shared_page, live_server):
+    _load_editor(shared_page, live_server)
+    _import_opfs(shared_page)
+    return shared_page
+
+
+@pytest.fixture(scope="function")
+def page(_shared_editor_page):
+    _import_opfs(_shared_editor_page)
+    _reset_workspace_state(_shared_editor_page)
+    return _shared_editor_page
 
 
 class TestMultiFileDocumentManagement:

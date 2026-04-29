@@ -147,8 +147,13 @@ class TestMultiFileDocumentManagement:
         time.sleep(1.5)
 
         # Edit file A (main.py) — clear and type unique content
-        page.locator("#clearBtn").click()
-        time.sleep(0.2)
+        page.locator(".editor-pane--active .cm-content").click()
+        page.keyboard.press("Control+a")
+        page.keyboard.press("Delete")
+        page.wait_for_function(
+            "() => document.querySelector('.editor-pane--active .cm-content')?.innerText.trim() === ''",
+            timeout=5000,
+        )
         page.locator(".editor-pane--active .cm-content").click()
         page.keyboard.type("# unique content in file A")
         time.sleep(0.3)

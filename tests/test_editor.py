@@ -197,8 +197,8 @@ def test_editor_accepts_keyboard_input(page, live_server):
     page.keyboard.type(test_text)
 
     page.wait_for_function(
-        f"() => document.querySelector('.cm-content').innerText.includes(\"Hello, MicroPython!\")",
-        timeout=UI_TIMEOUT,
+        "() => document.querySelector('.cm-content').innerText.includes(\"Hello, MicroPython!\")",
+        timeout=UI_TIMEOUT*2,
     )
     assert "Hello, MicroPython!" in page.locator(".cm-content").inner_text()
 

@@ -10,7 +10,7 @@ from playwright.sync_api import expect
 pytestmark = pytest.mark.editor
 
 # Timeout for CDN-loaded resources (CodeMirror modules from esm.sh)
-CDN_TIMEOUT = 15_000
+from timing import CDN_TIMEOUT
 
 
 def _goto_editor(page, live_server):

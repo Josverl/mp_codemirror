@@ -30,8 +30,7 @@ pytestmark = pytest.mark.worker
 # Helpers
 # ---------------------------------------------------------------------------
 
-EDITOR_TIMEOUT = 15_000  # ms – time for CodeMirror to initialise from CDN
-LSP_TIMEOUT = 20_000  # ms – time for Pyright worker to process and push diagnostics
+from timing import EDITOR_TIMEOUT, LSP_TIMEOUT, UI_TIMEOUT, DEBOUNCE_SETTLE, SHORT_SETTLE, LSP_ROUND_TRIP, POLL_INTERVAL
 
 
 def _load_editor(page, base_url: str):
@@ -46,7 +45,7 @@ def _clear_editor(page):
     page.keyboard.press("Delete")
     page.wait_for_function(
         "() => document.querySelector('.cm-content').innerText.trim() === ''",
-        timeout=5000,
+        timeout=UI_TIMEOUT,
     )
 
 
@@ -80,7 +79,7 @@ def test_editor_loads_without_lsp(page, live_server):
 
     _load_editor(page, live_server)
     # Give app.js time to attempt (and possibly fail) LSP connection
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=10000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
 
     assert page.locator(".cm-editor").is_visible(), "Editor must be visible"
     assert page.locator(".cm-content").is_visible(), "Editor content area must be visible"
@@ -93,7 +92,7 @@ def test_editor_loads_without_lsp(page, live_server):
 def test_editor_remains_editable_without_lsp(page, live_server):
     """Typing in the editor must work regardless of LSP availability."""
     _load_editor(page, live_server)
-    time.sleep(2)
+    time.sleep(LSP_ROUND_TRIP - 0.5)
 
     _clear_editor(page)
     _type_in_editor(page, "x = 42")
@@ -108,7 +107,7 @@ def test_no_lint_markers_without_lsp(page, live_server):
         pytest.skip("Skipped: Worker bundle available; marker behaviour differs.")
 
     _load_editor(page, live_server)
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=10000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
 
     markers = page.locator(".cm-lint-marker")
     assert markers.count() == 0, "No lint markers expected when LSP is unavailable"
@@ -123,7 +122,7 @@ def test_lsp_failure_is_non_fatal(page, live_server):
     page.on("pageerror", lambda exc: uncaught_errors.append(str(exc)))
 
     _load_editor(page, live_server)
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=10000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
 
     assert not uncaught_errors, f"Unexpected uncaught JS exceptions: {uncaught_errors}"
     # Editor must still be usable
@@ -142,7 +141,7 @@ def test_lsp_client_initialises_in_browser(page, live_server):
     page.on("console", lambda m: console_msgs.append(m.text))
 
     _load_editor(page, live_server)
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
 
     assert any("LSP client ready" in m for m in console_msgs), (
         f"Expected 'LSP client ready' in console. Got: {console_msgs[:15]}"
@@ -156,7 +155,7 @@ def test_lsp_client_initialises_in_browser(page, live_server):
 def test_diagnostics_appear_for_undefined_variable(page, live_server):
     """Typing code with an undefined variable must produce a lint marker."""
     _load_editor(page, live_server)
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
 
     _clear_editor(page)
     _type_in_editor(page, "result = clearly_undefined_name")
@@ -172,7 +171,7 @@ def test_diagnostics_appear_for_undefined_variable(page, live_server):
 def test_diagnostic_gutter_is_present(page, live_server):
     """The lint gutter element must be rendered when LSP is connected."""
     _load_editor(page, live_server)
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
 
     # lintGutter() creates an element with class cm-gutter-lint
     lint_gutter = page.locator(".cm-gutter-lint")
@@ -185,7 +184,7 @@ def test_diagnostic_gutter_is_present(page, live_server):
 def test_error_severity_marker_shown(page, live_server):
     """An undefined-name error must produce an error-severity marker."""
     _load_editor(page, live_server)
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
 
     _clear_editor(page)
     _type_in_editor(page, "bad = no_such_variable_xyz")
@@ -197,7 +196,7 @@ def test_error_severity_marker_shown(page, live_server):
     except Exception:
         # Pyright may emit 'warning' rather than 'error' for undefined names
         warn_marker = page.locator(".cm-lint-marker-warning, .cm-lint-marker-error")
-        warn_marker.first.wait_for(timeout=5_000)
+        warn_marker.first.wait_for(timeout=UI_TIMEOUT)
         assert warn_marker.count() > 0, "At least one error/warning marker expected"
 
 
@@ -208,7 +207,7 @@ def test_diagnostics_published_to_console(page, live_server):
     page.on("console", lambda m: console_msgs.append(m.text))
 
     _load_editor(page, live_server)
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
 
     _clear_editor(page)
     _type_in_editor(page, "x = totally_unknown_symbol")
@@ -218,7 +217,7 @@ def test_diagnostics_published_to_console(page, live_server):
     while time.time() < deadline:
         if any("Received diagnostics" in m for m in console_msgs):
             break
-        time.sleep(0.5)
+        time.sleep(SHORT_SETTLE)
 
     assert any("Received diagnostics" in m for m in console_msgs), (
         "Browser console must log received diagnostics. "
@@ -230,13 +229,13 @@ def test_diagnostics_published_to_console(page, live_server):
 def test_clean_code_produces_no_errors(page, live_server):
     """Valid Python must not produce error or warning lint markers."""
     _load_editor(page, live_server)
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
 
     _clear_editor(page)
     _type_in_editor(page, "x: int = 42")
 
     # Give Pyright time to analyse and respond
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
 
     error_markers = page.locator(".cm-lint-marker-error, .cm-lint-marker-warning")
     assert error_markers.count() == 0, "No error/warning markers expected for valid Python"
@@ -280,8 +279,8 @@ def test_cross_file_import_resolves_without_diagnostics(page, live_server):
 
     page.goto(verify_url, wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=30_000)
-    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
-    time.sleep(2.5)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=EDITOR_TIMEOUT)
+    time.sleep(LSP_ROUND_TRIP)
 
     diagnostics_text = page.locator("#diagnostics-status").inner_text()
     lint_markers = page.locator(".cm-lint-marker-error, .cm-lint-marker-warning")

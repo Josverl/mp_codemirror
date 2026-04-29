@@ -8,15 +8,15 @@ and appear in the tree, and that clicking a file opens it in the editor.
 import pytest
 import time
 
-pytestmark = pytest.mark.editor
+from timing import CDN_TIMEOUT, UI_TIMEOUT, OPFS_TIMEOUT, SHORT_SETTLE, OPFS_SETTLE
 
-CDN_TIMEOUT = 15_000
+pytestmark = pytest.mark.editor
 
 
 def _load_editor(page, live_server):
     page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
-    time.sleep(1)
+    time.sleep(OPFS_SETTLE)
 
 
 class TestFileTreeUI:
@@ -48,7 +48,7 @@ class TestFileTreeUI:
         _load_editor(page, live_server)
         page.wait_for_function(
             "() => document.querySelector('.tab-bar__tab') !== null",
-            timeout=8000,
+            timeout=OPFS_TIMEOUT,
         )
         tabs = page.locator(".tab-bar__tab")
         assert tabs.count() >= 1, "At least one tab should be open"
@@ -93,8 +93,8 @@ class TestFileTreeUI:
         assert result is True
 
         page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
-        page.wait_for_selector(".file-tree__list", timeout=5000)
-        time.sleep(0.6)
+        page.wait_for_selector(".file-tree__list", timeout=UI_TIMEOUT)
+        time.sleep(SHORT_SETTLE)
 
         rename_result = page.evaluate("""
             () => {

@@ -10,15 +10,15 @@ Verifies that:
 import pytest
 import time
 
-pytestmark = pytest.mark.editor
+from timing import CDN_TIMEOUT, UI_TIMEOUT, OPFS_TIMEOUT, OPFS_SETTLE, SHORT_SETTLE, POLL_INTERVAL, DEBOUNCE_SETTLE
 
-CDN_TIMEOUT = 15_000
+pytestmark = pytest.mark.editor
 
 
 def _load_editor(page, live_server):
     page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
-    time.sleep(1.5)  # let OPFS init settle
+    time.sleep(OPFS_SETTLE)  # let OPFS init settle
 
 
 def _import_opfs(page):
@@ -76,7 +76,7 @@ class TestMultiFileDocumentManagement:
         _load_editor(page, live_server)
         page.wait_for_function(
             "() => document.querySelector('.tab-bar__tab--active') !== null",
-            timeout=8000,
+            timeout=OPFS_TIMEOUT,
         )
         active_tab = page.locator(".tab-bar__tab--active")
         assert active_tab.count() >= 1, "Active tab should be shown"
@@ -95,17 +95,17 @@ class TestMultiFileDocumentManagement:
                 await window.OPFSProject.writeFile('second.py', '# second file');
             }
         """)
-        time.sleep(0.3)
+        time.sleep(POLL_INTERVAL)
 
         # Click the file in the tree — wait for it to appear first
         page.wait_for_function(
             "() => document.querySelector('.file-tree__list') !== null",
-            timeout=5000,
+            timeout=UI_TIMEOUT,
         )
         # Reload tree by navigating to the page again (tree will show the new file)
         page.reload(wait_until="domcontentloaded")
         page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
-        time.sleep(1.5)
+        time.sleep(OPFS_SETTLE)
 
         # Find second.py in the tree and click it
         tree_items = page.locator(".file-tree__file")
@@ -118,12 +118,12 @@ class TestMultiFileDocumentManagement:
                 break
 
         assert found, "second.py should be in the file tree"
-        time.sleep(0.5)
+        time.sleep(SHORT_SETTLE)
 
         # The active tab should now show second.py
         page.wait_for_function(
             "() => { const t = document.querySelector('.tab-bar__tab--active .tab-bar__label'); return t && t.textContent.includes('second.py'); }",
-            timeout=5000,
+            timeout=UI_TIMEOUT,
         )
         active_label = page.locator(".tab-bar__tab--active .tab-bar__label").inner_text()
         assert "second.py" in active_label, f"Active tab should be second.py, got: {active_label!r}"
@@ -139,12 +139,12 @@ class TestMultiFileDocumentManagement:
                 await window.OPFSProject.writeFile('file_b.py', '# file B');
             }
         """)
-        time.sleep(0.3)
+        time.sleep(POLL_INTERVAL)
 
         # Reload to pick up the new file in the tree
         page.reload(wait_until="domcontentloaded")
         page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
-        time.sleep(1.5)
+        time.sleep(OPFS_SETTLE)
 
         # Edit file A (main.py) — clear and type unique content
         page.locator(".editor-pane--active .cm-content").click()
@@ -152,11 +152,11 @@ class TestMultiFileDocumentManagement:
         page.keyboard.press("Delete")
         page.wait_for_function(
             "() => document.querySelector('.editor-pane--active .cm-content')?.innerText.trim() === ''",
-            timeout=5000,
+            timeout=UI_TIMEOUT,
         )
         page.locator(".editor-pane--active .cm-content").click()
         page.keyboard.type("# unique content in file A")
-        time.sleep(0.3)
+        time.sleep(POLL_INTERVAL)
 
         # Switch to file B via tree
         tree_items = page.locator(".file-tree__file")
@@ -166,7 +166,7 @@ class TestMultiFileDocumentManagement:
                 item.locator(".file-tree__row").click()
                 break
 
-        time.sleep(0.5)
+        time.sleep(SHORT_SETTLE)
 
         # Switch back to main.py (first tab)
         tabs = page.locator(".tab-bar__tab")
@@ -176,7 +176,7 @@ class TestMultiFileDocumentManagement:
                 tab.click()
                 break
 
-        time.sleep(0.5)
+        time.sleep(SHORT_SETTLE)
 
         # Content should be preserved
         content = page.locator(".editor-pane--active .cm-content").inner_text()
@@ -196,7 +196,7 @@ class TestMultiFileDocumentManagement:
         """)
         page.reload(wait_until="domcontentloaded")
         page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
-        time.sleep(1.5)
+        time.sleep(OPFS_SETTLE)
 
         # Open closeable.py
         tree_items = page.locator(".file-tree__file")
@@ -205,7 +205,7 @@ class TestMultiFileDocumentManagement:
             if "closeable.py" in item.inner_text():
                 item.locator(".file-tree__row").click()
                 break
-        time.sleep(0.5)
+        time.sleep(SHORT_SETTLE)
 
         # Count tabs before close
         tab_count_before = page.locator(".tab-bar__tab").count()
@@ -219,7 +219,7 @@ class TestMultiFileDocumentManagement:
                 tab.locator(".tab-bar__close").click()
                 break
 
-        time.sleep(0.3)
+        time.sleep(POLL_INTERVAL)
         tab_count_after = page.locator(".tab-bar__tab").count()
         assert tab_count_after < tab_count_before, \
             f"Tab count should decrease after close: {tab_count_before} → {tab_count_after}"
@@ -258,7 +258,7 @@ class TestMultiFileDocumentManagement:
             if "dirty_close.py" in item.inner_text():
                 item.locator(".file-tree__row").click()
                 break
-        time.sleep(0.4)
+        time.sleep(DEBOUNCE_SETTLE)
 
         # Make unsaved edit
         page.locator(".editor-pane--active .cm-content").click()
@@ -273,7 +273,7 @@ class TestMultiFileDocumentManagement:
             if "dirty_close.py" in tab.inner_text():
                 tab.locator(".tab-bar__close").click()
                 break
-        time.sleep(0.4)
+        time.sleep(DEBOUNCE_SETTLE)
 
         # Tab should still be open after cancel
         labels_after_cancel = [
@@ -290,7 +290,7 @@ class TestMultiFileDocumentManagement:
             if "dirty_close.py" in tab.inner_text():
                 tab.locator(".tab-bar__close").click()
                 break
-        time.sleep(0.5)
+        time.sleep(SHORT_SETTLE)
 
         # Reopen file and verify unsaved change was not persisted.
         tree_items = page.locator(".file-tree__file")
@@ -299,7 +299,7 @@ class TestMultiFileDocumentManagement:
             if "dirty_close.py" in item.inner_text():
                 item.locator(".file-tree__row").click()
                 break
-        time.sleep(0.4)
+        time.sleep(DEBOUNCE_SETTLE)
         content = page.locator(".editor-pane--active .cm-content").inner_text()
         assert "unsaved" not in content, "Discard close should not persist unsaved edits"
 
@@ -328,7 +328,7 @@ class TestMultiFileDocumentManagement:
                 }
             }
         """)
-        time.sleep(0.3)
+        time.sleep(POLL_INTERVAL)
 
         # Open nested file tab first.
         opened = page.evaluate("""
@@ -341,7 +341,7 @@ class TestMultiFileDocumentManagement:
             }
         """)
         assert opened, "file_a.py should be present in file tree"
-        time.sleep(0.4)
+        time.sleep(DEBOUNCE_SETTLE)
 
         # Delete the directory via file-tree actions and confirm inline dialog.
         deleted = page.evaluate("""

@@ -33,9 +33,7 @@ pytestmark = pytest.mark.worker
 # Helpers
 # ---------------------------------------------------------------------------
 
-EDITOR_TIMEOUT = 15_000
-LSP_TIMEOUT = 20_000
-DEBOUNCE_MS = 300  # must match CHANGE_DEBOUNCE_MS in app.js
+from timing import EDITOR_TIMEOUT, LSP_TIMEOUT, DEBOUNCE_MS, DEBOUNCE_SETTLE, SHORT_SETTLE, POLL_INTERVAL
 
 
 def _load_and_wait(page, base_url: str):
@@ -57,7 +55,7 @@ def _clear_editor(page):
     # callers call console.clear() and start typing.  Without this, the
     # clear's debounce is cancelled by the first keystroke of the next
     # _type_in_editor call and "Sending didChange" is never logged.
-    time.sleep(0.4)
+    time.sleep(DEBOUNCE_SETTLE)
 
 
 def _type_in_editor(page, text: str, delay: int = 50):
@@ -136,7 +134,7 @@ def test_diagnostics_received_for_invalid_import(page, live_server):
     while time.time() < deadline:
         if any("Received diagnostics" in m for m in console):
             break
-        time.sleep(0.5)
+        time.sleep(SHORT_SETTLE)
 
     assert any("Received diagnostics" in m for m in console), (
         "Pyright must push diagnostics after an invalid import. "
@@ -228,7 +226,7 @@ def test_diagnostics_update_when_code_fixed(page, live_server):
     while time.time() < deadline:
         if any("Received diagnostics" in m for m in console):
             break
-        time.sleep(0.5)
+        time.sleep(SHORT_SETTLE)
 
     assert any("Received diagnostics" in m for m in console), "Should receive diagnostics for invalid code first"
     console.clear()
@@ -241,7 +239,7 @@ def test_diagnostics_update_when_code_fixed(page, live_server):
     while time.time() < deadline:
         if any("Received diagnostics" in m for m in console):
             break
-        time.sleep(0.5)
+        time.sleep(SHORT_SETTLE)
 
     assert any("Received diagnostics" in m for m in console), (
         "Pyright must push updated diagnostics after fixing the code"
@@ -267,10 +265,10 @@ def test_close_tab_cancels_pending_did_change(page, live_server):
 
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
     page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
-    time.sleep(1.0)
+    time.sleep(1.0)  # OPFS reload settle
 
     assert _open_tree_file(page, "debounce_close.py"), "debounce_close.py should be in the file tree"
-    time.sleep(0.2)
+    time.sleep(POLL_INTERVAL)
 
     console.clear()
     _type_in_editor(page, "\n# pending", delay=10)
@@ -317,10 +315,10 @@ def test_document_version_does_not_drift_across_tab_switches(page, live_server):
     """)
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
     page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
-    time.sleep(1.0)
+    time.sleep(1.0)  # OPFS reload settle
 
     assert _open_tree_file(page, "drift_a.py"), "drift_a.py should be in tree"
-    time.sleep(0.3)
+    time.sleep(POLL_INTERVAL)
 
     # Edit A twice
     _type_in_editor(page, "\n# edit-a-1", delay=15)
@@ -330,7 +328,7 @@ def test_document_version_does_not_drift_across_tab_switches(page, live_server):
 
     # Switch to B and edit
     assert _open_tree_file(page, "drift_b.py"), "drift_b.py should be in tree"
-    time.sleep(0.4)
+    time.sleep(DEBOUNCE_SETTLE)
     _type_in_editor(page, "\n# edit-b-1", delay=15)
     time.sleep((DEBOUNCE_MS + 400) / 1000)
 
@@ -341,7 +339,7 @@ def test_document_version_does_not_drift_across_tab_switches(page, live_server):
         if "drift_a.py" in tab.inner_text():
             tab.click()
             break
-    time.sleep(0.4)
+    time.sleep(DEBOUNCE_SETTLE)
     _type_in_editor(page, "\n# edit-a-3", delay=15)
     time.sleep((DEBOUNCE_MS + 400) / 1000)
 

@@ -32,12 +32,13 @@ export class FileTree {
      * @param {(path: string) => Promise<void>} [callbacks.onRename]
      * @param {() => void} [callbacks.onRefresh]
      */
-    constructor(container, { onOpen, onDelete, onRename, onRefresh }) {
+    constructor(container, { onOpen, onDelete, onRename, onRefresh, onClearAll }) {
         this._container = container;
         this._onOpen = onOpen;
         this._onDelete = onDelete;
         this._onRename = onRename;
         this._onRefresh = onRefresh;
+        this._onClearAll = onClearAll;
         this._expanded = loadExpanded();
         this._activeFile = null;
         this._entries = [];
@@ -65,6 +66,17 @@ export class FileTree {
         this._list.className = 'file-tree__list';
         this._list.setAttribute('role', 'tree');
         container.appendChild(this._list);
+
+        // Footer with "Clear All" button
+        this._footer = document.createElement('div');
+        this._footer.className = 'file-tree__footer';
+        const clearAllBtn = document.createElement('button');
+        clearAllBtn.className = 'file-tree__clear-all-btn';
+        clearAllBtn.title = 'Delete all files';
+        clearAllBtn.textContent = 'Clear All';
+        clearAllBtn.addEventListener('click', () => this._clearAll());
+        this._footer.appendChild(clearAllBtn);
+        container.appendChild(this._footer);
     }
 
     setActiveFile(path) {
@@ -353,6 +365,20 @@ export class FileTree {
         await OPFSProject.deleteFile(path);
         dispatch(Events.FILE_DELETED, { path });
         if (this._onDelete) await this._onDelete(path);
+        await this.refresh();
+        if (this._onRefresh) this._onRefresh();
+    }
+
+    async _clearAll() {
+        if (!window.confirm('Delete all files?')) return;
+        const entries = await OPFSProject.listFiles();
+        // Only delete top-level entries; recursive delete handles subdirectories.
+        const topLevel = entries.filter(e => !e.path.includes('/'));
+        for (const entry of topLevel) {
+            await OPFSProject.deleteFile(entry.path);
+            dispatch(Events.FILE_DELETED, { path: entry.path });
+        }
+        if (this._onClearAll) await this._onClearAll();
         await this.refresh();
         if (this._onRefresh) this._onRefresh();
     }

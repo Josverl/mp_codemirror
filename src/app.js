@@ -846,6 +846,15 @@ async function initializeEditor() {
             refreshTabBar();
         },
         onRefresh: () => refreshTabBar(),
+        onClearAll: async () => {
+            for (const openPath of [...docManager.openFiles]) {
+                clearPendingDidChange(openPath);
+                docManager.discard(openPath);
+                await docManager.closeFile(openPath);
+                forgetDocumentVersion(`file:///workspace/${openPath}`);
+            }
+            refreshTabBar();
+        },
     });
     await fileTree.refresh();
     fileTree.setActiveFile(initialFile);
@@ -1018,15 +1027,6 @@ function toggleTheme() {
     reconfigureThemeOnAllViews();
 }
 
-// Clear editor content
-function clearEditor() {
-    const transaction = view.state.update({
-        changes: { from: 0, to: view.state.doc.length, insert: "" }
-    });
-    view.dispatch(transaction);
-    view.focus();
-}
-
 // Trigger type checking with Pyright
 function triggerTypeCheck() {
     if (!lspClient || !lspClient.connected) {
@@ -1099,7 +1099,6 @@ export function setEditorContent(content) {
 // Event listeners
 document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 document.getElementById('typeCheckBtn').addEventListener('click', triggerTypeCheck);
-document.getElementById('clearBtn').addEventListener('click', clearEditor);
 document.getElementById('helpBtn').addEventListener('click', () => {
     const panel = document.getElementById('keyboard-help');
     panel.hidden = !panel.hidden;

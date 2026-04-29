@@ -40,7 +40,7 @@ DEBOUNCE_MS = 300  # must match CHANGE_DEBOUNCE_MS in app.js
 
 def _load_and_wait(page, base_url: str):
     """Navigate to editor and wait for LSP to initialise."""
-    page.goto(f"{base_url}/index.html")
+    page.goto(f"{base_url}/index.html", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
     page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
 

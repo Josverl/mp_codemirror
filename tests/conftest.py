@@ -2,6 +2,7 @@
 Pytest configuration for CodeMirror Editor tests
 """
 
+import signal
 import socket
 import subprocess
 import time
@@ -28,34 +29,54 @@ def is_port_open(host: str, port: int) -> bool:
         sock.close()
 
 
-def _detect_server_base_url() -> str | None:
-    """Return the base URL of the HTTP server on :8888 by probing known paths."""
-    for candidate in (
-        "http://localhost:8888/index.html",
-        "http://localhost:8888/src/index.html",
-    ):
+def _kill_port(port: int) -> None:
+    """Kill any process listening on the given TCP port."""
+    try:
+        result = subprocess.run(
+            ["fuser", "-k", f"{port}/tcp"],
+            capture_output=True,
+        )
+    except FileNotFoundError:
+        # fuser not available; fall back to lsof
         try:
-            resp = urllib.request.urlopen(candidate, timeout=2)
-            if resp.status == 200:
-                return candidate.removesuffix("/index.html")
-        except Exception:
-            pass
-    return None
+            out = subprocess.check_output(["lsof", "-ti", f"tcp:{port}"], text=True)
+            for pid in out.split():
+                try:
+                    import os
+                    os.kill(int(pid), signal.SIGTERM)
+                except (ProcessLookupError, ValueError):
+                    pass
+        except subprocess.CalledProcessError:
+            pass  # nothing listening
+
+
+def _server_responds(base_url: str, timeout: float = 3.0) -> bool:
+    """Return True if the server at base_url/index.html responds with HTTP 200."""
+    try:
+        resp = urllib.request.urlopen(f"{base_url}/index.html", timeout=timeout)
+        return resp.status == 200
+    except Exception:
+        return False
 
 
 @pytest.fixture(scope="session")
 def live_server():
     """
-    Provide the base URL for the editor.  Reuses an already-running server on
-    :8888 (detecting whether it serves from the project root or src/), and
-    starts a fresh one only when the port is free.
+    Always start a fresh python3 -m http.server for the test session.
+
+    Any existing process on port 8888 is killed first to avoid stale
+    CLOSE_WAIT connections that cause every test to time out.
+    The server serves from the project root so both src/ and dist/ are
+    accessible; the yielded base URL is http://localhost:8888/src.
     """
     if is_port_open("localhost", 8888):
-        base = _detect_server_base_url()
-        yield base or "http://localhost:8888"
-        return
+        _kill_port(8888)
+        # Give the OS time to release the port
+        for _ in range(10):
+            if not is_port_open("localhost", 8888):
+                break
+            time.sleep(0.3)
 
-    # Serve from project root so both src/ and dist/ are accessible
     project_root = Path(__file__).parent.parent
     process = subprocess.Popen(
         ["python3", "-m", "http.server", "8888"],
@@ -63,8 +84,18 @@ def live_server():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    time.sleep(1)
-    yield "http://localhost:8888/src"
+
+    base_url = "http://localhost:8888/src"
+    # Wait until the server actually responds (up to 5 s)
+    for _ in range(25):
+        if _server_responds(base_url):
+            break
+        time.sleep(0.2)
+    else:
+        process.terminate()
+        raise RuntimeError("HTTP server on :8888 did not respond in time")
+
+    yield base_url
     process.terminate()
     process.wait()
 

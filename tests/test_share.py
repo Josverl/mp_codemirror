@@ -15,7 +15,7 @@ CDN_TIMEOUT = 15_000
 
 def _goto_editor(page, live_server):
     """Navigate to the editor and wait for CodeMirror to initialise."""
-    page.goto(f"{live_server}/index.html")
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
 
@@ -167,7 +167,7 @@ def test_url_restores_code(page, live_server):
     }""")
 
     # Navigate to that shareable URL
-    page.goto(f"{live_server}/index.html?code={compressed}")
+    page.goto(f"{live_server}/index.html?code={compressed}", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
     content = page.evaluate("() => document.querySelector('.cm-content').innerText")
@@ -183,7 +183,7 @@ def test_url_restores_board(page, live_server):
         return await compressCode('pass');
     }""")
 
-    page.goto(f"{live_server}/index.html?board=esp32&code={compressed}")
+    page.goto(f"{live_server}/index.html?board=esp32&code={compressed}", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
     board = page.evaluate("() => document.getElementById('boardSelect').value")
@@ -198,7 +198,7 @@ def test_url_board_preloads_matching_stubs(page, live_server):
         return await compressCode('from machine import CAN');
     }""")
 
-    page.goto(f"{live_server}/index.html?board=stm32&code={compressed}")
+    page.goto(f"{live_server}/index.html?board=stm32&code={compressed}", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     page.wait_for_function("() => document.getElementById('boardSelect').value === 'stm32'")
 
@@ -222,7 +222,7 @@ def test_url_restores_typecheck_mode(page, live_server):
         return await compressCode('pass');
     }""")
 
-    page.goto(f"{live_server}/index.html?typeCheckMode=strict&code={compressed}")
+    page.goto(f"{live_server}/index.html?typeCheckMode=strict&code={compressed}", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
     mode = page.evaluate("() => document.getElementById('typeCheckMode').value")
@@ -237,7 +237,7 @@ def test_url_params_cleaned_after_restore(page, live_server):
         return await compressCode('pass');
     }""")
 
-    page.goto(f"{live_server}/index.html?code={compressed}")
+    page.goto(f"{live_server}/index.html?code={compressed}", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
     # Wait for URL to be cleaned

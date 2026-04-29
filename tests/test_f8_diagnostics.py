@@ -15,7 +15,7 @@ CDN_TIMEOUT = 15_000
 
 def _goto_editor(page, live_server):
     """Navigate to the editor and wait for CodeMirror to initialise."""
-    page.goto(f"{live_server}/index.html")
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
 

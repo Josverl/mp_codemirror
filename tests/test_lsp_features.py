@@ -44,7 +44,7 @@ DEBOUNCE_WAIT = 2.5  # debounce (300 ms) + Pyright round-trip margin
 
 def _load_editor(page, base_url: str, wait_for_lsp: bool = True):
     """Navigate to the editor and wait for CodeMirror + optionally LSP."""
-    page.goto(f"{base_url}/index.html")
+    page.goto(f"{base_url}/index.html", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
     if wait_for_lsp:
         page.wait_for_function(

@@ -16,7 +16,7 @@ CDN_TIMEOUT = 15_000
 
 
 def _load_editor(page, live_server):
-    page.goto(f"{live_server}/index.html")
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     time.sleep(1.5)  # let OPFS init settle
 
@@ -103,7 +103,7 @@ class TestMultiFileDocumentManagement:
             timeout=5000,
         )
         # Reload tree by navigating to the page again (tree will show the new file)
-        page.reload()
+        page.reload(wait_until="domcontentloaded")
         page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
         time.sleep(1.5)
 
@@ -142,7 +142,7 @@ class TestMultiFileDocumentManagement:
         time.sleep(0.3)
 
         # Reload to pick up the new file in the tree
-        page.reload()
+        page.reload(wait_until="domcontentloaded")
         page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
         time.sleep(1.5)
 
@@ -189,7 +189,7 @@ class TestMultiFileDocumentManagement:
                 await window.OPFSProject.writeFile('closeable.py', '# close me');
             }
         """)
-        page.reload()
+        page.reload(wait_until="domcontentloaded")
         page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
         time.sleep(1.5)
 
@@ -242,7 +242,7 @@ class TestMultiFileDocumentManagement:
                 await window.OPFSProject.writeFile('dirty_close.py', '# baseline');
             }
         """)
-        page.reload()
+        page.reload(wait_until="domcontentloaded")
         page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
         time.sleep(1.2)
 
@@ -309,7 +309,7 @@ class TestMultiFileDocumentManagement:
                 await window.OPFSProject.writeFile('lib_cascade/file_a.py', '# cascade');
             }
         """)
-        page.reload()
+        page.reload(wait_until="domcontentloaded")
         page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
         time.sleep(1.2)
 

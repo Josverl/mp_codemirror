@@ -14,7 +14,7 @@ CDN_TIMEOUT = 15_000
 
 
 def _load_editor(page, live_server):
-    page.goto(f"{live_server}/index.html")
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     time.sleep(1)
 

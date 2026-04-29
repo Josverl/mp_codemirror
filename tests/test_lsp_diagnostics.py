@@ -36,7 +36,7 @@ LSP_TIMEOUT = 20_000  # ms – time for Pyright worker to process and push diagn
 
 def _load_editor(page, base_url: str):
     """Navigate to the editor and wait for CodeMirror to be ready."""
-    page.goto(f"{base_url}/index.html?cb={time.time_ns()}")
+    page.goto(f"{base_url}/index.html?cb={time.time_ns()}", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
 
 

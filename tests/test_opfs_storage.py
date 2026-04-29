@@ -14,7 +14,7 @@ CDN_TIMEOUT = 15_000
 
 
 def _load_editor(page, live_server):
-    page.goto(f"{live_server}/index.html")
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     # Wait until OPFSProject is ready (init called in app.js)
     page.wait_for_function(
@@ -181,7 +181,7 @@ class TestOPFSStorage:
         """)
 
         # Reload the page
-        page.reload()
+        page.reload(wait_until="domcontentloaded")
         page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
         time.sleep(1)
         _import_opfs(page)

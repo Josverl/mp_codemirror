@@ -135,13 +135,11 @@
     </script>
 
     <script>
-        if (!['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-            const githubButtonsScript = document.createElement('script');
-            githubButtonsScript.async = true;
-            githubButtonsScript.defer = true;
-            githubButtonsScript.src = 'https://buttons.github.io/buttons.js';
-            document.body.appendChild(githubButtonsScript);
-        }
+        const githubButtonsScript = document.createElement('script');
+        githubButtonsScript.async = true;
+        githubButtonsScript.defer = true;
+        githubButtonsScript.src = 'https://buttons.github.io/buttons.js';
+        document.body.appendChild(githubButtonsScript);
     </script>
     <!-- Main application script -->
     <script type="module" src="app.js"></script>

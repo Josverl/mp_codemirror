@@ -2,7 +2,6 @@
 Pytest configuration for CodeMirror Editor tests
 """
 
-import signal
 import socket
 import subprocess
 import time
@@ -17,37 +16,11 @@ import pytest
 from playwright.sync_api import sync_playwright
 
 
-def is_port_open(host: str, port: int) -> bool:
-    """Check if a TCP port is accepting connections."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(1)
-    try:
-        return sock.connect_ex((host, port)) == 0
-    except Exception:
-        return False
-    finally:
-        sock.close()
-
-
-def _kill_port(port: int) -> None:
-    """Kill any process listening on the given TCP port."""
-    try:
-        result = subprocess.run(
-            ["fuser", "-k", f"{port}/tcp"],
-            capture_output=True,
-        )
-    except FileNotFoundError:
-        # fuser not available; fall back to lsof
-        try:
-            out = subprocess.check_output(["lsof", "-ti", f"tcp:{port}"], text=True)
-            for pid in out.split():
-                try:
-                    import os
-                    os.kill(int(pid), signal.SIGTERM)
-                except (ProcessLookupError, ValueError):
-                    pass
-        except subprocess.CalledProcessError:
-            pass  # nothing listening
+def _free_port() -> int:
+    """Return an ephemeral TCP port that is free right now."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def _server_responds(base_url: str, timeout: float = 3.0) -> bool:
@@ -62,30 +35,24 @@ def _server_responds(base_url: str, timeout: float = 3.0) -> bool:
 @pytest.fixture(scope="session")
 def live_server():
     """
-    Always start a fresh python3 -m http.server for the test session.
+    Start a fresh HTTP server on a dynamically chosen free port for this
+    test session.  Using a unique port per session means concurrent pytest
+    invocations (e.g. two terminals, CI matrix) never share or kill each
+    other's server.
 
-    Any existing process on port 8888 is killed first to avoid stale
-    CLOSE_WAIT connections that cause every test to time out.
     The server serves from the project root so both src/ and dist/ are
-    accessible; the yielded base URL is http://localhost:8888/src.
+    accessible; the yielded base URL is http://localhost:{port}/src.
     """
-    if is_port_open("localhost", 8888):
-        _kill_port(8888)
-        # Give the OS time to release the port
-        for _ in range(10):
-            if not is_port_open("localhost", 8888):
-                break
-            time.sleep(0.3)
-
+    port = _free_port()
     project_root = Path(__file__).parent.parent
     server_script = Path(__file__).parent / "http_server.py"
     process = subprocess.Popen(
-        ["python3", str(server_script), "8888", str(project_root)],
+        ["python3", str(server_script), str(port), str(project_root)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
 
-    base_url = "http://localhost:8888/src"
+    base_url = f"http://localhost:{port}/src"
     # Wait until the server actually responds (up to 5 s)
     for _ in range(25):
         if _server_responds(base_url):
@@ -93,7 +60,7 @@ def live_server():
         time.sleep(0.2)
     else:
         process.terminate()
-        raise RuntimeError("HTTP server on :8888 did not respond in time")
+        raise RuntimeError(f"HTTP server on :{port} did not respond in time")
 
     yield base_url
     process.terminate()

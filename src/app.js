@@ -833,15 +833,45 @@ async function initializeEditor() {
             refreshTabBar();
         },
         onRename: async (oldPath, newPath) => {
-            if (docManager.openFiles.includes(oldPath)) {
+            const oldUri = `file:///workspace/${oldPath}`;
+            const newUri = `file:///workspace/${newPath}`;
+            const wasOpen = docManager.openFiles.includes(oldPath);
+            let content;
+            if (wasOpen) {
                 clearPendingDidChange(oldPath);
                 clearPendingDidChange(newPath);
-                const content = docManager.getCurrentContent(oldPath);
+                content = docManager.getCurrentContent(oldPath);
                 docManager.discard(oldPath);
                 await docManager.closeFile(oldPath);
-                forgetDocumentVersion(`file:///workspace/${oldPath}`);
+                forgetDocumentVersion(oldUri);
+                // Tell Pyright the old document is gone
+                if (lspClient) lspClient.notify('textDocument/didClose', { textDocument: { uri: oldUri } });
                 await OPFSProject.writeFile(newPath, content);
                 await docManager.openFile(newPath);
+            } else {
+                // File wasn't open in editor — read content from OPFS for worker sync
+                try { content = await OPFSProject.readFile(newPath); } catch { content = ''; }
+            }
+            // Update worker VFS: remove old path, write new path
+            if (lspTransport?.worker) {
+                lspTransport.worker.postMessage({ type: 'deleteFile', path: oldPath });
+                lspTransport.worker.postMessage({ type: 'syncFile', path: newPath, content });
+            }
+            // Notify Pyright about the file-system change so it re-analyses importers
+            if (lspClient) {
+                lspClient.notify('workspace/didChangeWatchedFiles', {
+                    changes: [
+                        { uri: oldUri, type: 3 }, // 3 = Deleted
+                        { uri: newUri, type: 1 },  // 1 = Created
+                    ]
+                });
+                // Nudge the active document so Pyright re-checks import statements
+                const activeUri = docManager.activeFile ? `file:///workspace/${docManager.activeFile}` : null;
+                if (activeUri && activeUri !== newUri) {
+                    const activeContent = docManager.activeView?.state.doc.toString() ?? '';
+                    const v = bumpDocumentVersion(activeUri);
+                    notifyDocumentChange(lspClient, activeUri, activeContent, v);
+                }
             }
             refreshTabBar();
         },

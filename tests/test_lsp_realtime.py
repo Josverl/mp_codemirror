@@ -33,13 +33,13 @@ pytestmark = pytest.mark.worker
 # Helpers
 # ---------------------------------------------------------------------------
 
-from timing import EDITOR_TIMEOUT, LSP_TIMEOUT, DEBOUNCE_MS, DEBOUNCE_SETTLE, SHORT_SETTLE, POLL_INTERVAL
+from timing import CDN_TIMEOUT, LSP_TIMEOUT, DEBOUNCE_MS, DEBOUNCE_SETTLE, SHORT_SETTLE, POLL_INTERVAL
 
 
 def _load_and_wait(page, base_url: str):
     """Navigate to editor and wait for LSP to initialise."""
     page.goto(f"{base_url}/index.html", wait_until="domcontentloaded")
-    page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
 
 
@@ -263,7 +263,7 @@ def test_close_tab_cancels_pending_did_change(page, live_server):
         }
     """)
 
-    page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
     time.sleep(1.0)  # OPFS reload settle
 
@@ -313,7 +313,7 @@ def test_document_version_does_not_drift_across_tab_switches(page, live_server):
             location.reload();
         }
     """)
-    page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
     time.sleep(1.0)  # OPFS reload settle
 

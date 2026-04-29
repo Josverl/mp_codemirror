@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 
 import pytest
+from timing import CDN_TIMEOUT, LSP_TIMEOUT, UI_TIMEOUT, POLL_INTERVAL, HOVER_WAIT, LSP_ROUND_TRIP
 
 # ---------------------------------------------------------------------------
 # Module-level skip marker (evaluated at collection time)
@@ -37,17 +38,14 @@ pytestmark = pytest.mark.worker
 # Helpers
 # ---------------------------------------------------------------------------
 
-from timing import EDITOR_TIMEOUT, LSP_TIMEOUT, UI_TIMEOUT, LSP_ROUND_TRIP as DEBOUNCE_WAIT, SHORT_SETTLE, POLL_INTERVAL, HOVER_WAIT
-
-
 def _load_editor(page, base_url: str, wait_for_lsp: bool = True):
     """Navigate to the editor and wait for CodeMirror + optionally LSP."""
     page.goto(f"{base_url}/index.html", wait_until="domcontentloaded")
-    page.wait_for_selector(".cm-editor", timeout=EDITOR_TIMEOUT)
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     if wait_for_lsp:
         page.wait_for_function(
             "() => window.__lspReady === true || window.__lspFailed === true",
-            timeout=15000,
+            timeout=LSP_TIMEOUT,
         )
 
 
@@ -57,7 +55,7 @@ def _clear_editor(page):
     page.keyboard.press("Delete")
     page.wait_for_function(
         "() => document.querySelector('.cm-content').innerText.trim() === ''",
-        timeout=5000,
+        timeout=UI_TIMEOUT,
     )
 
 
@@ -67,7 +65,7 @@ def _type_in_editor(page, text: str, delay: int = 30):
     editor.press_sequentially(text, delay=delay)
 
 
-def _type_and_flush(page, text: str, extra_wait: float = DEBOUNCE_WAIT):
+def _type_and_flush(page, text: str, extra_wait: float = LSP_ROUND_TRIP):
     """Type text, then wait long enough for the debounce to flush and Pyright to respond."""
     _type_in_editor(page, text)
     time.sleep(extra_wait)
@@ -159,7 +157,7 @@ def test_completion_appears_after_explicit_trigger(page, live_server):
     page.keyboard.press("Enter")
     page.keyboard.type("sys.")
     # Wait for debounce to flush AND for Pyright to process the content
-    time.sleep(DEBOUNCE_WAIT)
+    time.sleep(LSP_ROUND_TRIP)
 
     # Cursor is already at end of 'sys.' — trigger explicit completion
     page.keyboard.press("Control+Space")
@@ -177,7 +175,7 @@ def test_completion_shows_multiple_options(page, live_server):
     _type_in_editor(page, "import sys")
     page.keyboard.press("Enter")
     page.keyboard.type("sys.")
-    time.sleep(DEBOUNCE_WAIT)
+    time.sleep(LSP_ROUND_TRIP)
 
     page.keyboard.press("Control+Space")
     page.locator(".cm-tooltip-autocomplete").wait_for(timeout=LSP_TIMEOUT)
@@ -260,7 +258,7 @@ def test_completion_lsp_request_is_logged(page, live_server):
     _type_in_editor(page, "import sys")
     page.keyboard.press("Enter")
     page.keyboard.type("sys.")
-    time.sleep(DEBOUNCE_WAIT)
+    time.sleep(LSP_ROUND_TRIP)
 
     page.keyboard.press("Control+Space")
     time.sleep(LSP_ROUND_TRIP)  # wait for the explicit completion round-trip

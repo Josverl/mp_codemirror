@@ -11,10 +11,9 @@ Keep DEBOUNCE_MS in sync with CHANGE_DEBOUNCE_MS in src/app.js.
 # ---------------------------------------------------------------------------
 
 CDN_TIMEOUT = 15_000     # CodeMirror modules to load from esm.sh CDN
-EDITOR_TIMEOUT = 15_000  # alias used in LSP test files (same intent as CDN_TIMEOUT)
-LSP_TIMEOUT = 20_000     # Pyright worker to respond with diagnostics
 UI_TIMEOUT = 5_000       # fast DOM state changes (theme toggle, clear, etc.)
-OPFS_TIMEOUT = 8_000     # OPFS file-system operation
+LSP_TIMEOUT = CDN_TIMEOUT + UI_TIMEOUT     # Pyright worker to respond with diagnostics
+OPFS_TIMEOUT = 5_000     # OPFS file-system operation
 
 # ---------------------------------------------------------------------------
 # App timing — must stay in sync with src/app.js

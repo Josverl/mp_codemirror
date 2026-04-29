@@ -7,10 +7,9 @@ F8 opens the lint panel. No LSP worker is required.
 
 import pytest
 from playwright.sync_api import expect
+from timing import CDN_TIMEOUT, UI_TIMEOUT
 
 pytestmark = pytest.mark.editor
-
-CDN_TIMEOUT = 15_000
 
 
 def _goto_editor(page, live_server):

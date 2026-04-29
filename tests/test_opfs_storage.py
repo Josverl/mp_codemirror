@@ -10,18 +10,39 @@ import time
 
 pytestmark = pytest.mark.editor
 
-CDN_TIMEOUT = 15_000
+from timing import LSP_TIMEOUT, UI_TIMEOUT, OPFS_SETTLE
 
+counter = 0
+start = time.time()
+previous = time.time()
+
+def logmessage(message = "Step", restart=False):
+    global counter, start, previous
+    if restart:
+        counter = 0
+    if counter == 0:
+        start = time.time()
+    counter += 10
+    elapsed_ms = (time.time() - start) * 1000
+    lapse_ms = (time.time() - previous) * 1000
+    previous = time.time()
+    print(f"[{counter}] {elapsed_ms:6.1f} ms (+{lapse_ms:6.1f} ms) {message}")
 
 def _load_editor(page, live_server):
+    logmessage("Loading editor")
     page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
-    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
-    # Wait until OPFSProject is ready (init called in app.js)
+    _wait_for_editor_ready(page)
+
+
+def _wait_for_editor_ready(page):
     page.wait_for_function(
-        "() => typeof window !== 'undefined'",
-        timeout=5000,
+        "() => window.__lspReady === true || window.__lspFailed === true",
+        timeout=LSP_TIMEOUT,
     )
-    time.sleep(1)  # let async init settle
+    logmessage("Waiting for editor to be ready")
+    page.wait_for_selector(".cm-editor", timeout=UI_TIMEOUT)
+    time.sleep(OPFS_SETTLE)  # let async init settle
+    logmessage("Editor loaded and ready")
 
 
 def _import_opfs(page):
@@ -38,26 +59,67 @@ def _import_opfs(page):
     """)
 
 
-class TestOPFSStorage:
-    def test_opfs_init_seeds_main_py(self, page, live_server):
-        """After init, main.py should exist in OPFS."""
-        _load_editor(page, live_server)
-        _import_opfs(page)
+def _reset_opfs_state(page):
+    """Delete project files, reset last-active state, and reseed main.py."""
+    logmessage("Resetting OPFS state")
+    page.evaluate("""
+        async () => {
+            const entries = await window.OPFSProject.listFiles();
+            const sorted = [...entries].sort(
+                (left, right) => right.path.split('/').length - left.path.split('/').length
+            );
 
-        exists = page.evaluate("""
+            for (const entry of sorted) {
+                try {
+                    await window.OPFSProject.deleteFile(entry.path);
+                } catch (error) {
+                    const message = String(error && error.message ? error.message : error);
+                    const name = error && error.name ? error.name : '';
+                    if (name !== 'NotFoundError' && !message.includes('not found')) {
+                        throw error;
+                    }
+                }
+            }
+
+            localStorage.removeItem('mp_last_active_file');
+            await window.OPFSProject.init();
+            window._opfsReady = true;
+        }
+    """)
+
+
+@pytest.fixture(scope="module")
+def opfs_page(shared_page, live_server):
+    logmessage("Initializing shared OPFS page", restart=True)
+    _load_editor(shared_page, live_server)
+    logmessage("importing OPFS")
+    _import_opfs(shared_page)
+    return shared_page
+
+
+@pytest.fixture(autouse=True)
+def reset_opfs_between_tests(opfs_page):
+    _import_opfs(opfs_page)
+    _reset_opfs_state(opfs_page)
+    return opfs_page
+
+
+class TestOPFSStorage:
+    def test_opfs_init_seeds_main_py(self, opfs_page):
+        """After init, main.py should exist in OPFS."""
+        logmessage("Testing OPFS init seeds main.py")
+        logmessage("Checking ....") 
+        exists = opfs_page.evaluate("""
             async () => {
-                await window.OPFSProject.init();
                 return window.OPFSProject.exists('main.py');
             }
         """)
+        logmessage("Checked for main.py existence")
         assert exists, "main.py should be seeded on first init"
 
-    def test_write_and_read_file(self, page, live_server):
+    def test_write_and_read_file(self, opfs_page):
         """writeFile then readFile returns the same content."""
-        _load_editor(page, live_server)
-        _import_opfs(page)
-
-        content = page.evaluate("""
+        content = opfs_page.evaluate("""
             async () => {
                 await window.OPFSProject.writeFile('test_rw.py', '# hello');
                 return window.OPFSProject.readFile('test_rw.py');
@@ -65,12 +127,9 @@ class TestOPFSStorage:
         """)
         assert content == "# hello", f"Unexpected content: {content!r}"
 
-    def test_list_files_includes_written_file(self, page, live_server):
+    def test_list_files_includes_written_file(self, opfs_page):
         """listFiles returns an entry for a file we wrote."""
-        _load_editor(page, live_server)
-        _import_opfs(page)
-
-        entries = page.evaluate("""
+        entries = opfs_page.evaluate("""
             async () => {
                 await window.OPFSProject.writeFile('list_test.py', '');
                 const files = await window.OPFSProject.listFiles();
@@ -79,12 +138,9 @@ class TestOPFSStorage:
         """)
         assert any('list_test.py' in p for p in entries), f"list_test.py not in {entries}"
 
-    def test_delete_file(self, page, live_server):
+    def test_delete_file(self, opfs_page):
         """deleteFile removes the file."""
-        _load_editor(page, live_server)
-        _import_opfs(page)
-
-        exists_after = page.evaluate("""
+        exists_after = opfs_page.evaluate("""
             async () => {
                 await window.OPFSProject.writeFile('to_delete.py', '# temp');
                 await window.OPFSProject.deleteFile('to_delete.py');
@@ -93,12 +149,9 @@ class TestOPFSStorage:
         """)
         assert not exists_after, "File should be gone after deleteFile"
 
-    def test_rename_file(self, page, live_server):
+    def test_rename_file(self, opfs_page):
         """renameFile moves content and removes old path."""
-        _load_editor(page, live_server)
-        _import_opfs(page)
-
-        result = page.evaluate("""
+        result = opfs_page.evaluate("""
             async () => {
                 await window.OPFSProject.writeFile('old_name.py', '# renamed');
                 await window.OPFSProject.renameFile('old_name.py', 'new_name.py');
@@ -112,12 +165,9 @@ class TestOPFSStorage:
         assert not result['oldExists'], "old_name.py should be gone"
         assert result['content'] == '# renamed'
 
-    def test_rename_rollback_preserves_existing_destination(self, page, live_server):
+    def test_rename_rollback_preserves_existing_destination(self, opfs_page):
         """If old-path delete fails during rename, pre-existing destination content is restored."""
-        _load_editor(page, live_server)
-        _import_opfs(page)
-
-        result = page.evaluate("""
+        result = opfs_page.evaluate("""
             async () => {
                 await window.OPFSProject.writeFile('rollback_old.py', '# old-content');
                 await window.OPFSProject.writeFile('rollback_new.py', '# existing-destination');
@@ -155,12 +205,9 @@ class TestOPFSStorage:
         assert result['newExists'], "destination should still exist after rollback"
         assert result['newContent'] == '# existing-destination', "destination content should be restored"
 
-    def test_last_active_file_persists(self, page, live_server):
+    def test_last_active_file_persists(self, opfs_page):
         """setLastActiveFile persists across calls within same session."""
-        _load_editor(page, live_server)
-        _import_opfs(page)
-
-        result = page.evaluate("""
+        result = opfs_page.evaluate("""
             () => {
                 window.OPFSProject.setLastActiveFile('helpers.py');
                 return window.OPFSProject.getLastActiveFile();
@@ -168,25 +215,20 @@ class TestOPFSStorage:
         """)
         assert result == 'helpers.py'
 
-    def test_file_persists_after_reload(self, page, live_server):
+    def test_file_persists_after_reload(self, opfs_page):
         """A file written in one page load is readable after reload."""
-        _load_editor(page, live_server)
-        _import_opfs(page)
-
-        page.evaluate("""
+        opfs_page.evaluate("""
             async () => {
-                await window.OPFSProject.init();
                 await window.OPFSProject.writeFile('persist_test.py', '# persisted');
             }
         """)
 
         # Reload the page
-        page.reload(wait_until="domcontentloaded")
-        page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
-        time.sleep(1)
-        _import_opfs(page)
+        opfs_page.reload(wait_until="domcontentloaded")
+        _wait_for_editor_ready(opfs_page)
+        _import_opfs(opfs_page)
 
-        content = page.evaluate("""
+        content = opfs_page.evaluate("""
             async () => {
                 return window.OPFSProject.readFile('persist_test.py');
             }

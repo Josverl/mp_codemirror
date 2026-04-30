@@ -23,6 +23,23 @@ function saveExpanded(set) {
     sessionStorage.setItem(EXPANDED_KEY, JSON.stringify([...set]));
 }
 
+function getAssetsBase() {
+    return window.location.pathname.includes('/src/') ? '../assets' : './assets';
+}
+
+function isPythonFile(name) {
+    const lower = name.toLowerCase();
+    return lower.endsWith('.py') || lower.endsWith('.pyi');
+}
+
+function getFileIcon(name) {
+    const lower = name.toLowerCase();
+    if (lower.endsWith('.json') || lower.endsWith('.yaml') || lower.endsWith('.yml')) return '⚙';
+    if (lower.endsWith('.md') || lower.endsWith('.txt')) return '📝';
+    if (lower.endsWith('.zip')) return '🗜';
+    return '📄';
+}
+
 export class FileTree {
     /**
      * @param {HTMLElement} container
@@ -181,6 +198,10 @@ export class FileTree {
         arrow.className = 'file-tree__arrow';
         arrow.textContent = isExpanded ? '▾' : '▸';
 
+        const icon = document.createElement('span');
+        icon.className = 'file-tree__icon file-tree__icon--folder';
+        icon.textContent = isExpanded ? '📂' : '📁';
+
         const label = document.createElement('span');
         label.className = 'file-tree__name';
         label.textContent = child.name;
@@ -188,6 +209,7 @@ export class FileTree {
         const actions = this._makeActions(child.path, true);
 
         row.appendChild(arrow);
+        row.appendChild(icon);
         row.appendChild(label);
         row.appendChild(actions);
         li.appendChild(row);
@@ -215,7 +237,15 @@ export class FileTree {
 
         const icon = document.createElement('span');
         icon.className = 'file-tree__icon';
-        icon.textContent = '  ';
+        if (isPythonFile(child.name)) {
+            const img = document.createElement('img');
+            img.className = 'file-tree__icon-img';
+            img.src = `${getAssetsBase()}/file_type_python.svg`;
+            img.alt = 'Python file';
+            icon.appendChild(img);
+        } else {
+            icon.textContent = getFileIcon(child.name);
+        }
 
         const label = document.createElement('span');
         label.className = 'file-tree__name';
@@ -267,15 +297,18 @@ export class FileTree {
 
     _toggleDir(path, li, arrow) {
         const expanded = this._expanded.has(path);
+        const icon = li.querySelector('.file-tree__icon--folder');
         if (expanded) {
             this._expanded.delete(path);
             arrow.textContent = '▸';
+            if (icon) icon.textContent = '📁';
             li.setAttribute('aria-expanded', 'false');
             const sub = li.querySelector('ul');
             if (sub) sub.remove();
         } else {
             this._expanded.add(path);
             arrow.textContent = '▾';
+            if (icon) icon.textContent = '📂';
             li.setAttribute('aria-expanded', 'true');
         }
         saveExpanded(this._expanded);

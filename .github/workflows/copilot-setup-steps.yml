@@ -3,6 +3,9 @@ name: Setup Copilot Agent Environment
 on:
     workflow_dispatch:
 
+permissions:
+    contents: read
+
 jobs:
     copilot-setup-steps:
         runs-on: ubuntu-latest

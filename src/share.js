@@ -93,6 +93,15 @@ function normalizeShareFiles(codeOrFiles) {
     return { 'main.py': '' };
 }
 
+export function resolveShareSettings(getBoard, getTypeCheckMode, getStdlib, getPythonVersion) {
+    return {
+        board: typeof getBoard === 'function' ? (getBoard() || '') : '',
+        typeCheckMode: typeof getTypeCheckMode === 'function' ? (getTypeCheckMode() || '') : '',
+        stdlib: typeof getStdlib === 'function' ? getStdlib() : undefined,
+        pythonVersion: typeof getPythonVersion === 'function' ? getPythonVersion() : undefined,
+    };
+}
+
 // ---- Base64url helpers (URL-safe, no padding) ----
 
 function arrayBufferToBase64url(bytes) {
@@ -349,9 +358,11 @@ export function buildIssueUrl(stubPackage, stubVersion, typeCheckMode, playgroun
  * @param {() => string} getBoard         Returns current board ID
  * @param {() => ({ package: string, version: string })} getStubMetadata Returns selected stubs package metadata
  * @param {() => string} getTypeCheckMode Returns current typeCheckMode
+ * @param {() => string} [getStdlib]      Returns stdlib selector: "micropython" | "cpython"
+ * @param {() => string} [getPythonVersion] Returns python version
  * @param {() => Promise<Object<string,string>>} [getFiles] Returns full share file map
  */
-export function initReportIssueButton(getCode, getBoard, getStubMetadata, getTypeCheckMode, getFiles) {
+export function initReportIssueButton(getCode, getBoard, getStubMetadata, getTypeCheckMode, getStdlib, getPythonVersion, getFiles) {
     const btn = document.getElementById('reportIssueBtn');
     const dropdown = document.getElementById('reportIssueDropdown');
     const confirmBtn = document.getElementById('reportIssueConfirm');
@@ -387,17 +398,22 @@ export function initReportIssueButton(getCode, getBoard, getStubMetadata, getTyp
     // Open GitHub issue in a new tab
     confirmBtn?.addEventListener('click', async () => {
         dropdown.hidden = true;
-        const board = getBoard();
+        const shareSettings = resolveShareSettings(getBoard, getTypeCheckMode, getStdlib, getPythonVersion);
         const stubMetadata = typeof getStubMetadata === 'function'
             ? (getStubMetadata() || {})
             : {};
-        const stubPackage = stubMetadata.package || board || '';
+        const stubPackage = stubMetadata.package || shareSettings.board || '';
         const stubVersion = stubMetadata.version || '';
-        const typeCheckMode = getTypeCheckMode();
         const files = await resolveShareFiles();
-        const playgroundUrl = await buildShareableUrl(files, board, typeCheckMode);
+        const playgroundUrl = await buildShareableUrl(
+            files,
+            shareSettings.board,
+            shareSettings.typeCheckMode,
+            shareSettings.stdlib,
+            shareSettings.pythonVersion,
+        );
         const labels = await resolveReportIssueLabels();
-        const issueUrl = buildIssueUrl(stubPackage, stubVersion, typeCheckMode, playgroundUrl, labels);
+        const issueUrl = buildIssueUrl(stubPackage, stubVersion, shareSettings.typeCheckMode, playgroundUrl, labels);
         window.open(issueUrl, '_blank', 'noopener,noreferrer');
     });
 }
@@ -490,37 +506,40 @@ export function initShareDropdown(getCode, getBoard, getTypeCheckMode, getStdlib
     // Wire up copy buttons
     document.getElementById('copyLink')?.addEventListener('click', async (e) => {
         const files = await resolveShareFiles();
+        const shareSettings = resolveShareSettings(getBoard, getTypeCheckMode, getStdlib, getPythonVersion);
         const ok = await copyShareableLink(
             files,
-            getBoard(),
-            getTypeCheckMode(),
-            typeof getStdlib === 'function' ? getStdlib() : undefined,
-            typeof getPythonVersion === 'function' ? getPythonVersion() : undefined,
+            shareSettings.board,
+            shareSettings.typeCheckMode,
+            shareSettings.stdlib,
+            shareSettings.pythonVersion,
         );
         if (ok) flashCopied(e.currentTarget);
     });
 
     document.getElementById('copyMdLink')?.addEventListener('click', async (e) => {
         const files = await resolveShareFiles();
+        const shareSettings = resolveShareSettings(getBoard, getTypeCheckMode, getStdlib, getPythonVersion);
         const ok = await copyMarkdownWithLink(
             files,
-            getBoard(),
-            getTypeCheckMode(),
-            typeof getStdlib === 'function' ? getStdlib() : undefined,
-            typeof getPythonVersion === 'function' ? getPythonVersion() : undefined,
+            shareSettings.board,
+            shareSettings.typeCheckMode,
+            shareSettings.stdlib,
+            shareSettings.pythonVersion,
         );
         if (ok) flashCopied(e.currentTarget);
     });
 
     document.getElementById('copyMdCode')?.addEventListener('click', async (e) => {
         const files = await resolveShareFiles();
+        const shareSettings = resolveShareSettings(getBoard, getTypeCheckMode, getStdlib, getPythonVersion);
         const ok = await copyMarkdownWithLinkAndCode(
             files,
             getCode(),
-            getBoard(),
-            getTypeCheckMode(),
-            typeof getStdlib === 'function' ? getStdlib() : undefined,
-            typeof getPythonVersion === 'function' ? getPythonVersion() : undefined,
+            shareSettings.board,
+            shareSettings.typeCheckMode,
+            shareSettings.stdlib,
+            shareSettings.pythonVersion,
         );
         if (ok) flashCopied(e.currentTarget);
     });

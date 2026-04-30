@@ -16,6 +16,17 @@ import pytest
 from playwright.sync_api import sync_playwright
 
 
+def pytest_addoption(parser):
+    """Allow selecting a Playwright browser while defaulting to chromium."""
+    parser.addoption(
+        "--browser-name",
+        action="store",
+        default="chromium",
+        choices=["chromium", "firefox", "webkit", "chrome", "msedge"],
+        help="Playwright browser to run UI tests with (default: chromium)",
+    )
+
+
 def _free_port() -> int:
     """Return an ephemeral TCP port that is free right now."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -81,10 +92,21 @@ def project_server(live_server):
 
 
 @pytest.fixture(scope="session")
-def browser():
+def browser_name(pytestconfig):
+    """Resolved browser target from CLI option or env var."""
+    return pytestconfig.getoption("browser_name")
+
+
+@pytest.fixture(scope="session")
+def browser(browser_name):
     """Single browser instance shared across the test session."""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        if browser_name in {"chrome", "msedge"}:
+            # Branded Chromium channels (Google Chrome / Microsoft Edge)
+            browser = p.chromium.launch(channel=browser_name, headless=True)
+        else:
+            browser_launcher = getattr(p, browser_name)
+            browser = browser_launcher.launch(headless=True)
         yield browser
         browser.close()
 

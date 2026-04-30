@@ -19,67 +19,83 @@ def _goto_editor(page, live_server):
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
 
+def _reset_share_state(page):
+    """Restore a clean in-page baseline before each shared-page test."""
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    page.evaluate("() => window.history.replaceState({}, '', window.location.pathname)")
+    if page.locator("#shareDropdown").is_visible():
+        page.keyboard.press("Escape")
+    expect(page.locator("#shareDropdown")).to_be_hidden()
+
+
+@pytest.fixture(scope="module")
+def _shared_share_page(shared_page, live_server):
+    """Module-scoped page for share tests that do not require navigation isolation."""
+    _goto_editor(shared_page, live_server)
+    return shared_page
+
+
+@pytest.fixture
+def share_page(_shared_share_page):
+    """Return the shared page after restoring baseline state before the test."""
+    _reset_share_state(_shared_share_page)
+    return _shared_share_page
+
+
 # ---------------------------------------------------------------------------
 # Share dropdown UI
 # ---------------------------------------------------------------------------
 
 
-def test_share_button_exists(page, live_server):
+def test_share_button_exists(share_page):
     """Share button is present in the header."""
-    _goto_editor(page, live_server)
-    expect(page.locator("#shareBtn")).to_be_visible()
+    expect(share_page.locator("#shareBtn")).to_be_visible()
 
 
-def test_share_dropdown_hidden_by_default(page, live_server):
+def test_share_dropdown_hidden_by_default(share_page):
     """Share dropdown is hidden on page load."""
-    _goto_editor(page, live_server)
-    expect(page.locator("#shareDropdown")).to_be_hidden()
+    expect(share_page.locator("#shareDropdown")).to_be_hidden()
 
 
-def test_share_dropdown_opens_on_click(page, live_server):
+def test_share_dropdown_opens_on_click(share_page):
     """Clicking the Share button shows the dropdown."""
-    _goto_editor(page, live_server)
-    page.locator("#shareBtn").click()
-    expect(page.locator("#shareDropdown")).to_be_visible()
+    share_page.locator("#shareBtn").click()
+    expect(share_page.locator("#shareDropdown")).to_be_visible()
 
 
-def test_share_dropdown_has_three_options(page, live_server):
+def test_share_dropdown_has_three_options(share_page):
     """Dropdown contains the three copy options."""
-    _goto_editor(page, live_server)
-    page.locator("#shareBtn").click()
-    expect(page.locator("#copyLink")).to_be_visible()
-    expect(page.locator("#copyMdLink")).to_be_visible()
-    expect(page.locator("#copyMdCode")).to_be_visible()
+    share_page.locator("#shareBtn").click()
+    expect(share_page.locator("#copyLink")).to_be_visible()
+    expect(share_page.locator("#copyMdLink")).to_be_visible()
+    expect(share_page.locator("#copyMdCode")).to_be_visible()
 
 
-def test_share_dropdown_closes_on_outside_click(page, live_server):
+def test_share_dropdown_closes_on_outside_click(share_page):
     """Clicking outside the dropdown closes it."""
-    _goto_editor(page, live_server)
-    page.locator("#shareBtn").click()
-    expect(page.locator("#shareDropdown")).to_be_visible()
+    share_page.locator("#shareBtn").click()
+    expect(share_page.locator("#shareDropdown")).to_be_visible()
 
     # Click elsewhere on the page
-    page.locator("main").click()
-    expect(page.locator("#shareDropdown")).to_be_hidden()
+    share_page.locator("main").click()
+    expect(share_page.locator("#shareDropdown")).to_be_hidden()
 
 
-def test_share_dropdown_closes_on_escape(page, live_server):
+def test_share_dropdown_closes_on_escape(share_page):
     """Pressing Escape closes the dropdown."""
-    _goto_editor(page, live_server)
-    page.locator("#shareBtn").click()
-    expect(page.locator("#shareDropdown")).to_be_visible()
+    share_page.locator("#shareBtn").click()
+    expect(share_page.locator("#shareDropdown")).to_be_visible()
 
-    page.keyboard.press("Escape")
-    expect(page.locator("#shareDropdown")).to_be_hidden()
+    share_page.keyboard.press("Escape")
+    expect(share_page.locator("#shareDropdown")).to_be_hidden()
 
 
-def test_share_dropdown_toggles(page, live_server):
+def test_share_dropdown_toggles(share_page):
     """Clicking Share twice opens then closes the dropdown."""
-    _goto_editor(page, live_server)
-    page.locator("#shareBtn").click()
-    expect(page.locator("#shareDropdown")).to_be_visible()
-    page.locator("#shareBtn").click()
-    expect(page.locator("#shareDropdown")).to_be_hidden()
+    share_page.locator("#shareBtn").click()
+    expect(share_page.locator("#shareDropdown")).to_be_visible()
+    share_page.locator("#shareBtn").click()
+    expect(share_page.locator("#shareDropdown")).to_be_hidden()
 
 
 # ---------------------------------------------------------------------------
@@ -87,11 +103,9 @@ def test_share_dropdown_toggles(page, live_server):
 # ---------------------------------------------------------------------------
 
 
-def test_compress_decompress_roundtrip(page, live_server):
+def test_compress_decompress_roundtrip(share_page):
     """Compressing and decompressing code yields the original text."""
-    _goto_editor(page, live_server)
-
-    result = page.evaluate("""async () => {
+    result = share_page.evaluate("""async () => {
         const { compressCode, decompressCode } = await import('./share.js');
         const original = 'from machine import Pin\\nled = Pin(2, Pin.OUT)\\nled.on()';
         const compressed = await compressCode(original);
@@ -101,11 +115,9 @@ def test_compress_decompress_roundtrip(page, live_server):
     assert result["ok"], f"Roundtrip failed: {result['original']!r} != {result['restored']!r}"
 
 
-def test_compress_empty_string(page, live_server):
+def test_compress_empty_string(share_page):
     """Empty string compresses and decompresses correctly."""
-    _goto_editor(page, live_server)
-
-    result = page.evaluate("""async () => {
+    result = share_page.evaluate("""async () => {
         const { compressCode, decompressCode } = await import('./share.js');
         const compressed = await compressCode('');
         const restored = await decompressCode(compressed);
@@ -114,11 +126,9 @@ def test_compress_empty_string(page, live_server):
     assert result is True
 
 
-def test_compress_unicode(page, live_server):
+def test_compress_unicode(share_page):
     """Unicode characters survive compression roundtrip."""
-    _goto_editor(page, live_server)
-
-    result = page.evaluate("""async () => {
+    result = share_page.evaluate("""async () => {
         const { compressCode, decompressCode } = await import('./share.js');
         const original = '# Ünïcödé: 日本語 🐍';
         const compressed = await compressCode(original);
@@ -133,11 +143,9 @@ def test_compress_unicode(page, live_server):
 # ---------------------------------------------------------------------------
 
 
-def test_build_shareable_url_contains_params(page, live_server):
+def test_build_shareable_url_contains_params(share_page):
     """buildShareableUrl produces a URL with board, typeCheckMode, and code params."""
-    _goto_editor(page, live_server)
-
-    result = page.evaluate("""async () => {
+    result = share_page.evaluate("""async () => {
         const { buildShareableUrl } = await import('./share.js');
         const url = await buildShareableUrl('x = 1', 'esp32', 'strict');
         const parsed = new URL(url);
@@ -206,9 +214,7 @@ def test_url_board_preloads_matching_stubs(page, live_server):
         "() => performance.getEntriesByType('resource').some(e => e.name.includes('stubs-stm32.zip'))",
         timeout=5000,
     )
-    fetched_resources = page.evaluate(
-        "() => performance.getEntriesByType('resource').map(e => e.name)"
-    )
+    fetched_resources = page.evaluate("() => performance.getEntriesByType('resource').map(e => e.name)")
     assert any("stubs-stm32.zip" in url for url in fetched_resources), (
         "Expected STM32 stubs to be fetched during URL-based board restore."
     )

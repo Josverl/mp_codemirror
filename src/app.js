@@ -12,7 +12,7 @@ import { EditorView, basicSetup } from 'codemirror';
 import { keymap } from '@codemirror/view';
 import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
-import { restoreFromUrl, initShareDropdown } from './share.js';
+import { restoreFromUrl, initShareDropdown, initReportIssueButton } from './share.js';
 import { notifyDocumentChange, notifyDocumentOpen, updateDiagnosticsStatus, lintKeymapExtension } from './lsp/diagnostics.js';
 import { OPFSProject } from './storage/opfs-project.js';
 import { DocumentManager } from './editor/document-manager.js';
@@ -185,6 +185,26 @@ function getSelectedStubsStatusLabel() {
     const parts = text.split(' — ').map((p) => p.trim()).filter(Boolean);
     if (parts.length >= 2) return `${parts[0]} v${parts[1]}`;
     return text;
+}
+
+function getSelectedStubMetadata() {
+    if (boardManifest?.boards && currentBoardId) {
+        const board = boardManifest.boards.find((b) => b.id === currentBoardId);
+        if (board) {
+            return {
+                package: board.package || board.id || '',
+                version: board.package_version || '',
+            };
+        }
+    }
+
+    const select = document.getElementById('boardSelect');
+    const text = select?.options?.[select.selectedIndex]?.textContent?.trim() || '';
+    const parts = text.split(' — ').map((p) => p.trim()).filter(Boolean);
+    return {
+        package: parts[0] || '',
+        version: parts[1] || '',
+    };
 }
 
 // Per-URI debounce timers for didChange notifications
@@ -1213,6 +1233,15 @@ async function initializeEditor() {
         () => currentTypeCheckMode,
         () => currentTypeshedPath === TYPESHED_PATH_MICROPYTHON ? 'micropython' : 'cpython',
         () => currentPythonVersion,
+        () => collectShareFiles(),
+    );
+
+    // Initialize report issue button
+    initReportIssueButton(
+        () => view.state.doc.toString(),
+        () => currentBoardId,
+        () => getSelectedStubMetadata(),
+        () => currentTypeCheckMode,
         () => collectShareFiles(),
     );
 

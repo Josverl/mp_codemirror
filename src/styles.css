@@ -618,7 +618,7 @@ body.light-theme .file-tree__header { color: #555; }
     list-style: none;
     padding: 0;
     margin: 0;
-    padding-left: 14px;
+    padding-left: 28px;
 }
 
 .file-tree__row {
@@ -642,10 +642,18 @@ body.light-theme .file-tree__file--active .file-tree__row { background: #cce5ff;
 
 .file-tree__arrow,
 .file-tree__icon {
-    font-size: 11px;
+    font-size: 12px;
     width: 14px;
     flex-shrink: 0;
     color: #888;
+    line-height: 1;
+    text-align: center;
+}
+
+.file-tree__icon-img {
+    display: block;
+    width: 14px;
+    height: 14px;
 }
 
 .file-tree__name {

@@ -19,6 +19,16 @@ def _goto_editor(page, live_server):
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
 
+def _open_options_panel(page):
+    """Ensure the right-side Options panel is open (sample controls live inside it)."""
+    is_open = page.evaluate("() => document.body.classList.contains('options-panel-open')")
+    if is_open:
+        return
+    page.locator("#options-panel-handle").click()
+    page.wait_for_timeout(50)
+    assert page.evaluate("() => document.body.classList.contains('options-panel-open')")
+
+
 def _reset_editor_state(page):
     """Restore the shared editor page to a light-theme sample-code baseline."""
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
@@ -40,6 +50,7 @@ def _reset_editor_state(page):
             }
         }"""
     )
+    _open_options_panel(page)
     page.locator("#loadSampleBtn").click()
     page.wait_for_function(
         "() => document.querySelector('.cm-content').innerText.trim().length > 0",

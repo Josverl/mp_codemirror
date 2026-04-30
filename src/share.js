@@ -265,6 +265,143 @@ export async function copyMarkdownWithLinkAndCode(codeOrFiles, codeBlockText, bo
     return copyToClipboard(md);
 }
 
+// ---- Report Issue helpers ----
+
+const REPORT_ISSUE_REPO = 'https://github.com/Josverl/micropython-stubs/issues/new';
+const REPORT_ISSUE_QUALITY_LABEL = 'Quality';
+const REPORT_ISSUE_LABEL_API =
+    `https://api.github.com/repos/Josverl/micropython-stubs/labels/${encodeURIComponent(REPORT_ISSUE_QUALITY_LABEL)}`;
+
+/**
+ * Resolve labels to prefill on the created GitHub issue.
+ * Falls back to no labels if the lookup fails or the label does not exist.
+ *
+ * @param {(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>} [fetchImpl]
+ * @returns {Promise<string[]>}
+ */
+export async function resolveReportIssueLabels(fetchImpl = globalThis.fetch) {
+    if (typeof fetchImpl !== 'function') {
+        return [];
+    }
+
+    try {
+        const response = await fetchImpl(REPORT_ISSUE_LABEL_API, {
+            method: 'GET',
+            headers: { Accept: 'application/vnd.github+json' },
+        });
+        if (!response.ok) {
+            return [];
+        }
+
+        const payload = await response.json();
+        if (payload?.name === REPORT_ISSUE_QUALITY_LABEL) {
+            return [REPORT_ISSUE_QUALITY_LABEL];
+        }
+    } catch {
+        // Graceful fallback: if lookup is blocked or offline, create issue without labels.
+    }
+
+    return [];
+}
+
+/**
+ * Build a pre-filled GitHub issue URL for the micropython-stubs repo.
+ *
+ * @param {string} stubPackage   Selected stubs package name (may be empty)
+ * @param {string} stubVersion   Selected stubs package version (may be empty)
+ * @param {string} typeCheckMode Current Pyright mode
+ * @param {string} playgroundUrl Shareable playground link to embed in the issue
+ * @param {string[]} [labels]    Optional labels to prefill on the issue
+ * @returns {string} GitHub new-issue URL with pre-filled title and body
+ */
+export function buildIssueUrl(stubPackage, stubVersion, typeCheckMode, playgroundUrl, labels = []) {
+    const normalizedVersion = stubVersion
+        ? (stubVersion.startsWith('v') ? stubVersion : `v${stubVersion}`)
+        : 'n/a';
+    const title = 'Stub issue: ';
+    const body =
+`## Describe the issue
+<!-- Please describe what is incorrect or missing in the stub. -->
+
+## Context
+**Stub package:** ${stubPackage || 'unknown'}
+**Stub version:** ${normalizedVersion}
+**Type check mode:** ${typeCheckMode || 'standard'}
+
+## Issue reproduction
+[MicroPython-stubs Playground](${playgroundUrl})
+`;
+
+    const url = new URL(REPORT_ISSUE_REPO);
+    url.searchParams.set('title', title);
+    url.searchParams.set('body', body);
+    if (labels.length > 0) {
+        url.searchParams.set('labels', labels.join(','));
+    }
+    return url.toString();
+}
+
+/**
+ * Initialise the "Report a stub issue" button and its confirmation dropdown.
+ * Call once after the DOM is ready.
+ *
+ * @param {() => string} getCode          Returns current editor content
+ * @param {() => string} getBoard         Returns current board ID
+ * @param {() => ({ package: string, version: string })} getStubMetadata Returns selected stubs package metadata
+ * @param {() => string} getTypeCheckMode Returns current typeCheckMode
+ * @param {() => Promise<Object<string,string>>} [getFiles] Returns full share file map
+ */
+export function initReportIssueButton(getCode, getBoard, getStubMetadata, getTypeCheckMode, getFiles) {
+    const btn = document.getElementById('reportIssueBtn');
+    const dropdown = document.getElementById('reportIssueDropdown');
+    const confirmBtn = document.getElementById('reportIssueConfirm');
+    if (!btn || !dropdown) return;
+
+    const resolveShareFiles = async () => {
+        if (typeof getFiles === 'function') {
+            return getFiles();
+        }
+        return { 'main.py': getCode() };
+    };
+
+    // Toggle dropdown
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.hidden = !dropdown.hidden;
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+        if (!dropdown.contains(e.target) && e.target !== btn) {
+            dropdown.hidden = true;
+        }
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            dropdown.hidden = true;
+        }
+    });
+
+    // Open GitHub issue in a new tab
+    confirmBtn?.addEventListener('click', async () => {
+        dropdown.hidden = true;
+        const board = getBoard();
+        const stubMetadata = typeof getStubMetadata === 'function'
+            ? (getStubMetadata() || {})
+            : {};
+        const stubPackage = stubMetadata.package || board || '';
+        const stubVersion = stubMetadata.version || '';
+        const typeCheckMode = getTypeCheckMode();
+        const files = await resolveShareFiles();
+        const playgroundUrl = await buildShareableUrl(files, board, typeCheckMode);
+        const labels = await resolveReportIssueLabels();
+        const issueUrl = buildIssueUrl(stubPackage, stubVersion, typeCheckMode, playgroundUrl, labels);
+        window.open(issueUrl, '_blank', 'noopener,noreferrer');
+    });
+}
+
 // ---- Share dropdown UI ----
 
 /**

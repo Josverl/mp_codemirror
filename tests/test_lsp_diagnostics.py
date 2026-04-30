@@ -281,3 +281,49 @@ def test_cross_file_import_resolves_without_diagnostics(page, live_server):
         f"Expected clean diagnostics for local import, got: {diagnostics_text!r}"
     )
     assert lint_markers.count() == 0, "No lint markers expected when local imports resolve"
+
+
+@requires_lsp
+def test_non_python_file_produces_no_diagnostics(page, live_server):
+    """Opening a non-Python file must not show any type-checking errors or warnings."""
+    setup_url = f"{live_server}/tests/worker-transport-test.html?cb={time.time_ns()}"
+    verify_url = f"{live_server}/index.html?cb={time.time_ns()}"
+
+    # Write a .txt file and set it as the active file in OPFS
+    page.goto(setup_url, wait_until="domcontentloaded")
+    page.wait_for_load_state("load", timeout=10_000)
+
+    page.evaluate(r"""
+        async () => {
+            const mod = await import('../storage/opfs-project.js');
+            window.OPFSProject = mod.OPFSProject;
+            await window.OPFSProject.init();
+
+            const entries = await window.OPFSProject.listFiles();
+            const paths = entries
+                .map((entry) => entry.path)
+                .sort((left, right) => right.length - left.length);
+            for (const path of paths) {
+                await window.OPFSProject.deleteFile(path);
+            }
+
+            // Write a non-Python text file
+            await window.OPFSProject.writeFile('notes.txt', 'x = totally_undefined\n');
+            window.OPFSProject.setLastActiveFile('notes.txt');
+        }
+    """)
+
+    page.goto(verify_url, wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=30_000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=CDN_TIMEOUT)
+    time.sleep(LSP_ROUND_TRIP)
+
+    diagnostics_text = page.locator("#diagnostics-status").inner_text()
+    lint_markers = page.locator(".cm-lint-marker-error, .cm-lint-marker-warning")
+
+    assert lint_markers.count() == 0, (
+        f"No lint markers expected for a non-Python (.txt) file, got {lint_markers.count()}"
+    )
+    assert "Errors: 0" in diagnostics_text and "Warnings: 0" in diagnostics_text, (
+        f"Expected zero errors/warnings for non-Python file, got: {diagnostics_text!r}"
+    )

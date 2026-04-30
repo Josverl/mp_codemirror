@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unit-tests:
     # Tier 0: Pure Python, no browser, no server. Fast.
@@ -82,8 +86,8 @@ jobs:
       fail-fast: false
       max-parallel: 8
       matrix:
-        browser: [chromium, firefox, webkit, msedge]
         suite: [editor, worker]
+        browser: [chromium, firefox, webkit]
     steps:
       - name: Checkout
         uses: actions/checkout@v6

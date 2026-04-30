@@ -20,6 +20,9 @@ import { createTransport } from './transport-factory.js';
  * @param {ArrayBuffer} [config.boardStubs] - Board stubs zip (undefined = use bundled default)
  * @param {Object.<string, string>} [config.workspaceFiles] - Project files to preload into /workspace
  * @param {string} [config.typeCheckingMode] - Pyright type checking mode
+ * @param {string} [config.typeshedPath] - Pyright typeshedPath
+ * @param {string} [config.pythonVersion] - Pyright pythonVersion
+ * @param {boolean} [config.verboseOutput] - Pyright verboseOutput
  */
 export async function createLSPClient(config = {}) {
     const transport = createTransport({
@@ -27,6 +30,9 @@ export async function createLSPClient(config = {}) {
         boardStubs: config.boardStubs,
         workspaceFiles: config.workspaceFiles,
         typeCheckingMode: config.typeCheckingMode,
+        typeshedPath: config.typeshedPath,
+        pythonVersion: config.pythonVersion,
+        verboseOutput: config.verboseOutput,
     });
 
     console.log('Creating LSP client...');

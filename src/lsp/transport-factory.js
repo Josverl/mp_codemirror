@@ -13,6 +13,9 @@ import { WorkerTransport } from './worker-transport.js';
  * @param {ArrayBuffer} [options.boardStubs] - Board-specific stubs data
  * @param {Object.<string, string>} [options.workspaceFiles] - Project files to preload into /workspace
  * @param {string} [options.typeCheckingMode] - Pyright type checking mode
+ * @param {string} [options.typeshedPath] - Pyright typeshedPath
+ * @param {string} [options.pythonVersion] - Pyright pythonVersion
+ * @param {boolean} [options.verboseOutput] - Pyright verboseOutput
  * @returns {WorkerTransport}
  */
 export function createTransport(options = {}) {
@@ -22,5 +25,8 @@ export function createTransport(options = {}) {
         boardStubs: options.boardStubs,
         workspaceFiles: options.workspaceFiles,
         typeCheckingMode: options.typeCheckingMode,
+        typeshedPath: options.typeshedPath,
+        pythonVersion: options.pythonVersion,
+        verboseOutput: options.verboseOutput,
     });
 }

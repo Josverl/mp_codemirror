@@ -41,10 +41,12 @@ class Board:
 
 # Boards that have installable stub packages
 BOARDS: list[Board] = [
+    Board(id="stdlib",  package="micropython-stdlib-stubs"), # Used for stdlib only
     Board(id="esp32", package="micropython-esp32-stubs", bundled=True),
     Board(id="rp2",   package="micropython-rp2-stubs"),
     Board(id="stm32", package="micropython-stm32-stubs"),
     Board(id="samd",  package="micropython-samd-stubs"),
+    Board(id="circuitpython",  package="circuitpython-stubs"),
 ]
 
 # Virtual boards (no stub package, included in manifest only)
@@ -129,6 +131,18 @@ def pack_board(board: Board) -> Board:
     target.mkdir(parents=True)
 
     print(f"  Installing {board.package}...")
+    # hack for circuitpython-stubs that do not include stdlib
+    if board.id == "circuitpython":
+        # Add the micropython-stdlib-stubs as  circuitpython-stubs do not include stdlib stubs.
+        subprocess.run(
+            ["uv", "pip", "install", "micropython-stdlib-stubs", "--target", str(target), "--quiet"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        # Add (rp2) time.pyi, as this is not in micropython-stdlib-stubs
+        shutil.copyfile( ASSETS / "time.pyi", target / "time.pyi" )
+
     subprocess.run(
         ["uv", "pip", "install", board.package, "--target", str(target), "--quiet"],
         check=True,

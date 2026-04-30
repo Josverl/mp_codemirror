@@ -26,9 +26,10 @@ const { configure, InMemory } = fs as any;
 
 // Bundled typeshed (inlined as ArrayBuffer by arraybuffer-loader)
 import typeshedFallbackZip from "../../assets/typeshed-fallback.zip";
+import micropythonStdlibZip from "../../assets/stubs-stdlib.zip";
 
-// Bundled default board stubs (ESP32)
-import defaultBoardStubsZip from "../../assets/stubs-esp32.zip";
+// Bundled default board stubs (rp2)
+import defaultBoardStubsZip from "../../assets/stubs-rp2.zip";
 
 import {
     BrowserMessageReader,
@@ -46,14 +47,8 @@ const ctx = self as unknown as DedicatedWorkerGlobalScope;
  * Initialize ZenFS virtual filesystem
  */
 async function initFs(
-    typeshedData?: ArrayBuffer | false,
     boardStubsData?: ArrayBuffer | false
 ) {
-    // Use bundled typeshed unless explicitly overridden
-    const typeshed = typeshedData === false
-        ? undefined
-        : (typeshedData || typeshedFallbackZip);
-
     // Use bundled default board stubs unless explicitly overridden
     const boardStubs = boardStubsData === false
         ? undefined
@@ -62,25 +57,25 @@ async function initFs(
     const mounts: Record<string, any> = {
         "/tmp": { backend: InMemory, name: "tmp" },
         "/workspace": { backend: InMemory, name: "workspace" },
+        "/typeshed-fallback": {
+            backend: Zip,
+            data: typeshedFallbackZip,
+        },
+        "/typeshed-micropython": {
+            backend: Zip,
+            data: micropythonStdlibZip,
+        },
     };
 
-    if (typeshed && typeshed instanceof ArrayBuffer && typeshed.byteLength > 0) {
-        mounts["/typeshed-fallback"] = {
-            backend: Zip,
-            data: typeshed,
-        };
-        console.log(`[pyright-worker] Mounting typeshed (${(typeshed.byteLength / 1024 / 1024).toFixed(1)}MB)`);
-    } else {
-        mounts["/typeshed-fallback"] = { backend: InMemory, name: "typeshed" };
-        console.warn("[pyright-worker] No typeshed data — builtins will not be resolved");
-    }
+    console.log(`[pyright-worker] Mounting /typeshed-fallback (${(typeshedFallbackZip.byteLength / 1024 / 1024).toFixed(1)}MB)`);
+    console.log(`[pyright-worker] Mounting /typeshed-micropython (${(micropythonStdlibZip.byteLength / 1024 / 1024).toFixed(1)}MB)`);
 
     if (boardStubs && boardStubs instanceof ArrayBuffer && boardStubs.byteLength > 0) {
         mounts["/typings"] = {
             backend: Zip,
             data: boardStubs,
         };
-        console.log(`[pyright-worker] Mounting board stubs (${(boardStubs.byteLength / 1024).toFixed(0)}KB)`);
+        console.log(`[pyright-worker] Mounting board stubs in /typings (${(boardStubs.byteLength / 1024).toFixed(0)}KB)`);
     } else {
         mounts["/typings"] = { backend: InMemory, name: "typings" };
         console.log("[pyright-worker] No board stubs — MicroPython modules will not resolve");
@@ -122,7 +117,28 @@ function writeWorkspaceFiles(files: Record<string, string> = {}) {
 /**
  * Create pyrightconfig.json in the virtual workspace
  */
-function writePyrightConfig(typeCheckingMode: string = "standard") {
+function writePyrightConfig(options: {
+    typeCheckingMode?: string;
+    typeshedPath?: string;
+    pythonVersion?: string;
+    verboseOutput?: boolean;
+} = {}) {
+    const {
+        typeCheckingMode = "standard",
+        typeshedPath = "/typeshed-micropython",
+        pythonVersion = "3.10",
+        verboseOutput = true,
+    } = options;
+
+    const resolvedTypeshedPath = typeshedPath === "/typeshed-fallback"
+        ? "/typeshed-fallback"
+        : "/typeshed-micropython";
+
+    const pythonMinor = Number.parseInt((pythonVersion.split(".")[1] || "10"), 10);
+    const resolvedPythonVersion = Number.isFinite(pythonMinor)
+        ? `3.${Math.max(10, Math.min(14, pythonMinor))}`
+        : "3.10";
+
     // Pyright requires `include`/`extraPaths` in pyrightconfig.json to be
     // RELATIVE to the config file's location (here: /workspace). Absolute
     // paths are silently dropped with "Ignoring path … because it is not
@@ -139,22 +155,25 @@ function writePyrightConfig(typeCheckingMode: string = "standard") {
     // NOT on extraPaths: it remains a regular package, so its contents are
     // imported as `from lib.foo import ...`.
     const config = {
-        typeshedPath: "/typings",
+        typeshedPath: resolvedTypeshedPath,
         stubPath: "/typings",
-        include: ["/workspace"],
-        extraPaths: [".", "/workspace/lib"],
+        include: ["."], // relative to /workspace
+        extraPaths: ["", ".", "/workspace/lib"],
         pythonPlatform: "Linux",
+        pythonVersion: resolvedPythonVersion,
+        ignore: ["/typings","/typeshed-*"], // relative to /workspace
+        verboseOutput,
         typeCheckingMode,
         reportMissingImports: "error",
         reportUnusedImport: "warning",
         reportUnusedVariable: "warning",
         reportConstantRedefinition : "warning",
+        reportAttributeAccessIssue : "warning", // unknown attributes
         reportUnknownArgumentType: "none",
         reportUnknownVariableType: "none",
         reportUnknownMemberType: "none",
-        reportPrivateImportUsage : "info",
-        reportPrivateUsage: "info",
-        
+        reportPrivateImportUsage : "information",
+        reportPrivateUsage: "information",
         reportMissingModuleSource: false,
         reportMissingTypeStubs: false,
     };
@@ -173,7 +192,7 @@ function writePyrightConfig(typeCheckingMode: string = "standard") {
 async function handleInitServer(msg: MsgInitServer) {
     try {
         console.log("[pyright-worker] Initializing filesystem...");
-        await initFs(msg.typeshedFallback, msg.boardStubs);
+        await initFs(msg.boardStubs);
 
         // Write user type stubs
         if (msg.userFiles && Object.keys(msg.userFiles).length > 0) {
@@ -185,7 +204,12 @@ async function handleInitServer(msg: MsgInitServer) {
         }
 
         // Write pyrightconfig
-        writePyrightConfig(msg.typeCheckingMode || "standard");
+        writePyrightConfig({
+            typeCheckingMode: msg.typeCheckingMode,
+            typeshedPath: msg.typeshedPath,
+            pythonVersion: msg.pythonVersion,
+            verboseOutput: msg.verboseOutput,
+        });
 
         console.log("[pyright-worker] Creating Pyright server...");
 

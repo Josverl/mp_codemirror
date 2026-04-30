@@ -1,4 +1,4 @@
-# ESP-NOW Communication Example
+# MicroPython - ESP-NOW Communication
 from time import sleep
 
 import espnow

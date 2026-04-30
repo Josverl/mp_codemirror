@@ -2,5 +2,7 @@
     "blink_led.py",
     "temperature_sensor.py",
     "espnow.py",
-    "rp2_pio.py"
+    "rp2_pio.py",
+    "cp_essentials.py",
+    "cp_digital.py"
 ]

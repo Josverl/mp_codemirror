@@ -14,12 +14,18 @@ export interface MsgInitServer {
     userFiles: UserFolder;
     /** Project files written into /workspace before Pyright starts */
     workspaceFiles?: Record<string, string>;
-    /** Custom typeshed override (zip ArrayBuffer), or false to use bundled */
-    typeshedFallback: ArrayBuffer | false | undefined;
+    /** Legacy custom typeshed override (unused by current worker implementation) */
+    typeshedFallback?: ArrayBuffer | false | undefined;
     /** Board stubs zip (ArrayBuffer), or false to skip, or undefined to use bundled default */
     boardStubs: ArrayBuffer | false | undefined;
     /** Pyright type checking mode: off, basic, standard, strict */
     typeCheckingMode?: string;
+    /** Pyright typeshedPath, e.g. /typeshed-micropython or /typeshed-fallback */
+    typeshedPath?: string;
+    /** Pyright pythonVersion in X.Y format */
+    pythonVersion?: string;
+    /** Pyright verboseOutput */
+    verboseOutput?: boolean;
 }
 
 export interface MsgServerInitialized {

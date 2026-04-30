@@ -184,22 +184,30 @@ def test_compress_unicode(share_page):
 
 
 def test_build_shareable_url_contains_params(share_page):
-    """buildShareableUrl produces a URL with board, typeCheckMode, and project params."""
+    """buildShareableUrl produces a URL with selected settings and project payload."""
     result = share_page.evaluate("""async () => {
         const { buildShareableUrl } = await import('./share.js');
-        const url = await buildShareableUrl('x = 1', 'esp32', 'strict');
+        const url = await buildShareableUrl('x = 1', 'esp32', 'strict', 'micropython', '3.12');
         const parsed = new URL(url);
         return {
             board: parsed.searchParams.get('board'),
             typeCheckMode: parsed.searchParams.get('typeCheckMode'),
+            stdlib: parsed.searchParams.get('stdlib'),
+            pythonVersion: parsed.searchParams.get('pythonVersion'),
             hasProject: parsed.searchParams.has('project'),
             hasLegacyCode: parsed.searchParams.has('code'),
+            hasVerbose: parsed.searchParams.has('verbose'),
+            hasVerboseOutput: parsed.searchParams.has('verboseOutput'),
         };
     }""")
     assert result["board"] == "esp32"
     assert result["typeCheckMode"] == "strict"
+    assert result["stdlib"] == "micropython"
+    assert result["pythonVersion"] == "3.12"
     assert result["hasProject"] is True
     assert result["hasLegacyCode"] is False
+    assert result["hasVerbose"] is False
+    assert result["hasVerboseOutput"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +308,24 @@ def test_url_restores_typecheck_mode(page, live_server):
 
     mode = page.evaluate("() => document.getElementById('typeCheckMode').value")
     assert mode == "strict"
+
+
+def test_url_restores_stdlib_and_python_version(page, live_server):
+    """Loading a URL restores stdlib selector and pythonVersion selector values."""
+    _goto_editor(page, live_server)
+    url = page.evaluate("""async () => {
+        const { buildShareableUrl } = await import('./share.js');
+        return await buildShareableUrl({ 'main.py': 'pass' }, 'esp32', 'standard', 'cpython', '3.14');
+    }""")
+
+    page.goto(url, wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+
+    stdlib_toggle = page.evaluate("() => document.getElementById('typeshedPathToggle').checked")
+    python_version = page.evaluate("() => document.getElementById('pythonVersion').value")
+
+    assert stdlib_toggle is False  # Off = CPython
+    assert python_version == "3.14"
 
 
 def test_url_params_cleaned_after_restore(page, live_server):

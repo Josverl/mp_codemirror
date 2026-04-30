@@ -6,11 +6,9 @@ Tests URL encoding/decoding, share dropdown UI, and URL restoration.
 
 import pytest
 from playwright.sync_api import expect
+from timing import CDN_TIMEOUT
 
 pytestmark = pytest.mark.editor
-
-# Timeout for CDN-loaded resources (CodeMirror modules from esm.sh)
-from timing import CDN_TIMEOUT
 
 
 def _goto_editor(page, live_server):
@@ -69,6 +67,31 @@ def test_share_dropdown_has_three_options(share_page):
     expect(share_page.locator("#copyLink")).to_be_visible()
     expect(share_page.locator("#copyMdLink")).to_be_visible()
     expect(share_page.locator("#copyMdCode")).to_be_visible()
+
+
+def test_share_warning_hidden_for_small_payload(share_page):
+    """Small projects should not show the large payload warning."""
+    share_page.locator("#shareBtn").click()
+    expect(share_page.locator("#sharePayloadWarning")).to_be_hidden()
+
+
+def test_share_warning_visible_for_large_payload(share_page):
+    """Large projects should show a visible warning when Share is opened."""
+    share_page.evaluate("""async () => {
+        const { setEditorContent } = await import('./app.js');
+        let seed = 0x12345678;
+        const chars = [];
+        for (let i = 0; i < 320000; i++) {
+            seed = (1664525 * seed + 1013904223) >>> 0;
+            chars.push(String.fromCharCode(33 + (seed % 90)));
+        }
+        setEditorContent(chars.join(''));
+    }""")
+
+    share_page.locator("#shareBtn").click()
+    warning = share_page.locator("#sharePayloadWarning")
+    expect(warning).to_be_visible()
+    expect(warning).to_contain_text("Large share payload")
 
 
 def test_share_dropdown_closes_on_outside_click(share_page):
@@ -144,7 +167,7 @@ def test_compress_unicode(share_page):
 
 
 def test_build_shareable_url_contains_params(share_page):
-    """buildShareableUrl produces a URL with board, typeCheckMode, and code params."""
+    """buildShareableUrl produces a URL with board, typeCheckMode, and project params."""
     result = share_page.evaluate("""async () => {
         const { buildShareableUrl } = await import('./share.js');
         const url = await buildShareableUrl('x = 1', 'esp32', 'strict');
@@ -152,12 +175,14 @@ def test_build_shareable_url_contains_params(share_page):
         return {
             board: parsed.searchParams.get('board'),
             typeCheckMode: parsed.searchParams.get('typeCheckMode'),
-            hasCode: parsed.searchParams.has('code'),
+            hasProject: parsed.searchParams.has('project'),
+            hasLegacyCode: parsed.searchParams.has('code'),
         };
     }""")
     assert result["board"] == "esp32"
     assert result["typeCheckMode"] == "strict"
-    assert result["hasCode"] is True
+    assert result["hasProject"] is True
+    assert result["hasLegacyCode"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -166,16 +191,15 @@ def test_build_shareable_url_contains_params(share_page):
 
 
 def test_url_restores_code(page, live_server):
-    """Loading a URL with code param restores the code in the editor."""
-    # First get a compressed code value
+    """Loading a URL with project param restores the code in the editor."""
     _goto_editor(page, live_server)
-    compressed = page.evaluate("""async () => {
-        const { compressCode } = await import('./share.js');
-        return await compressCode('x = 42\\nprint(x)');
+    url = page.evaluate("""async () => {
+        const { buildShareableUrl } = await import('./share.js');
+        return await buildShareableUrl({ 'main.py': 'x = 42\\nprint(x)' }, '', 'standard');
     }""")
 
     # Navigate to that shareable URL
-    page.goto(f"{live_server}/index.html?code={compressed}", wait_until="domcontentloaded")
+    page.goto(url, wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
     content = page.evaluate("() => document.querySelector('.cm-content').innerText")
@@ -183,15 +207,41 @@ def test_url_restores_code(page, live_server):
     assert "print(x)" in content
 
 
+def test_url_restores_multiple_files_with_names(page, live_server):
+    """Project shares restore every file path, preserving original names."""
+    _goto_editor(page, live_server)
+    url = page.evaluate("""async () => {
+        const { buildShareableUrl } = await import('./share.js');
+        return await buildShareableUrl({
+            'main.py': 'print(\"main\")',
+            'lib/utils.py': 'VALUE = 7',
+            'drivers/sensor.py': 'class Sensor: pass',
+        }, 'esp32', 'standard');
+    }""")
+
+    page.goto(url, wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+
+    restored_files = page.evaluate("""async () => {
+        const { OPFSProject } = await import('./storage/opfs-project.js');
+        const entries = await OPFSProject.listFiles();
+        return entries.filter(e => e.type === 'file').map(e => e.path).sort();
+    }""")
+
+    assert 'main.py' in restored_files
+    assert 'lib/utils.py' in restored_files
+    assert 'drivers/sensor.py' in restored_files
+
+
 def test_url_restores_board(page, live_server):
     """Loading a URL with board param selects that board."""
     _goto_editor(page, live_server)
-    compressed = page.evaluate("""async () => {
-        const { compressCode } = await import('./share.js');
-        return await compressCode('pass');
+    url = page.evaluate("""async () => {
+        const { buildShareableUrl } = await import('./share.js');
+        return await buildShareableUrl({ 'main.py': 'pass' }, 'esp32', 'standard');
     }""")
 
-    page.goto(f"{live_server}/index.html?board=esp32&code={compressed}", wait_until="domcontentloaded")
+    page.goto(url, wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
     board = page.evaluate("() => document.getElementById('boardSelect').value")
@@ -201,12 +251,12 @@ def test_url_restores_board(page, live_server):
 def test_url_board_preloads_matching_stubs(page, live_server):
     """URL board selection must preload stubs for the same board before LSP init."""
     _goto_editor(page, live_server)
-    compressed = page.evaluate("""async () => {
-        const { compressCode } = await import('./share.js');
-        return await compressCode('from machine import CAN');
+    url = page.evaluate("""async () => {
+        const { buildShareableUrl } = await import('./share.js');
+        return await buildShareableUrl({ 'main.py': 'from machine import CAN' }, 'stm32', 'standard');
     }""")
 
-    page.goto(f"{live_server}/index.html?board=stm32&code={compressed}", wait_until="domcontentloaded")
+    page.goto(url, wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
     page.wait_for_function("() => document.getElementById('boardSelect').value === 'stm32'")
 
@@ -223,12 +273,12 @@ def test_url_board_preloads_matching_stubs(page, live_server):
 def test_url_restores_typecheck_mode(page, live_server):
     """Loading a URL with typeCheckMode param selects that mode."""
     _goto_editor(page, live_server)
-    compressed = page.evaluate("""async () => {
-        const { compressCode } = await import('./share.js');
-        return await compressCode('pass');
+    url = page.evaluate("""async () => {
+        const { buildShareableUrl } = await import('./share.js');
+        return await buildShareableUrl({ 'main.py': 'pass' }, 'esp32', 'strict');
     }""")
 
-    page.goto(f"{live_server}/index.html?typeCheckMode=strict&code={compressed}", wait_until="domcontentloaded")
+    page.goto(url, wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
     mode = page.evaluate("() => document.getElementById('typeCheckMode').value")
@@ -238,18 +288,33 @@ def test_url_restores_typecheck_mode(page, live_server):
 def test_url_params_cleaned_after_restore(page, live_server):
     """After restoring from URL params, the address bar is cleaned up."""
     _goto_editor(page, live_server)
+    url = page.evaluate("""async () => {
+        const { buildShareableUrl } = await import('./share.js');
+        return await buildShareableUrl({ 'main.py': 'pass' }, '', 'standard');
+    }""")
+
+    page.goto(url, wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+
+    # Wait for URL to be cleaned
+    page.wait_for_function(
+        "() => window.location.search === ''",
+        timeout=5000,
+    )
+    current_url = page.evaluate("() => window.location.href")
+    assert "project=" not in current_url
+
+
+def test_legacy_code_param_still_decodes(page, live_server):
+    """Legacy `code` share links remain decodable for backward compatibility."""
+    _goto_editor(page, live_server)
     compressed = page.evaluate("""async () => {
         const { compressCode } = await import('./share.js');
-        return await compressCode('pass');
+        return await compressCode('legacy = True\\nprint(legacy)');
     }""")
 
     page.goto(f"{live_server}/index.html?code={compressed}", wait_until="domcontentloaded")
     page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
 
-    # Wait for URL to be cleaned
-    page.wait_for_function(
-        "() => !window.location.search.includes('code=')",
-        timeout=5000,
-    )
-    current_url = page.evaluate("() => window.location.href")
-    assert "code=" not in current_url
+    content = page.evaluate("() => document.querySelector('.cm-content').innerText")
+    assert "legacy = True" in content

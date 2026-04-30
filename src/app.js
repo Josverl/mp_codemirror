@@ -1,6 +1,7 @@
 /**
- * CodeMirror 6 MicroPython Editor
- * A simple Python code editor with syntax highlighting and basic features
+ * MicroPython-stubs Playground
+ * A simple MicroPython code editor with syntax highlighting and static type checking 
+ * based on CodeMirror 6 and Pyright running in a Web Worker.
  */
 
 import { python } from '@codemirror/lang-python';
@@ -137,6 +138,46 @@ async function collectWorkspaceFiles(activePath = null, activeContentOverride = 
         result[activePath] = activeContentOverride;
     }
     return result;
+}
+
+async function collectShareFiles() {
+    const activePath = docManager?.activeFile || OPFSProject.getLastActiveFile() || 'main.py';
+    const activeContent = view?.state.doc.toString() ?? null;
+    const files = await collectWorkspaceFiles(activePath, activeContent);
+
+    // Overlay all open tabs so unsaved edits are included for non-active files.
+    if (docManager) {
+        for (const path of docManager.openFiles) {
+            files[path] = docManager.getCurrentContent(path);
+        }
+    }
+
+    if (Object.keys(files).length === 0) {
+        files[activePath || 'main.py'] = activeContent ?? '';
+    }
+    return files;
+}
+
+async function replaceProjectFiles(files) {
+    const existingEntries = await OPFSProject.listFiles();
+    for (const entry of existingEntries) {
+        if (entry.type !== 'file') continue;
+        try {
+            await OPFSProject.deleteFile(entry.path);
+        } catch {
+            // Ignore races where a file disappears during cleanup.
+        }
+    }
+
+    for (const [path, content] of Object.entries(files)) {
+        await OPFSProject.writeFile(path, content ?? '');
+    }
+}
+
+function pickInitialFile(sharedFiles) {
+    if (!sharedFiles || Object.keys(sharedFiles).length === 0) return null;
+    if (sharedFiles['main.py'] !== undefined) return 'main.py';
+    return Object.keys(sharedFiles).sort()[0];
 }
 
 async function syncWorkspaceToLSP({ openDocuments = false, activeUri = documentUri, workspaceFiles = null } = {}) {
@@ -725,6 +766,8 @@ function rebindLSPAllViews() {
 async function initializeEditor() {
     // Check URL parameters first (shareable link)
     const urlState = await restoreFromUrl();
+    const sharedFiles = urlState.files;
+    const hasSharedPayload = Boolean(sharedFiles || urlState.code);
 
     // If URL specifies a board, apply it before board selector init
     if (urlState.board) {
@@ -744,7 +787,8 @@ async function initializeEditor() {
         initBoardSelector(),
     ]);
 
-    // Use code from URL if present, otherwise load first example
+    // Use code from legacy URL if present, otherwise load first example.
+    // New-format project URLs are restored directly into OPFS below.
     if (urlState.code) {
         sampleCode = urlState.code;
     } else {
@@ -755,13 +799,15 @@ async function initializeEditor() {
     // Initialize OPFS storage before starting LSP so the worker can preload the project.
     await OPFSProject.init();
 
-    // If loaded from a shareable URL, put the code in main.py.
-    if (urlState.code) {
+    if (sharedFiles) {
+        await replaceProjectFiles(sharedFiles);
+    } else if (urlState.code) {
+        // Legacy single-file links decode into main.py.
         await OPFSProject.writeFile('main.py', urlState.code);
     }
 
     // Determine the initial file and content before the worker starts.
-    const initialFile = OPFSProject.getLastActiveFile();
+    const initialFile = pickInitialFile(sharedFiles) || OPFSProject.getLastActiveFile();
     documentUri = `file:///workspace/${initialFile}`;
 
     let initialContent;
@@ -974,13 +1020,14 @@ async function initializeEditor() {
         () => view.state.doc.toString(),
         () => currentBoardId,
         () => currentTypeCheckMode,
+        () => collectShareFiles(),
     );
 
     // Wire Export / Import buttons
     initExportImport();
 
     // If loaded from a shareable link, clear URL params
-    if (urlState.code) {
+    if (hasSharedPayload) {
         const cleanUrl = window.location.pathname + window.location.hash;
         window.history.replaceState(null, '', cleanUrl);
     }

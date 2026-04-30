@@ -194,11 +194,20 @@ def test_theme_toggle_cycles_back_to_light(editor_page):
 
 def _clear_active_editor(page):
     """Select all content in the active CodeMirror editor and delete it."""
-    page.locator(".cm-content").click()
+    # Prefer the active pane to avoid reading hidden/inactive editors.
+    active_content = page.locator(".editor-pane--active .cm-content")
+    if active_content.count() > 0:
+        active_content.click()
+    else:
+        page.locator(".cm-content").click()
     page.keyboard.press("Control+a")
     page.keyboard.press("Delete")
     page.wait_for_function(
-        "() => document.querySelector('.cm-content').innerText.trim() === ''",
+        """() => {
+            const active = document.querySelector('.editor-pane--active .cm-content');
+            const el = active || document.querySelector('.cm-content');
+            return Boolean(el) && el.innerText.trim() === '';
+        }""",
         timeout=UI_TIMEOUT,
     )
 

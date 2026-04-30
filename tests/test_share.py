@@ -26,6 +26,16 @@ def _reset_share_state(page):
     expect(page.locator("#shareDropdown")).to_be_hidden()
 
 
+def _open_options_panel(page):
+    """Ensure the right-side Options panel is open (Share lives inside it)."""
+    is_open = page.evaluate("() => document.body.classList.contains('options-panel-open')")
+    if is_open:
+        return
+    page.locator("#options-panel-handle").click()
+    page.wait_for_timeout(50)
+    assert page.evaluate("() => document.body.classList.contains('options-panel-open')")
+
+
 @pytest.fixture(scope="module")
 def _shared_share_page(shared_page, live_server):
     """Module-scoped page for share tests that do not require navigation isolation."""
@@ -57,12 +67,14 @@ def test_share_dropdown_hidden_by_default(share_page):
 
 def test_share_dropdown_opens_on_click(share_page):
     """Clicking the Share button shows the dropdown."""
+    _open_options_panel(share_page)
     share_page.locator("#shareBtn").click()
     expect(share_page.locator("#shareDropdown")).to_be_visible()
 
 
 def test_share_dropdown_has_three_options(share_page):
     """Dropdown contains the three copy options."""
+    _open_options_panel(share_page)
     share_page.locator("#shareBtn").click()
     expect(share_page.locator("#copyLink")).to_be_visible()
     expect(share_page.locator("#copyMdLink")).to_be_visible()
@@ -71,6 +83,7 @@ def test_share_dropdown_has_three_options(share_page):
 
 def test_share_warning_hidden_for_small_payload(share_page):
     """Small projects should not show the large payload warning."""
+    _open_options_panel(share_page)
     share_page.locator("#shareBtn").click()
     expect(share_page.locator("#sharePayloadWarning")).to_be_hidden()
 
@@ -88,6 +101,7 @@ def test_share_warning_visible_for_large_payload(share_page):
         setEditorContent(chars.join(''));
     }""")
 
+    _open_options_panel(share_page)
     share_page.locator("#shareBtn").click()
     warning = share_page.locator("#sharePayloadWarning")
     expect(warning).to_be_visible()
@@ -96,6 +110,7 @@ def test_share_warning_visible_for_large_payload(share_page):
 
 def test_share_dropdown_closes_on_outside_click(share_page):
     """Clicking outside the dropdown closes it."""
+    _open_options_panel(share_page)
     share_page.locator("#shareBtn").click()
     expect(share_page.locator("#shareDropdown")).to_be_visible()
 
@@ -106,6 +121,7 @@ def test_share_dropdown_closes_on_outside_click(share_page):
 
 def test_share_dropdown_closes_on_escape(share_page):
     """Pressing Escape closes the dropdown."""
+    _open_options_panel(share_page)
     share_page.locator("#shareBtn").click()
     expect(share_page.locator("#shareDropdown")).to_be_visible()
 
@@ -115,6 +131,7 @@ def test_share_dropdown_closes_on_escape(share_page):
 
 def test_share_dropdown_toggles(share_page):
     """Clicking Share twice opens then closes the dropdown."""
+    _open_options_panel(share_page)
     share_page.locator("#shareBtn").click()
     expect(share_page.locator("#shareDropdown")).to_be_visible()
     share_page.locator("#shareBtn").click()

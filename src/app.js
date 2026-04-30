@@ -1049,13 +1049,39 @@ initializeEditor();
 function initSidebarResize() {
     const handle = document.getElementById('sidebar-resize-handle');
     const panel = document.getElementById('file-tree-panel');
-    if (!handle || !panel) return;
+    const workspace = document.getElementById('workspace');
+    const editorColumn = document.getElementById('editor-column');
+    const isMobilePortrait = window.matchMedia('(max-width: 900px) and (orientation: portrait)');
+    if (!handle || !panel || !workspace) return;
 
     let dragging = false;
     let startX = 0;
     let startWidth = 0;
+    let swipeStartX = null;
+
+    function closeMobileSidebar() {
+        document.body.classList.remove('mobile-sidebar-open');
+    }
+
+    function toggleMobileSidebar() {
+        document.body.classList.toggle('mobile-sidebar-open');
+    }
+
+    function syncSidebarMode() {
+        if (isMobilePortrait.matches) {
+            panel.style.width = '';
+            document.body.classList.remove('mobile-sidebar-open');
+            return;
+        }
+        panel.style.transform = '';
+        document.body.classList.remove('mobile-sidebar-open');
+    }
+
+    syncSidebarMode();
+    isMobilePortrait.addEventListener('change', syncSidebarMode);
 
     handle.addEventListener('mousedown', (e) => {
+        if (isMobilePortrait.matches) return;
         dragging = true;
         startX = e.clientX;
         startWidth = panel.offsetWidth;
@@ -1077,6 +1103,42 @@ function initSidebarResize() {
         handle.classList.remove('dragging');
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
+    });
+
+    handle.addEventListener('click', (e) => {
+        if (!isMobilePortrait.matches) return;
+        e.preventDefault();
+        e.stopPropagation();
+        toggleMobileSidebar();
+    });
+
+    workspace.addEventListener('touchstart', (e) => {
+        if (!isMobilePortrait.matches || !e.touches.length) return;
+        swipeStartX = e.touches[0].clientX;
+    }, { passive: true });
+
+    workspace.addEventListener('touchmove', (e) => {
+        if (!isMobilePortrait.matches || !e.touches.length || swipeStartX === null) return;
+        const currentX = e.touches[0].clientX;
+        const delta = currentX - swipeStartX;
+
+        // Swipe in from the edge to open, swipe left to close.
+        if (!document.body.classList.contains('mobile-sidebar-open') && swipeStartX <= 24 && delta > 45) {
+            document.body.classList.add('mobile-sidebar-open');
+            swipeStartX = null;
+        } else if (document.body.classList.contains('mobile-sidebar-open') && delta < -45) {
+            document.body.classList.remove('mobile-sidebar-open');
+            swipeStartX = null;
+        }
+    }, { passive: true });
+
+    workspace.addEventListener('touchend', () => {
+        swipeStartX = null;
+    }, { passive: true });
+
+    editorColumn?.addEventListener('click', () => {
+        if (!isMobilePortrait.matches) return;
+        closeMobileSidebar();
     });
 }
 

@@ -12,6 +12,8 @@
 :root {
     --header-height: 80px;
     --footer-height: 64px;
+    --mobile-sidebar-width: min(74vw, 280px);
+    --mobile-sidebar-handle-width: 18px;
 }
 
 body {
@@ -196,6 +198,8 @@ button {
     border-radius: 4px;
     transition: background-color 0.2s ease;
     font-weight: 500;
+    min-height: 34px;
+    line-height: 1;
 }
 
 button:active {
@@ -540,6 +544,9 @@ body.light-theme .file-tree__file--active .file-tree__row { background: #cce5ff;
     font-weight: 500;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    line-height: 1;
 }
 
 body.dark-theme .import-label {
@@ -827,36 +834,57 @@ body.dark-theme .cm-lsp-hover a {
 /* Responsive design */
 @media (max-width: 768px) {
     :root {
-        --header-height: 120px;
+        --header-height: 92px;
     }
 
     header {
-        flex-direction: column;
-        gap: 15px;
-        align-items: stretch;
+        min-height: auto;
+        gap: 8px;
+        padding: 8px 12px;
+        align-items: center;
     }
 
     header h1 {
-        font-size: 20px;
+        font-size: 22px;
         text-align: center;
-    }
-
-    .controls {
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-
-    .sample-selector {
         width: 100%;
     }
 
+    .controls {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+    }
+
+    .controls::-webkit-scrollbar {
+        display: none;
+    }
+
+    .controls > * {
+        flex: 0 0 auto;
+    }
+
+    .sample-selector {
+        width: auto;
+        min-width: 220px;
+    }
+
+    .sample-selector {
+        gap: 6px;
+    }
+
     .sample-selector select {
-        flex: 1;
+        flex: 1 1 auto;
         min-width: 0;
+        max-width: 230px;
     }
 
     main {
-        padding: 0 15px 15px 15px;
+        padding: 0 10px 10px 10px;
     }
 
     footer {
@@ -875,23 +903,95 @@ body.dark-theme .cm-lsp-hover a {
         font-size: 18px;
     }
 
-    .controls {
-        flex-direction: column;
-        gap: 8px;
-    }
-
     .sample-selector {
-        width: 100%;
         flex-direction: row;
+        min-width: 200px;
     }
 
     button {
-        width: 100%;
+        width: auto;
     }
 
     .sample-selector button {
         width: auto;
         min-width: 80px;
+    }
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+    :root {
+        --header-height: 90px;
+        --footer-height: 0px;
+    }
+
+    #helpBtn,
+    footer {
+        display: none;
+    }
+
+    #workspace {
+        position: relative;
+    }
+
+    #editor-column {
+        margin-left: var(--mobile-sidebar-handle-width);
+    }
+
+    #file-tree-panel {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: var(--mobile-sidebar-width);
+        min-width: var(--mobile-sidebar-width);
+        max-width: var(--mobile-sidebar-width);
+        border-radius: 0 6px 6px 0;
+        transform: translateX(calc(-1 * var(--mobile-sidebar-width) + var(--mobile-sidebar-handle-width)));
+        transition: transform 0.2s ease;
+        z-index: 20;
+        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.2);
+    }
+
+    body.mobile-sidebar-open #file-tree-panel {
+        transform: translateX(0);
+    }
+
+    #sidebar-resize-handle {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: var(--mobile-sidebar-handle-width);
+        background: rgba(0, 122, 204, 0.2);
+        border-radius: 0 4px 4px 0;
+        cursor: ew-resize;
+        z-index: 21;
+    }
+
+    body.mobile-sidebar-open #sidebar-resize-handle {
+        left: var(--mobile-sidebar-width);
+        background: rgba(0, 122, 204, 0.4);
+    }
+
+    body.mobile-sidebar-open #editor-column {
+        margin-left: var(--mobile-sidebar-handle-width);
+    }
+
+    #sidebar-resize-handle::after {
+        content: 'FILES';
+        position: absolute;
+        left: 2px;
+        top: 50%;
+        transform: translateY(-50%) rotate(180deg);
+        writing-mode: vertical-rl;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        opacity: 0.95;
+    }
+
+    #editor-container {
+        border-radius: 4px;
     }
 }
 

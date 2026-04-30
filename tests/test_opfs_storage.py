@@ -17,16 +17,17 @@ start = time.time()
 previous = time.time()
 
 def logmessage(message = "Step", restart=False):
-    global counter, start, previous
-    if restart:
-        counter = 0
-    if counter == 0:
-        start = time.time()
-    counter += 10
-    elapsed_ms = (time.time() - start) * 1000
-    lapse_ms = (time.time() - previous) * 1000
-    previous = time.time()
-    print(f"[{counter}] {elapsed_ms:6.1f} ms (+{lapse_ms:6.1f} ms) {message}")
+    pass
+    # global counter, start, previous
+    # if restart:
+    #     counter = 0
+    # if counter == 0:
+    #     start = time.time()
+    # counter += 10
+    # elapsed_ms = (time.time() - start) * 1000
+    # lapse_ms = (time.time() - previous) * 1000
+    # previous = time.time()
+    # print(f"[{counter}] {elapsed_ms:6.1f} ms (+{lapse_ms:6.1f} ms) {message}")
 
 def _load_editor(page, live_server):
     logmessage("Loading editor")

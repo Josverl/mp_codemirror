@@ -265,6 +265,8 @@ def test_completion_auto_triggers_for_alias_dotted_access(lsp_features_page):
 
     _type_in_editor(lsp_features_page, "import time as t")
     lsp_features_page.keyboard.press("Enter")
+    # Ensure no pre-existing completion popup remains from previous typing.
+    lsp_features_page.keyboard.press("Escape")
     lsp_features_page.keyboard.type("t.")
 
     # Wait for debounce flush and a server response before asserting menu content.

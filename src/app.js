@@ -4,6 +4,7 @@
  */
 
 import { python } from '@codemirror/lang-python';
+import { startCompletion } from '@codemirror/autocomplete';
 import { indentUnit } from '@codemirror/language';
 import { Compartment, Prec } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
@@ -77,6 +78,34 @@ let fileTree = null;
 
 const CHANGE_DEBOUNCE_MS = 300; // Wait 300ms after user stops typing
 const STARTUP_REANALYZE_DELAY_MS = 50;
+const AUTO_DOT_COMPLETION_DELAY_MS = CHANGE_DEBOUNCE_MS + 80;
+
+// Per-view timers used for auto completion trigger after typing a dot.
+const dotCompletionTimers = new WeakMap();
+
+function scheduleDotCompletion(view) {
+    const prev = dotCompletionTimers.get(view);
+    if (prev) {
+        clearTimeout(prev);
+    }
+
+    const timer = setTimeout(() => {
+        dotCompletionTimers.delete(view);
+        if (view.isDestroyed) return;
+
+        const { state } = view;
+        const main = state.selection.main;
+        if (!main.empty) return;
+
+        const pos = main.head;
+        if (pos <= 0) return;
+        if (state.sliceDoc(pos - 1, pos) !== '.') return;
+
+        startCompletion(view);
+    }, AUTO_DOT_COMPLETION_DELAY_MS);
+
+    dotCompletionTimers.set(view, timer);
+}
 
 // Cache for collectWorkspaceFiles — invalidated on file mutations.
 let _workspaceFilesCache = null;
@@ -621,6 +650,19 @@ function buildExtensions(path, themeC, lspC) {
             { key: 'Tab', run: indentWithFourSpaces },
             { key: 'Shift-Tab', run: dedentFourSpaces },
             { key: 'Mod-s', run: () => { docManager?.saveFile(); return true; } },
+            {
+                key: '.',
+                run(targetView) {
+                    const tr = targetView.state.replaceSelection('.');
+                    targetView.dispatch({
+                        ...tr,
+                        scrollIntoView: true,
+                        userEvent: 'input.type',
+                    });
+                    scheduleDotCompletion(targetView);
+                    return true;
+                }
+            },
         ])),
         themeC.of(isDarkTheme ? darkTheme : lightTheme),
         lintKeymapExtension,

@@ -70,11 +70,38 @@ export class FileTree {
         // Footer with "Clear All" button
         this._footer = document.createElement('div');
         this._footer.className = 'file-tree__footer';
+
+        const footerActions = document.createElement('div');
+        footerActions.className = 'file-tree__footer-actions';
+
+        const exportBtn = document.createElement('button');
+        exportBtn.id = 'exportBtn';
+        exportBtn.className = 'file-tree__footer-btn';
+        exportBtn.title = 'Export project as ZIP';
+        exportBtn.textContent = 'Export';
+
+        const importLabel = document.createElement('label');
+        importLabel.id = 'importLabel';
+        importLabel.className = 'import-label file-tree__footer-btn';
+        importLabel.title = 'Import ZIP or .py file';
+        importLabel.textContent = 'Import';
+
+        const importFile = document.createElement('input');
+        importFile.id = 'importFile';
+        importFile.type = 'file';
+        importFile.accept = '.zip,.py';
+        importFile.style.display = 'none';
+        importLabel.appendChild(importFile);
+
         const clearAllBtn = document.createElement('button');
         clearAllBtn.className = 'file-tree__clear-all-btn';
         clearAllBtn.title = 'Delete all files';
         clearAllBtn.textContent = 'Clear All';
         clearAllBtn.addEventListener('click', () => this._clearAll());
+
+        footerActions.appendChild(importLabel);
+        footerActions.appendChild(exportBtn);
+        this._footer.appendChild(footerActions);
         this._footer.appendChild(clearAllBtn);
         container.appendChild(this._footer);
     }

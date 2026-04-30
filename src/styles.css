@@ -1165,6 +1165,10 @@ body.dark-theme .cm-lsp-hover a {
         padding: 0;
     }
 
+    body:not(.mobile-sidebar-open) #editor-column {
+        margin-left: var(--mobile-sidebar-handle-width);
+    }
+
     body:not(.mobile-sidebar-open) #diagnostics-status {
         padding-left: calc(12px + var(--mobile-sidebar-handle-width) + 6px);
     }

@@ -248,7 +248,7 @@ function handleSyncFile(msg: MsgSyncFile) {
         fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(fullPath, msg.content);
     } catch (err: any) {
-        console.warn(`[pyright-worker] syncFile failed for ${msg.path}:`, err?.message);
+        console.warn("[pyright-worker] syncFile failed for %s:", msg.path, err?.message);
     }
 }
 
@@ -259,7 +259,7 @@ function handleDeleteFile(msg: MsgDeleteFile) {
             fs.unlinkSync(fullPath);
         }
     } catch (err: any) {
-        console.warn(`[pyright-worker] deleteFile failed for ${msg.path}:`, err?.message);
+        console.warn("[pyright-worker] deleteFile failed for %s:", msg.path, err?.message);
     }
 }
 

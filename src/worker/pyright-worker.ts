@@ -139,13 +139,23 @@ function writePyrightConfig(typeCheckingMode: string = "standard") {
     // NOT on extraPaths: it remains a regular package, so its contents are
     // imported as `from lib.foo import ...`.
     const config = {
-        typeshedPath: "/typeshed-fallback",
+        typeshedPath: "/typings",
         stubPath: "/typings",
-        include: ["."],
-        extraPaths: [".", "libs"],
+        include: ["/workspace"],
+        extraPaths: [".", "/workspace/lib"],
         pythonPlatform: "Linux",
         typeCheckingMode,
-        reportMissingModuleSource: "none",
+        reportMissingImports: "error",
+        reportUnusedImport: "warning",
+        reportUnusedVariable: "warning",
+        reportConstantRedefinition : "warning",
+        reportUnknownArgumentType: "none",
+        reportUnknownVariableType: "none",
+        reportUnknownMemberType: "none",
+        reportPrivateImportUsage : "info",
+        reportPrivateUsage: "info",
+        
+        reportMissingModuleSource: false,
         reportMissingTypeStubs: false,
     };
 

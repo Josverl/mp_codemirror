@@ -59,6 +59,24 @@ let pyrightVersion = "";
 // Type checking mode
 let currentTypeCheckMode = localStorage.getItem('mp_typeCheckMode') || 'standard';
 
+function getSelectedStubsStatusLabel() {
+    if (boardManifest?.boards && currentBoardId) {
+        const board = boardManifest.boards.find((b) => b.id === currentBoardId);
+        if (board) {
+            if (board.package_version) return `${board.package} v${board.package_version}`;
+            if (board.package) return board.package;
+            return board.id;
+        }
+    }
+
+    const select = document.getElementById('boardSelect');
+    const text = select?.options?.[select.selectedIndex]?.textContent?.trim() || '';
+    if (!text || /^loading\.{0,3}$/i.test(text)) return '';
+    const parts = text.split(' — ').map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]} v${parts[1]}`;
+    return text;
+}
+
 // Per-URI debounce timers for didChange notifications
 const changeDebounceTimers = new Map();
 
@@ -247,6 +265,9 @@ async function initBoardSelector() {
             : boardManifest.default;
         select.value = currentBoardId;
 
+        // Ensure status line reflects selected stubs immediately.
+        updateDiagnosticsStatus([], pyrightVersion, getSelectedStubsStatusLabel());
+
         select.addEventListener('change', handleBoardChange);
     } catch (err) {
         console.warn('Could not load board manifest:', err);
@@ -321,7 +342,7 @@ async function handleBoardChange(event) {
 
         // Clear old diagnostics and rebind LSP for every open view.
         if (docManager) {
-            updateDiagnosticsStatus([], pyrightVersion);
+            updateDiagnosticsStatus([], pyrightVersion, getSelectedStubsStatusLabel());
             // Worker was restarted — every URI starts over.
             documentVersions.clear();
             const activeUri = `file:///workspace/${docManager.activeFile}`;
@@ -383,7 +404,7 @@ async function handleTypeCheckModeChange(event) {
         localStorage.setItem('mp_typeCheckMode', newMode);
 
         if (docManager) {
-            updateDiagnosticsStatus([], pyrightVersion);
+            updateDiagnosticsStatus([], pyrightVersion, getSelectedStubsStatusLabel());
             documentVersions.clear();
             const activeUri = `file:///workspace/${docManager.activeFile}`;
             await syncWorkspaceToLSP({ openDocuments: false, activeUri, workspaceFiles });
@@ -736,7 +757,7 @@ function bindLSPToView(v) {
     const uri = `file:///workspace/${meta.path}`;
     const content = v.state.doc.toString();
     resetDocumentVersion(uri);
-    const ext = createLSPPlugin(lspClient, v, uri, 'python', content, pyrightVersion);
+    const ext = createLSPPlugin(lspClient, v, uri, 'python', content, pyrightVersion, getSelectedStubsStatusLabel);
     v.dispatch({ effects: meta.lspC.reconfigure(ext) });
     meta.lspBound = true;
 }
@@ -762,7 +783,7 @@ function rebindLSPAllViews() {
         clearLSPOnView(v);
         bindLSPToView(v);
     });
-    updateDiagnosticsStatus([], pyrightVersion);
+    updateDiagnosticsStatus([], pyrightVersion, getSelectedStubsStatusLabel());
 }
 
 // Initialize editor after loading sample
@@ -867,13 +888,13 @@ async function initializeEditor() {
     docManager = new DocumentManager(editorContainerEl, createViewForPath);
     docManager.onActiveChange((path) => {
         // Keep the module-level `view` and `documentUri` in sync with whichever
-        // pane is active so existing callsites (share, export, triggerTypeCheck,
+        // pane is active so existing callsites (share, export,
         // etc.) keep working unchanged.
         view = docManager.activeView;
         if (path) documentUri = `file:///workspace/${path}`;
         // Clear diagnostics status when switching to a non-Python file
         if (path && !path.endsWith('.py')) {
-            updateDiagnosticsStatus([], pyrightVersion);
+            updateDiagnosticsStatus([], pyrightVersion, getSelectedStubsStatusLabel());
         }
     });
 
@@ -1051,7 +1072,7 @@ function initSidebarResize() {
     const panel = document.getElementById('file-tree-panel');
     const workspace = document.getElementById('workspace');
     const editorColumn = document.getElementById('editor-column');
-    const isMobilePortrait = window.matchMedia('(max-width: 900px) and (orientation: portrait)');
+    const isCompactViewport = window.matchMedia('(max-width: 900px)');
     if (!handle || !panel || !workspace) return;
 
     let dragging = false;
@@ -1068,7 +1089,7 @@ function initSidebarResize() {
     }
 
     function syncSidebarMode() {
-        if (isMobilePortrait.matches) {
+        if (isCompactViewport.matches) {
             panel.style.width = '';
             document.body.classList.remove('mobile-sidebar-open');
             return;
@@ -1078,10 +1099,10 @@ function initSidebarResize() {
     }
 
     syncSidebarMode();
-    isMobilePortrait.addEventListener('change', syncSidebarMode);
+    isCompactViewport.addEventListener('change', syncSidebarMode);
 
     handle.addEventListener('mousedown', (e) => {
-        if (isMobilePortrait.matches) return;
+        if (isCompactViewport.matches) return;
         dragging = true;
         startX = e.clientX;
         startWidth = panel.offsetWidth;
@@ -1106,19 +1127,19 @@ function initSidebarResize() {
     });
 
     handle.addEventListener('click', (e) => {
-        if (!isMobilePortrait.matches) return;
+        if (!isCompactViewport.matches) return;
         e.preventDefault();
         e.stopPropagation();
         toggleMobileSidebar();
     });
 
     workspace.addEventListener('touchstart', (e) => {
-        if (!isMobilePortrait.matches || !e.touches.length) return;
+        if (!isCompactViewport.matches || !e.touches.length) return;
         swipeStartX = e.touches[0].clientX;
     }, { passive: true });
 
     workspace.addEventListener('touchmove', (e) => {
-        if (!isMobilePortrait.matches || !e.touches.length || swipeStartX === null) return;
+        if (!isCompactViewport.matches || !e.touches.length || swipeStartX === null) return;
         const currentX = e.touches[0].clientX;
         const delta = currentX - swipeStartX;
 
@@ -1137,8 +1158,32 @@ function initSidebarResize() {
     }, { passive: true });
 
     editorColumn?.addEventListener('click', () => {
-        if (!isMobilePortrait.matches) return;
+        if (!isCompactViewport.matches) return;
         closeMobileSidebar();
+    });
+}
+
+function initOptionsPanel() {
+    const panel = document.getElementById('options-panel');
+    const handle = document.getElementById('options-panel-handle');
+    if (!panel || !handle) return;
+
+    function syncState(open) {
+        document.body.classList.toggle('options-panel-open', open);
+        panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+
+    function toggle() {
+        syncState(!document.body.classList.contains('options-panel-open'));
+    }
+
+    syncState(false);
+    handle.addEventListener('click', toggle);
+    handle.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggle();
+        }
     });
 }
 
@@ -1215,45 +1260,6 @@ function toggleTheme() {
     reconfigureThemeOnAllViews();
 }
 
-// Trigger type checking with Pyright
-function triggerTypeCheck() {
-    if (!lspClient || !lspClient.connected) {
-        console.warn('LSP client not connected. Cannot run type check.');
-        alert('LSP client not connected. Make sure the Pyright server is running.');
-        return;
-    }
-
-    const activePath = docManager?.activeFile || documentUri.replace('file:///workspace/', '');
-    if (!activePath.endsWith('.py')) {
-        console.log('Skipping type check for non-Python file:', activePath);
-        return;
-    }
-
-    try {
-        const content = view.state.doc.toString();
-        const v = bumpDocumentVersion(documentUri);
-
-        console.log('Triggering type check...');
-        notifyDocumentChange(lspClient, documentUri, content, v);
-        console.log('Type check notification sent');
-
-        // Visual feedback
-        const button = document.getElementById('typeCheckBtn');
-        const originalText = button.textContent;
-        button.textContent = '⏳ Checking...';
-        button.disabled = true;
-
-        // Re-enable button after a short delay
-        setTimeout(() => {
-            button.textContent = originalText;
-            button.disabled = false;
-        }, 200);
-    } catch (error) {
-        console.error('Error triggering type check:', error);
-        alert('Failed to run type check. Check console for details.');
-    }
-}
-
 // Load sample code from selected file
 async function loadSample() {
     const select = document.getElementById('sampleSelect');
@@ -1270,11 +1276,6 @@ async function loadSample() {
     });
     view.dispatch(transaction);
     view.focus();
-
-    // Automatically trigger type check after loading a new example
-    setTimeout(() => {
-        triggerTypeCheck();
-    }, 300); // Small delay to ensure editor update is complete
 }
 
 // Get editor content (useful for future integrations)
@@ -1292,7 +1293,6 @@ export function setEditorContent(content) {
 
 // Event listeners
 document.getElementById('themeToggle').addEventListener('click', toggleTheme);
-document.getElementById('typeCheckBtn').addEventListener('click', triggerTypeCheck);
 document.getElementById('helpBtn').addEventListener('click', () => {
     const panel = document.getElementById('keyboard-help');
     panel.hidden = !panel.hidden;
@@ -1309,6 +1309,7 @@ if (savedTypeCheckMode) {
 
 // Initialize with light theme
 document.body.classList.add('light-theme');
+initOptionsPanel();
 
 // Export the view for testing purposes
 export { view };

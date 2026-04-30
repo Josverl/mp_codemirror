@@ -40,8 +40,9 @@ export const lintKeymapExtension = Prec.high(keymap.of([
  * Update the diagnostics status bar below the editor.
  * @param {Array} diagnostics - CodeMirror diagnostics array
  * @param {string} [pyrightVersion] - Optional pyright version to display
+ * @param {string} [stubsLabel] - Optional stubs label, e.g. "micropython-rp2-stubs v1.28.0.post3"
  */
-export function updateDiagnosticsStatus(diagnostics = [], pyrightVersion = "") {
+export function updateDiagnosticsStatus(diagnostics = [], pyrightVersion = "", stubsLabel = "") {
     const el = document.getElementById('diagnostics-status');
     if (!el) return;
 
@@ -52,15 +53,57 @@ export function updateDiagnosticsStatus(diagnostics = [], pyrightVersion = "") {
         else info++;
     }
 
-    const versionSuffix = pyrightVersion
-        ? ` | <span class="pyright-version">Pyright ${pyrightVersion}</span>`
-        : "";
-
-    el.innerHTML =
+    const resolvedStubsLabel = (stubsLabel || '').trim() || getSelectedStubsLabelFromDom();
+    const statusMain =
         `Errors: <span class="count-error">${errors}</span>` +
         ` | Warnings: <span class="count-warning">${warnings}</span>` +
-        ` | Info: <span class="count-info">${info}</span>` +
-        versionSuffix;
+        ` | Info: <span class="count-info">${info}</span>`;
+
+    const statusMetaParts = [];
+    if (resolvedStubsLabel) {
+        statusMetaParts.push(`<span class="stubs-version">${escapeHtml(resolvedStubsLabel)}</span>`);
+    }
+    if (pyrightVersion) {
+        statusMetaParts.push(`<span class="pyright-version">Pyright ${pyrightVersion}</span>`);
+    }
+
+    const statusMeta = statusMetaParts.length
+        ? `<span class="status-meta-sep"> | </span><span class="status-meta">${statusMetaParts.join(' | ')}</span>`
+        : '';
+
+    el.innerHTML = `<span class="status-main">${statusMain}</span>${statusMeta}`;
+}
+
+/**
+ * Read and normalize board text from the board selector.
+ * Input option format is typically: "package — version".
+ */
+function getSelectedStubsLabelFromDom() {
+    const select = document.getElementById('boardSelect');
+    if (!select || select.selectedIndex < 0) return '';
+
+    const selected = select.options[select.selectedIndex];
+    if (!selected) return '';
+
+    const text = (selected.textContent || '').trim();
+    if (!text) return '';
+    if (/^loading\.{0,3}$/i.test(text)) return '';
+
+    const parts = text.split(' — ').map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+        return `${parts[0]} v${parts[1]}`;
+    }
+
+    return text;
+}
+
+function escapeHtml(value) {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
 }
 
 /**
@@ -69,8 +112,9 @@ export function updateDiagnosticsStatus(diagnostics = [], pyrightVersion = "") {
  * @param {string} fileUri - Document URI
  * @param {Object} view - CodeMirror view
  * @param {string} [pyrightVersion] - Pyright version string to display in the status bar
+ * @param {(() => string)|string} [stubsStatusSource] - Current stubs label or label provider
  */
-export function createLSPDiagnostics(client, fileUri, view, pyrightVersion = "") {
+export function createLSPDiagnostics(client, fileUri, view, pyrightVersion = "", stubsStatusSource = "") {
     // Listen for diagnostic notifications from the server
     client.onNotification((method, params) => {
         if (method === 'textDocument/publishDiagnostics') {
@@ -91,7 +135,10 @@ export function createLSPDiagnostics(client, fileUri, view, pyrightVersion = "")
                 // Use setDiagnostics to update the editor
                 view.dispatch(setDiagnostics(view.state, cmDiagnostics));
                 console.log('Dispatched setDiagnostics');
-                updateDiagnosticsStatus(cmDiagnostics, pyrightVersion);
+                const stubsLabel = typeof stubsStatusSource === 'function'
+                    ? (stubsStatusSource() || '')
+                    : (stubsStatusSource || '');
+                updateDiagnosticsStatus(cmDiagnostics, pyrightVersion, stubsLabel);
             }
         }
     });

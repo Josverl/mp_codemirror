@@ -17,6 +17,9 @@ pytest tests/test_lsp_diagnostics.py -v
 
 # Run all tests
 pytest tests/ -v
+
+# Run browser tests with a specific browser
+pytest -m editor -v --browser-name firefox
 ```
 
 ## Test Files

@@ -1242,6 +1242,8 @@ async function initializeEditor() {
         () => currentBoardId,
         () => getSelectedStubMetadata(),
         () => currentTypeCheckMode,
+        () => currentTypeshedPath === TYPESHED_PATH_MICROPYTHON ? 'micropython' : 'cpython',
+        () => currentPythonVersion,
         () => collectShareFiles(),
     );
 

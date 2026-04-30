@@ -7,7 +7,7 @@
     "build:worker": "webpack --mode production",
     "build:worker:dev": "webpack --mode development",
     "build:typeshed": "node scripts/pack-typeshed.mjs",
-    "test:unit:completion": "node --test tests/test_completion.unit.mjs"
+    "test:unit:completion": "node --test tests/test_completion*.unit.mjs"
   },
   "devDependencies": {
     "@zenfs/archives": "^0.1.0",

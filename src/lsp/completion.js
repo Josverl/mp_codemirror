@@ -11,15 +11,29 @@ import {
     dedupeAndSortCompletionOptions,
 } from './completion-core.mjs';
 
+const AUTO_TRIGGER_WAIT_MS = 320;
+
+function delay(ms) {
+    return new Promise(resolve => {
+        setTimeout(resolve, ms);
+    });
+}
+
 /**
  * Create LSP completion source for CodeMirror
  * 
  * @param {SimpleLSPClient} lspClient - The LSP client instance
  * @param {string} documentUri - The document URI (e.g., 'file:///workspace/document.py')
+ * @param {Object} [options]
+ * @param {number} [options.autoTriggerDelayMs=320] - Delay auto-triggered dotted completions to allow didChange debounce to flush
  * @returns {Function} CodeMirror completion source function
  */
-export function createCompletionSource(lspClient, documentUri) {
+export function createCompletionSource(lspClient, documentUri, options = {}) {
+    const autoTriggerDelayMs = options.autoTriggerDelayMs ?? AUTO_TRIGGER_WAIT_MS;
+    let latestRequestId = 0;
+
     return async (context) => {
+        const requestId = ++latestRequestId;
         console.log('LSP completion source called, explicit:', context.explicit);
 
         // Try to match dotted attribute access (e.g., "sys.") or just words
@@ -39,6 +53,17 @@ export function createCompletionSource(lspClient, documentUri) {
         const lineNumber = context.state.doc.lineAt(pos).number - 1; // 0-based
 
         console.log(`LSP completion at line ${lineNumber + 1}, char ${character}, word: "${word.text}"`);
+
+        const shouldWaitForDottedAutoTrigger = !context.explicit
+            && autoTriggerDelayMs > 0
+            && (lineText[character - 1] === '.' || word.text.includes('.'));
+
+        if (shouldWaitForDottedAutoTrigger) {
+            await delay(autoTriggerDelayMs);
+            if (requestId !== latestRequestId) {
+                return null;
+            }
+        }
 
         // Determine the starting position for completion
         // For dotted access like "sys.arg", start from after the last dot
@@ -62,6 +87,10 @@ export function createCompletionSource(lspClient, documentUri) {
                     triggerCharacter: lineText[character - 1] === '.' ? '.' : undefined
                 }
             });
+
+            if (requestId !== latestRequestId) {
+                return null;
+            }
 
             // Handle both CompletionList and CompletionItem[] responses
             const items = result?.items || result || [];

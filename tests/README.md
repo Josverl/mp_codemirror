@@ -6,7 +6,7 @@ This directory contains Playwright-based tests for the CodeMirror Python Editor.
 
 Run tests (the HTTP server is auto-started by test fixtures):
 ```bash
-# Run fast completion unit tests (no browser)
+# Run fast completion unit tests (no browser, no page load)
 npm run test:unit:completion
 
 # Run real-time LSP tests

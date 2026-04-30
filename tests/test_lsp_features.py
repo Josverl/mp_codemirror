@@ -258,6 +258,34 @@ def test_completion_for_string_methods(lsp_features_page):
 
 
 @requires_lsp
+def test_completion_auto_triggers_for_alias_dotted_access(lsp_features_page):
+    """Typing t. after import alias should auto-show LSP members like sleep."""
+    console_msgs: list[str] = []
+    lsp_features_page.on("console", lambda m: console_msgs.append(m.text))
+
+    _type_in_editor(lsp_features_page, "import time as t")
+    lsp_features_page.keyboard.press("Enter")
+    lsp_features_page.keyboard.type("t.")
+
+    # Wait for debounce flush and a server response before asserting menu content.
+    deadline = time.time() + LSP_TIMEOUT / 1000
+    while time.time() < deadline:
+        if any("Received diagnostics" in m for m in console_msgs[-8:]):
+            break
+        time.sleep(POLL_INTERVAL)
+    time.sleep(POLL_INTERVAL)
+
+    autocomplete = lsp_features_page.locator(".cm-tooltip-autocomplete")
+    autocomplete.wait_for(timeout=LSP_TIMEOUT)
+    options = lsp_features_page.locator(".cm-completionLabel")
+    labels = [options.nth(i).inner_text() for i in range(min(30, options.count()))]
+
+    assert any(lbl.lower() == "sleep" for lbl in labels), (
+        f"Expected auto-triggered completions for 't.' to include 'sleep'. Got: {labels}"
+    )
+
+
+@requires_lsp
 def test_completion_lsp_request_is_logged(lsp_features_page):
     """The LSP completion request must be logged to the browser console."""
     console_msgs: list[str] = []

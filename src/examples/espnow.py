@@ -1,14 +1,14 @@
 # ESP-NOW Communication Example
 from time import sleep
 
-from esp import espnow
+import espnow
 from machine import Pin
 
 BROADCAST = b"\xff\xff\xff\xff\xff\xff"
 
 # Initialize ESP-NOW
 e = espnow.ESPNow()
-e.init()
+
 # Define peer MAC address (replace with actual MAC address of the peer device)
 # peer_mac = b'\x24\x6F\x28\xAA\xBB\xCC'  # Example MAC address
 peer_mac = BROADCAST

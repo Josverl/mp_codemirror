@@ -1311,5 +1311,11 @@ if (savedTypeCheckMode) {
 document.body.classList.add('light-theme');
 initOptionsPanel();
 
+// Set header icon src using the correct assets base path
+const headerIcon = document.getElementById('headerIcon');
+if (headerIcon) {
+    headerIcon.src = `${getAssetsBase()}/colorstubs-xs.jpg`;
+}
+
 // Export the view for testing purposes
 export { view };

@@ -287,27 +287,17 @@ body.light-theme .options-header { color: #555; }
     max-width: none;
 }
 
-.export-import-row {
-    display: grid;
-    grid-template-columns: auto auto;
-    gap: 8px;
-    justify-content: start;
-}
-
 #options-panel .share-wrapper {
     display: inline-block;
     flex: 0 0 auto;
 }
 
-#options-panel .export-import-row,
 #options-panel #helpBtn {
     flex: 0 0 auto;
 }
 
 #options-panel .share-wrapper #shareBtn,
 #options-panel #helpBtn,
-#options-panel #exportBtn,
-#options-panel #importLabel,
 #options-panel #loadSampleBtn {
     min-width: 96px;
 }
@@ -723,6 +713,41 @@ body.light-theme .file-tree__file--active .file-tree__row { background: #cce5ff;
     border-top: 1px solid rgba(128, 128, 128, 0.2);
 }
 
+.file-tree__footer-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.file-tree__footer-btn {
+    background: none;
+    border: 1px solid rgba(128, 128, 128, 0.3);
+    padding: 2px 6px;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 3px;
+    color: inherit;
+    opacity: 0.7;
+    min-height: 0;
+    width: 100%;
+    text-align: center;
+}
+
+.file-tree__footer-btn.import-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    line-height: 1.2;
+    padding: 2px 6px;
+    min-height: 0;
+}
+
+.file-tree__footer-btn:hover {
+    opacity: 1;
+}
+
 .file-tree__clear-all-btn {
     background: none;
     border: 1px solid rgba(128, 128, 128, 0.3);
@@ -770,6 +795,19 @@ body.light-theme .import-label {
 }
 
 .import-label:hover { opacity: 0.85; }
+
+/* Footer action style override for moved Import control */
+.file-tree__footer .import-label.file-tree__footer-btn,
+body.dark-theme .file-tree__footer .import-label.file-tree__footer-btn,
+body.light-theme .file-tree__footer .import-label.file-tree__footer-btn {
+    background: none;
+    color: inherit;
+    border: 1px solid rgba(128, 128, 128, 0.3);
+}
+
+.file-tree__footer .import-label.file-tree__footer-btn:hover {
+    opacity: 1;
+}
 
 /* CodeMirror specific overrides */
 .cm-editor {

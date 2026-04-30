@@ -75,6 +75,19 @@ serve:
 test *args='':
     pytest tests/ -v {{args}}
 
+# run Tier 0 Python unit tests only
+test-unit-py:
+    uv run pytest -m unit -v || test $? -eq 5
+
+# run Tier 0 JavaScript unit tests only
+test-unit-js:
+    node --test tests/*.unit.mjs
+
+# run all Tier 0 unit tests (Python + JavaScript)
+test-unit:
+    just test-unit-py
+    just test-unit-js
+
 # run only the worker transport tests
 test-worker *args='':
     pytest tests/test_worker_transport.py -v {{args}}

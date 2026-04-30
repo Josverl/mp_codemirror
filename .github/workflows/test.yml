@@ -12,12 +12,17 @@ concurrency:
 
 jobs:
   unit-tests:
-    # Tier 0: Pure Python, no browser, no server. Fast.
+    # Tier 0: Pure Python + JavaScript unit tests, no browser, no server. Fast.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
@@ -28,8 +33,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra test
 
-      - name: Run unit tests
+      - name: Run Python unit tests
         run: uv run pytest -m unit -v || test $? -eq 5
+
+      - name: Run JavaScript unit tests
+        run: node --test tests/*.unit.mjs
 
   security-audit:
     # Tier 0: Check npm dependencies for known vulnerabilities.

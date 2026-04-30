@@ -58,6 +58,116 @@ let pyrightVersion = "";
 
 // Type checking mode
 let currentTypeCheckMode = localStorage.getItem('mp_typeCheckMode') || 'standard';
+const TYPESHED_PATH_MICROPYTHON = '/typeshed-micropython';
+const TYPESHED_PATH_FALLBACK = '/typeshed-fallback';
+
+function sanitizeTypeshedPath(pathValue) {
+    return pathValue === TYPESHED_PATH_FALLBACK
+        ? TYPESHED_PATH_FALLBACK
+        : TYPESHED_PATH_MICROPYTHON;
+}
+
+function parseStdlibToTypeshedPath(stdlibValue) {
+    const value = String(stdlibValue || '').toLowerCase();
+    if (value === 'cpython' || value === TYPESHED_PATH_FALLBACK.toLowerCase()) {
+        return TYPESHED_PATH_FALLBACK;
+    }
+    if (value === 'micropython' || value === TYPESHED_PATH_MICROPYTHON.toLowerCase()) {
+        return TYPESHED_PATH_MICROPYTHON;
+    }
+    return null;
+}
+
+function sanitizePythonVersion(versionValue) {
+    const match = /^3\.(\d+)$/.exec(String(versionValue || ''));
+    const minor = match ? Number.parseInt(match[1], 10) : 10;
+    const clamped = Number.isFinite(minor) ? Math.max(10, Math.min(14, minor)) : 10;
+    return `3.${clamped}`;
+}
+
+function parseStoredBoolean(key, fallback = true) {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return raw === '1' || raw === 'true';
+}
+
+let currentTypeshedPath = sanitizeTypeshedPath(localStorage.getItem('mp_typeshedPath'));
+let currentPythonVersion = sanitizePythonVersion(localStorage.getItem('mp_pythonVersion') || '3.10');
+let currentVerboseOutput = parseStoredBoolean('mp_verboseOutput', true);
+
+function getWorkerUrl() {
+    return window.location.pathname.includes('/src/')
+        ? '../dist/pyright_worker.js'
+        : './pyright_worker.js';
+}
+
+function updateVerboseOutputLabel() {
+    const label = document.getElementById('verboseOutputLabel');
+    if (!label) return;
+    label.textContent = currentVerboseOutput ? 'On' : 'Off';
+}
+
+function initPythonVersionSelector() {
+    const select = document.getElementById('pythonVersion');
+    if (!select) return;
+    select.innerHTML = '';
+    for (let minor = 10; minor <= 14; minor += 1) {
+        const value = `3.${minor}`;
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = value;
+        select.appendChild(opt);
+    }
+    select.value = currentPythonVersion;
+}
+
+function setLSPControlsDisabled(disabled) {
+    const ids = [
+        'boardSelect',
+        'typeCheckMode',
+        'typeshedPathToggle',
+        'pythonVersion',
+        'verboseOutputToggle',
+    ];
+    for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el) el.disabled = disabled;
+    }
+}
+
+async function restartLSPWithCurrentSettings(boardId) {
+    if (!lspClient || !lspTransport) return;
+
+    const stubs = await fetchBoardStubs(boardId);
+    const activePath = docManager?.activeFile || documentUri.replace('file:///workspace/', '');
+    const activeContent = view ? view.state.doc.toString() : null;
+    const workspaceFiles = await collectWorkspaceFiles(activePath, activeContent);
+
+    const result = await switchBoard(
+        { client: lspClient, transport: lspTransport },
+        {
+            workerUrl: getWorkerUrl(),
+            timeout: 15000,
+            boardStubs: stubs,
+            workspaceFiles,
+            typeCheckingMode: currentTypeCheckMode,
+            typeshedPath: currentTypeshedPath,
+            pythonVersion: currentPythonVersion,
+            verboseOutput: currentVerboseOutput,
+        }
+    );
+
+    lspClient = result.client;
+    lspTransport = result.transport;
+
+    if (docManager) {
+        updateDiagnosticsStatus([], pyrightVersion, getSelectedStubsStatusLabel());
+        documentVersions.clear();
+        const activeUri = `file:///workspace/${docManager.activeFile}`;
+        await syncWorkspaceToLSP({ openDocuments: false, activeUri, workspaceFiles });
+        rebindLSPAllViews();
+    }
+}
 
 function getSelectedStubsStatusLabel() {
     if (boardManifest?.boards && currentBoardId) {
@@ -242,9 +352,10 @@ async function initBoardSelector() {
         const resp = await fetch(`${base}/stubs-manifest.json`);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         boardManifest = await resp.json();
+        const selectableBoards = (boardManifest.boards || []).filter((b) => b.id !== 'stdlib');
 
         select.innerHTML = '';
-        for (const board of boardManifest.boards) {
+        for (const board of selectableBoards) {
             const opt = document.createElement('option');
             opt.value = board.id;
             // Virtual boards (file === null) show their name; real boards show package — version
@@ -260,9 +371,12 @@ async function initBoardSelector() {
 
         // Restore saved selection or use manifest default
         const saved = localStorage.getItem('mp_board');
-        currentBoardId = saved && boardManifest.boards.some(b => b.id === saved)
+        const defaultBoardId = selectableBoards.some((b) => b.id === boardManifest.default)
+            ? boardManifest.default
+            : (selectableBoards[0]?.id || '');
+        currentBoardId = saved && selectableBoards.some((b) => b.id === saved)
             ? saved
-            : boardManifest.default;
+            : defaultBoardId;
         select.value = currentBoardId;
 
         // Ensure status line reflects selected stubs immediately.
@@ -312,43 +426,11 @@ async function handleBoardChange(event) {
 
     try {
         loading.hidden = false;
-        select.disabled = true;
+        setLSPControlsDisabled(true);
 
-        const stubs = await fetchBoardStubs(newBoardId);
-        const activePath = docManager?.activeFile || documentUri.replace('file:///workspace/', '');
-        const activeContent = view ? view.state.doc.toString() : null;
-        const workspaceFiles = await collectWorkspaceFiles(activePath, activeContent);
-
-        // Determine worker URL
-        const workerUrl = window.location.pathname.includes('/src/')
-            ? '../dist/pyright_worker.js'
-            : './pyright_worker.js';
-
-        const result = await switchBoard(
-            { client: lspClient, transport: lspTransport },
-            {
-                workerUrl,
-                timeout: 15000,
-                boardStubs: stubs,
-                workspaceFiles,
-                typeCheckingMode: currentTypeCheckMode,
-            }
-        );
-
-        lspClient = result.client;
-        lspTransport = result.transport;
+        await restartLSPWithCurrentSettings(newBoardId);
         currentBoardId = newBoardId;
         localStorage.setItem('mp_board', newBoardId);
-
-        // Clear old diagnostics and rebind LSP for every open view.
-        if (docManager) {
-            updateDiagnosticsStatus([], pyrightVersion, getSelectedStubsStatusLabel());
-            // Worker was restarted — every URI starts over.
-            documentVersions.clear();
-            const activeUri = `file:///workspace/${docManager.activeFile}`;
-            await syncWorkspaceToLSP({ openDocuments: false, activeUri, workspaceFiles });
-            rebindLSPAllViews();
-        }
 
         console.log(`Switched to board: ${newBoardId}`);
     } catch (err) {
@@ -357,7 +439,7 @@ async function handleBoardChange(event) {
         select.value = currentBoardId;
     } finally {
         loading.hidden = true;
-        select.disabled = false;
+        setLSPControlsDisabled(false);
     }
 }
 
@@ -366,9 +448,11 @@ async function handleTypeCheckModeChange(event) {
     const newMode = event.target.value;
     if (newMode === currentTypeCheckMode) return;
 
+    const previousMode = currentTypeCheckMode;
+    currentTypeCheckMode = newMode;
+    localStorage.setItem('mp_typeCheckMode', newMode);
+
     if (!lspClient || !lspTransport) {
-        currentTypeCheckMode = newMode;
-        localStorage.setItem('mp_typeCheckMode', newMode);
         return;
     }
 
@@ -377,47 +461,102 @@ async function handleTypeCheckModeChange(event) {
 
     try {
         loading.hidden = false;
-        select.disabled = true;
-
-        const stubs = await fetchBoardStubs(currentBoardId);
-        const activePath = docManager?.activeFile || documentUri.replace('file:///workspace/', '');
-        const activeContent = view ? view.state.doc.toString() : null;
-        const workspaceFiles = await collectWorkspaceFiles(activePath, activeContent);
-        const workerUrl = window.location.pathname.includes('/src/')
-            ? '../dist/pyright_worker.js'
-            : './pyright_worker.js';
-
-        const result = await switchBoard(
-            { client: lspClient, transport: lspTransport },
-            {
-                workerUrl,
-                timeout: 15000,
-                boardStubs: stubs,
-                workspaceFiles,
-                typeCheckingMode: newMode,
-            }
-        );
-
-        lspClient = result.client;
-        lspTransport = result.transport;
-        currentTypeCheckMode = newMode;
-        localStorage.setItem('mp_typeCheckMode', newMode);
-
-        if (docManager) {
-            updateDiagnosticsStatus([], pyrightVersion, getSelectedStubsStatusLabel());
-            documentVersions.clear();
-            const activeUri = `file:///workspace/${docManager.activeFile}`;
-            await syncWorkspaceToLSP({ openDocuments: false, activeUri, workspaceFiles });
-            rebindLSPAllViews();
-        }
+        setLSPControlsDisabled(true);
+        await restartLSPWithCurrentSettings(currentBoardId);
 
         console.log(`Switched to type checking mode: ${newMode}`);
     } catch (err) {
         console.error('Type check mode switch failed:', err);
-        select.value = currentTypeCheckMode;
+        currentTypeCheckMode = previousMode;
+        localStorage.setItem('mp_typeCheckMode', previousMode);
+        select.value = previousMode;
     } finally {
         loading.hidden = true;
-        select.disabled = false;
+        setLSPControlsDisabled(false);
+    }
+}
+
+async function handleTypeshedPathToggleChange(event) {
+    const nextPath = event.target.checked ? TYPESHED_PATH_MICROPYTHON : TYPESHED_PATH_FALLBACK;
+    if (nextPath === currentTypeshedPath) return;
+
+    const previousPath = currentTypeshedPath;
+    currentTypeshedPath = nextPath;
+    localStorage.setItem('mp_typeshedPath', currentTypeshedPath);
+
+    if (!lspClient || !lspTransport) return;
+
+    const loading = document.getElementById('boardLoading');
+    try {
+        loading.hidden = false;
+        setLSPControlsDisabled(true);
+        await restartLSPWithCurrentSettings(currentBoardId);
+        console.log(`Switched to typeshed path: ${currentTypeshedPath}`);
+    } catch (err) {
+        console.error('Typeshed path switch failed:', err);
+        currentTypeshedPath = previousPath;
+        localStorage.setItem('mp_typeshedPath', previousPath);
+        event.target.checked = previousPath === TYPESHED_PATH_MICROPYTHON;
+    } finally {
+        loading.hidden = true;
+        setLSPControlsDisabled(false);
+    }
+}
+
+async function handlePythonVersionChange(event) {
+    const nextVersion = sanitizePythonVersion(event.target.value);
+    if (nextVersion === currentPythonVersion) return;
+
+    const previousVersion = currentPythonVersion;
+    currentPythonVersion = nextVersion;
+    localStorage.setItem('mp_pythonVersion', nextVersion);
+    event.target.value = nextVersion;
+
+    if (!lspClient || !lspTransport) return;
+
+    const loading = document.getElementById('boardLoading');
+    try {
+        loading.hidden = false;
+        setLSPControlsDisabled(true);
+        await restartLSPWithCurrentSettings(currentBoardId);
+        console.log(`Switched to pythonVersion: ${nextVersion}`);
+    } catch (err) {
+        console.error('Python version switch failed:', err);
+        currentPythonVersion = previousVersion;
+        localStorage.setItem('mp_pythonVersion', previousVersion);
+        event.target.value = previousVersion;
+    } finally {
+        loading.hidden = true;
+        setLSPControlsDisabled(false);
+    }
+}
+
+async function handleVerboseOutputToggleChange(event) {
+    const nextVerbose = !!event.target.checked;
+    if (nextVerbose === currentVerboseOutput) return;
+
+    const previousVerbose = currentVerboseOutput;
+    currentVerboseOutput = nextVerbose;
+    localStorage.setItem('mp_verboseOutput', nextVerbose ? '1' : '0');
+    updateVerboseOutputLabel();
+
+    if (!lspClient || !lspTransport) return;
+
+    const loading = document.getElementById('boardLoading');
+    try {
+        loading.hidden = false;
+        setLSPControlsDisabled(true);
+        await restartLSPWithCurrentSettings(currentBoardId);
+        console.log(`Switched verboseOutput: ${nextVerbose ? 'on' : 'off'}`);
+    } catch (err) {
+        console.error('Verbose output switch failed:', err);
+        currentVerboseOutput = previousVerbose;
+        localStorage.setItem('mp_verboseOutput', previousVerbose ? '1' : '0');
+        event.target.checked = previousVerbose;
+        updateVerboseOutputLabel();
+    } finally {
+        loading.hidden = true;
+        setLSPControlsDisabled(false);
     }
 }
 
@@ -805,6 +944,27 @@ async function initializeEditor() {
         document.getElementById('typeCheckMode').value = urlState.typeCheckMode;
     }
 
+    if (urlState.stdlib) {
+        const typeshedPath = parseStdlibToTypeshedPath(urlState.stdlib);
+        if (typeshedPath) {
+            currentTypeshedPath = typeshedPath;
+            localStorage.setItem('mp_typeshedPath', currentTypeshedPath);
+            const toggle = document.getElementById('typeshedPathToggle');
+            if (toggle) {
+                toggle.checked = currentTypeshedPath === TYPESHED_PATH_MICROPYTHON;
+            }
+        }
+    }
+
+    if (urlState.pythonVersion) {
+        currentPythonVersion = sanitizePythonVersion(urlState.pythonVersion);
+        localStorage.setItem('mp_pythonVersion', currentPythonVersion);
+        const versionSelect = document.getElementById('pythonVersion');
+        if (versionSelect) {
+            versionSelect.value = currentPythonVersion;
+        }
+    }
+
     // Fetch available examples and board manifest in parallel
     await Promise.all([
         fetchExampleFiles(),
@@ -863,11 +1023,14 @@ async function initializeEditor() {
         window.__lspFailed = false;
         console.log('Initializing LSP client...');
         const lspResult = await createLSPClient({
-            workerUrl,
+            workerUrl: getWorkerUrl(),
             timeout: 15000,
             boardStubs: initialBoardStubs,
             workspaceFiles: initialWorkspaceFiles,
             typeCheckingMode: currentTypeCheckMode,
+            typeshedPath: currentTypeshedPath,
+            pythonVersion: currentPythonVersion,
+            verboseOutput: currentVerboseOutput,
         });
         lspClient = lspResult.client;
         lspTransport = lspResult.transport;
@@ -1048,6 +1211,8 @@ async function initializeEditor() {
         () => view.state.doc.toString(),
         () => currentBoardId,
         () => currentTypeCheckMode,
+        () => currentTypeshedPath === TYPESHED_PATH_MICROPYTHON ? 'micropython' : 'cpython',
+        () => currentPythonVersion,
         () => collectShareFiles(),
     );
 
@@ -1299,6 +1464,9 @@ document.getElementById('helpBtn').addEventListener('click', () => {
 });
 document.getElementById('loadSampleBtn').addEventListener('click', loadSample);
 document.getElementById('typeCheckMode').addEventListener('change', handleTypeCheckModeChange);
+document.getElementById('typeshedPathToggle').addEventListener('change', handleTypeshedPathToggleChange);
+document.getElementById('pythonVersion').addEventListener('change', handlePythonVersionChange);
+document.getElementById('verboseOutputToggle').addEventListener('change', handleVerboseOutputToggleChange);
 
 // Restore saved type checking mode
 const savedTypeCheckMode = localStorage.getItem('mp_typeCheckMode');
@@ -1306,6 +1474,16 @@ if (savedTypeCheckMode) {
     document.getElementById('typeCheckMode').value = savedTypeCheckMode;
     currentTypeCheckMode = savedTypeCheckMode;
 }
+
+initPythonVersionSelector();
+document.getElementById('pythonVersion').value = currentPythonVersion;
+
+const typeshedToggle = document.getElementById('typeshedPathToggle');
+typeshedToggle.checked = currentTypeshedPath === TYPESHED_PATH_MICROPYTHON;
+
+const verboseOutputToggle = document.getElementById('verboseOutputToggle');
+verboseOutputToggle.checked = currentVerboseOutput;
+updateVerboseOutputLabel();
 
 // Initialize with light theme
 document.body.classList.add('light-theme');

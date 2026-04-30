@@ -43,6 +43,28 @@
                     <option value="strict">Strict</option>
                 </select>
             </div>
+            <div class="typeshed-toggle">
+                <label for="typeshedPathToggle">stdlib:</label>
+                <div class="typeshed-switch-row" aria-label="Select stdlib stubs path">
+                    <span class="switch-side-label">MicroPython</span>
+                    <label class="switch" for="typeshedPathToggle">
+                        <input id="typeshedPathToggle" type="checkbox" aria-label="Use MicroPython stdlib stubs">
+                        <span class="switch-slider" aria-hidden="true"></span>
+                    </label>
+                    <span class="switch-side-label">CPython</span>
+                </div>
+            </div>
+            <div class="python-version-selector">
+                <label for="pythonVersion">Python:</label>
+                <select id="pythonVersion" aria-label="Pyright python version"></select>
+            </div>
+            <div class="verbose-toggle">
+                <label for="verboseOutputToggle">Verbose:</label>
+                <div class="toggle-row">
+                    <input id="verboseOutputToggle" type="checkbox" aria-label="Enable verbose Pyright output">
+                    <span id="verboseOutputLabel"></span>
+                </div>
+            </div>
             <div class="share-wrapper">
                 <button id="shareBtn" aria-label="Share code" title="Share code">Share</button>
                 <div id="shareDropdown" class="share-dropdown" hidden>

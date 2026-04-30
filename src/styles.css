@@ -263,6 +263,9 @@ body.light-theme .options-header { color: #555; }
 
 #options-panel .board-selector,
 #options-panel .typecheck-selector,
+#options-panel .typeshed-toggle,
+#options-panel .python-version-selector,
+#options-panel .verbose-toggle,
 #options-panel .sample-selector {
     flex: 1 1 100%;
     display: grid;
@@ -276,15 +279,89 @@ body.light-theme .options-header { color: #555; }
 }
 
 #options-panel .board-selector label,
-#options-panel .typecheck-selector label {
+#options-panel .typecheck-selector label,
+#options-panel .typeshed-toggle label,
+#options-panel .python-version-selector label,
+#options-panel .verbose-toggle label {
     text-align: right;
 }
 
 #options-panel .sample-selector select,
 #options-panel .board-selector select,
-#options-panel .typecheck-selector select {
+#options-panel .typecheck-selector select,
+#options-panel .python-version-selector select {
     width: 100%;
     max-width: none;
+}
+
+#options-panel .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+#options-panel .toggle-row input[type="checkbox"] {
+    margin: 0;
+}
+
+#options-panel .typeshed-switch-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#options-panel .switch-side-label {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+#options-panel .switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+#options-panel .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+#options-panel .switch-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: #8a8a8a;
+    transition: background-color 0.2s ease;
+    border-radius: 999px;
+}
+
+#options-panel .switch-slider::before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    top: 3px;
+    background-color: #fff;
+    transition: transform 0.2s ease;
+    border-radius: 50%;
+    transform: translateX(20px);
+}
+
+#options-panel .switch input:checked + .switch-slider {
+    background-color: #0d9488;
+}
+
+#options-panel .switch input:checked + .switch-slider::before {
+    transform: translateX(0);
+}
+
+#options-panel .switch input:focus-visible + .switch-slider {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
 }
 
 #options-panel .share-wrapper {
@@ -328,12 +405,23 @@ body.light-theme .options-header { color: #555; }
 }
 
 .board-selector label,
-.typecheck-selector label {
+.typecheck-selector label,
+.typeshed-toggle label,
+.python-version-selector label,
+.verbose-toggle label {
     font-size: 13px;
     font-weight: 500;
 }
 
 .typecheck-selector {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.typeshed-toggle,
+.python-version-selector,
+.verbose-toggle {
     display: flex;
     gap: 4px;
     align-items: center;

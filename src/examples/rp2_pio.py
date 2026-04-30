@@ -1,4 +1,4 @@
-# Example using PIO to blink an LED and raise an IRQ at 1Hz.
+# MicroPython - RP2 PIO blinky
 
 import time
 from machine import Pin

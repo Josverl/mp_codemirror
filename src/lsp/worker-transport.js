@@ -17,6 +17,9 @@ export class WorkerTransport {
         this._connectReject = null;
         this._boardStubs = options.boardStubs; // ArrayBuffer | false | undefined
         this._typeCheckingMode = options.typeCheckingMode; // string | undefined
+        this._typeshedPath = options.typeshedPath; // string | undefined
+        this._pythonVersion = options.pythonVersion; // string | undefined
+        this._verboseOutput = options.verboseOutput; // boolean | undefined
         this._workspaceFiles = options.workspaceFiles || {};
         this.pyrightVersion = ""; // set when serverInitialized is received
     }
@@ -61,6 +64,9 @@ export class WorkerTransport {
                         typeshedFallback: undefined, // use bundled typeshed
                         boardStubs: this._boardStubs, // use bundled default or override
                         typeCheckingMode: this._typeCheckingMode,
+                        typeshedPath: this._typeshedPath,
+                        pythonVersion: this._pythonVersion,
+                        verboseOutput: this._verboseOutput,
                     });
                     return;
                 }

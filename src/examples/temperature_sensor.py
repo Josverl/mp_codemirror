@@ -1,4 +1,4 @@
-# MicroPython Example - Temperature Sensor
+# MicroPython - Temperature Sensor
 from time import sleep
 
 from machine import ADC, Pin

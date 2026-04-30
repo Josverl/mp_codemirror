@@ -127,15 +127,19 @@ function base64urlToUint8Array(str) {
  * @param {string|Object<string,string>} codeOrFiles
  * @param {string} board  Board ID (e.g. "esp32")
  * @param {string} typeCheckMode  Pyright type checking mode
+ * @param {string} [stdlib] stdlib selector: "micropython" | "cpython"
+ * @param {string} [pythonVersion] Python version (e.g. "3.10")
  * @returns {Promise<string>} Full shareable URL
  */
-export async function buildShareableUrl(codeOrFiles, board, typeCheckMode) {
+export async function buildShareableUrl(codeOrFiles, board, typeCheckMode, stdlib, pythonVersion) {
     const url = new URL(window.location.href);
     // Remove any existing params we manage
     url.search = '';
 
     if (board) url.searchParams.set('board', board);
     if (typeCheckMode) url.searchParams.set('typeCheckMode', typeCheckMode);
+    if (stdlib) url.searchParams.set('stdlib', stdlib);
+    if (pythonVersion) url.searchParams.set('pythonVersion', pythonVersion);
 
     const projectEncoded = await encodeProjectFiles(normalizeShareFiles(codeOrFiles));
     url.searchParams.set(PROJECT_PARAM, projectEncoded);
@@ -145,7 +149,7 @@ export async function buildShareableUrl(codeOrFiles, board, typeCheckMode) {
 
 /**
  * Parse shareable parameters from the current URL.
- * @returns {{ project: string|null, code: string|null, board: string|null, typeCheckMode: string|null }}
+ * @returns {{ project: string|null, code: string|null, board: string|null, typeCheckMode: string|null, stdlib: string|null, pythonVersion: string|null }}
  */
 export function parseUrlParams() {
     const params = new URLSearchParams(window.location.search);
@@ -154,6 +158,8 @@ export function parseUrlParams() {
         code: params.get(LEGACY_CODE_PARAM),
         board: params.get('board'),
         typeCheckMode: params.get('typeCheckMode'),
+        stdlib: params.get('stdlib'),
+        pythonVersion: params.get('pythonVersion'),
     };
 }
 
@@ -163,10 +169,10 @@ export function parseUrlParams() {
  * New-format links decode into `files`.
  * Legacy links decode into `code`.
  *
- * @returns {Promise<{ files: Object<string,string>|null, code: string|null, board: string|null, typeCheckMode: string|null }>}
+ * @returns {Promise<{ files: Object<string,string>|null, code: string|null, board: string|null, typeCheckMode: string|null, stdlib: string|null, pythonVersion: string|null }>}
  */
 export async function restoreFromUrl() {
-    const { project, code: encodedLegacy, board, typeCheckMode } = parseUrlParams();
+     const { project, code: encodedLegacy, board, typeCheckMode, stdlib, pythonVersion } = parseUrlParams();
     let files = null;
     let code = null;
 
@@ -186,7 +192,7 @@ export async function restoreFromUrl() {
         }
     }
 
-    return { files, code, board, typeCheckMode };
+    return { files, code, board, typeCheckMode, stdlib, pythonVersion };
 }
 
 // ---- Clipboard copy helpers ----
@@ -219,10 +225,12 @@ async function copyToClipboard(text) {
  * @param {string|Object<string,string>} codeOrFiles
  * @param {string} board
  * @param {string} typeCheckMode
+ * @param {string} [stdlib]
+ * @param {string} [pythonVersion]
  * @returns {Promise<boolean>}
  */
-export async function copyShareableLink(codeOrFiles, board, typeCheckMode) {
-    const url = await buildShareableUrl(codeOrFiles, board, typeCheckMode);
+export async function copyShareableLink(codeOrFiles, board, typeCheckMode, stdlib, pythonVersion) {
+    const url = await buildShareableUrl(codeOrFiles, board, typeCheckMode, stdlib, pythonVersion);
     return copyToClipboard(url);
 }
 
@@ -231,10 +239,12 @@ export async function copyShareableLink(codeOrFiles, board, typeCheckMode) {
  * @param {string|Object<string,string>} codeOrFiles
  * @param {string} board
  * @param {string} typeCheckMode
+ * @param {string} [stdlib]
+ * @param {string} [pythonVersion]
  * @returns {Promise<boolean>}
  */
-export async function copyMarkdownWithLink(codeOrFiles, board, typeCheckMode) {
-    const url = await buildShareableUrl(codeOrFiles, board, typeCheckMode);
+export async function copyMarkdownWithLink(codeOrFiles, board, typeCheckMode, stdlib, pythonVersion) {
+    const url = await buildShareableUrl(codeOrFiles, board, typeCheckMode, stdlib, pythonVersion);
     const md = `[MicroPython-stubs Playground](${url})`;
     return copyToClipboard(md);
 }
@@ -245,10 +255,12 @@ export async function copyMarkdownWithLink(codeOrFiles, board, typeCheckMode) {
  * @param {string} codeBlockText
  * @param {string} board
  * @param {string} typeCheckMode
+ * @param {string} [stdlib]
+ * @param {string} [pythonVersion]
  * @returns {Promise<boolean>}
  */
-export async function copyMarkdownWithLinkAndCode(codeOrFiles, codeBlockText, board, typeCheckMode) {
-    const url = await buildShareableUrl(codeOrFiles, board, typeCheckMode);
+export async function copyMarkdownWithLinkAndCode(codeOrFiles, codeBlockText, board, typeCheckMode, stdlib, pythonVersion) {
+    const url = await buildShareableUrl(codeOrFiles, board, typeCheckMode, stdlib, pythonVersion);
     const md = `[MicroPython-stubs Playground](${url})\n\n\`\`\`python\n${codeBlockText}\n\`\`\``;
     return copyToClipboard(md);
 }
@@ -275,9 +287,11 @@ function flashCopied(button) {
  * @param {() => string} getCode          Returns current editor content
  * @param {() => string} getBoard         Returns current board ID
  * @param {() => string} getTypeCheckMode Returns current typeCheckMode
+ * @param {() => string} [getStdlib]      Returns stdlib selector: "micropython" | "cpython"
+ * @param {() => string} [getPythonVersion] Returns python version
  * @param {() => Promise<Object<string,string>>} [getFiles] Returns full share file map
  */
-export function initShareDropdown(getCode, getBoard, getTypeCheckMode, getFiles) {
+export function initShareDropdown(getCode, getBoard, getTypeCheckMode, getStdlib, getPythonVersion, getFiles) {
     const shareBtn = document.getElementById('shareBtn');
     const dropdown = document.getElementById('shareDropdown');
     const warningEl = document.getElementById('sharePayloadWarning');
@@ -339,19 +353,38 @@ export function initShareDropdown(getCode, getBoard, getTypeCheckMode, getFiles)
     // Wire up copy buttons
     document.getElementById('copyLink')?.addEventListener('click', async (e) => {
         const files = await resolveShareFiles();
-        const ok = await copyShareableLink(files, getBoard(), getTypeCheckMode());
+        const ok = await copyShareableLink(
+            files,
+            getBoard(),
+            getTypeCheckMode(),
+            typeof getStdlib === 'function' ? getStdlib() : undefined,
+            typeof getPythonVersion === 'function' ? getPythonVersion() : undefined,
+        );
         if (ok) flashCopied(e.currentTarget);
     });
 
     document.getElementById('copyMdLink')?.addEventListener('click', async (e) => {
         const files = await resolveShareFiles();
-        const ok = await copyMarkdownWithLink(files, getBoard(), getTypeCheckMode());
+        const ok = await copyMarkdownWithLink(
+            files,
+            getBoard(),
+            getTypeCheckMode(),
+            typeof getStdlib === 'function' ? getStdlib() : undefined,
+            typeof getPythonVersion === 'function' ? getPythonVersion() : undefined,
+        );
         if (ok) flashCopied(e.currentTarget);
     });
 
     document.getElementById('copyMdCode')?.addEventListener('click', async (e) => {
         const files = await resolveShareFiles();
-        const ok = await copyMarkdownWithLinkAndCode(files, getCode(), getBoard(), getTypeCheckMode());
+        const ok = await copyMarkdownWithLinkAndCode(
+            files,
+            getCode(),
+            getBoard(),
+            getTypeCheckMode(),
+            typeof getStdlib === 'function' ? getStdlib() : undefined,
+            typeof getPythonVersion === 'function' ? getPythonVersion() : undefined,
+        );
         if (ok) flashCopied(e.currentTarget);
     });
 }

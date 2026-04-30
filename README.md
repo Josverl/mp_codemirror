@@ -313,6 +313,9 @@ playwright install chromium
 ### Running Tests
 
 ```bash
+# Run fast completion unit tests (no browser/page load)
+npm run test:unit:completion
+
 # Run all tests
 pytest tests/ -v
 

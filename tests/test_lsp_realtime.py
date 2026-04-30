@@ -75,6 +75,35 @@ def _open_tree_file(page, file_name: str):
 
 
 # ---------------------------------------------------------------------------
+# Fixtures: Module-scoped page + autouse reset
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def realtime_page(shared_page, live_server):
+    """Module-scoped page with editor loaded and LSP initialized."""
+    shared_page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    shared_page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    shared_page.wait_for_function(
+        "() => window.__lspReady === true || window.__lspFailed === true",
+        timeout=15000,
+    )
+    return shared_page
+
+
+@pytest.fixture(autouse=True)
+def reset_editor_between_tests(realtime_page):
+    """Clear editor with proper debounce settle before each test."""
+    # Reset BEFORE test runs
+    try:
+        _clear_editor(realtime_page)
+    except Exception:
+        # If clear fails, continue anyway
+        pass
+    yield
+
+
+# ---------------------------------------------------------------------------
 # Real-time diagnostics tests
 # ---------------------------------------------------------------------------
 
@@ -85,7 +114,10 @@ def test_lsp_server_connects_via_browser(page, live_server):
     console: list[str] = []
     page.on("console", lambda m: console.append(m.text))
 
-    _load_and_wait(page, live_server)
+    # Load fresh page to capture init messages
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
 
     transport_connected = any("Transport connected" in m for m in console)
     lsp_ready = any("LSP client ready" in m for m in console)
@@ -100,19 +132,21 @@ def test_did_change_notification_sent_on_typing(page, live_server):
     console: list[str] = []
     page.on("console", lambda m: console.append(m.text))
 
-    _load_and_wait(page, live_server)
+    # Load fresh page to capture console messages
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    page.wait_for_function(
+        "() => window.__lspReady === true || window.__lspFailed === true",
+        timeout=15000,
+    )
 
     _clear_editor(page)
     console.clear()
 
     _type_in_editor(page, "import nonexistent_module")
-    # Wait for debounce + a small margin
-    time.sleep((DEBOUNCE_MS + 500) / 1000)
-
     didchange_msgs = [m for m in console if "Sending didChange" in m]
     assert didchange_msgs, (
-        f"Expected 'Sending didChange' in console after typing. "
-        f"Console: {[m for m in console if 'did' in m.lower()]}"
+        f"Expected 'Sending didChange' in console after typing. Console: {[m for m in console if 'did' in m.lower()]}"
     )
 
 
@@ -122,7 +156,13 @@ def test_diagnostics_received_for_invalid_import(page, live_server):
     console: list[str] = []
     page.on("console", lambda m: console.append(m.text))
 
-    _load_and_wait(page, live_server)
+    # Load fresh page to capture console messages
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    page.wait_for_function(
+        "() => window.__lspReady === true || window.__lspFailed === true",
+        timeout=15000,
+    )
 
     _clear_editor(page)
     console.clear()
@@ -143,14 +183,11 @@ def test_diagnostics_received_for_invalid_import(page, live_server):
 
 
 @requires_lsp
-def test_lint_marker_appears_in_gutter_on_typing(page, live_server):
+def test_lint_marker_appears_in_gutter_on_typing(realtime_page):
     """Typing invalid code must cause a lint marker to appear in the gutter."""
-    _load_and_wait(page, live_server)
+    _type_in_editor(realtime_page, "result = undefined_var_abc")
 
-    _clear_editor(page)
-    _type_in_editor(page, "result = undefined_var_abc")
-
-    marker = page.locator(".cm-lint-marker")
+    marker = realtime_page.locator(".cm-lint-marker")
     marker.first.wait_for(timeout=LSP_TIMEOUT)
     assert marker.count() > 0, "Lint marker must appear after typing invalid code"
 
@@ -161,7 +198,13 @@ def test_did_change_is_debounced(page, live_server):
     console: list[str] = []
     page.on("console", lambda m: console.append(m.text))
 
-    _load_and_wait(page, live_server)
+    # Load fresh page to capture console messages
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    page.wait_for_function(
+        "() => window.__lspReady === true || window.__lspFailed === true",
+        timeout=15000,
+    )
 
     _clear_editor(page)
     console.clear()
@@ -182,7 +225,13 @@ def test_document_version_increments(page, live_server):
     console: list[str] = []
     page.on("console", lambda m: console.append(m.text))
 
-    _load_and_wait(page, live_server)
+    # Load fresh page to capture console messages
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    page.wait_for_function(
+        "() => window.__lspReady === true || window.__lspFailed === true",
+        timeout=15000,
+    )
 
     _clear_editor(page)
     console.clear()
@@ -198,9 +247,7 @@ def test_document_version_increments(page, live_server):
     _type_in_editor(page, "y = 2")
     time.sleep((DEBOUNCE_MS + 400) / 1000)
 
-    versions = [
-        int(m.group(1)) for msg in console if "Sending didChange" in msg for m in [version_re.search(msg)] if m
-    ]
+    versions = [int(m.group(1)) for msg in console if "Sending didChange" in msg for m in [version_re.search(msg)] if m]
 
     assert len(versions) >= 1, (
         f"At least one version number must be logged. Console: {[m for m in console if 'didChange' in m]}"
@@ -215,7 +262,13 @@ def test_diagnostics_update_when_code_fixed(page, live_server):
     console: list[str] = []
     page.on("console", lambda m: console.append(m.text))
 
-    _load_and_wait(page, live_server)
+    # Load fresh page to capture console messages
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    page.wait_for_function(
+        "() => window.__lspReady === true || window.__lspFailed === true",
+        timeout=15000,
+    )
 
     _clear_editor(page)
     console.clear()
@@ -253,7 +306,10 @@ def test_close_tab_cancels_pending_did_change(page, live_server):
     page.on("console", lambda m: console.append(m.text))
     page.on("dialog", lambda d: d.accept())
 
-    _load_and_wait(page, live_server)
+    # Load fresh page for this test which requires specific file state
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
 
     page.evaluate("""
         async () => {
@@ -303,7 +359,10 @@ def test_document_version_does_not_drift_across_tab_switches(page, live_server):
     console: list[str] = []
     page.on("console", lambda m: console.append(m.text))
 
-    _load_and_wait(page, live_server)
+    # Load fresh page for this test which requires specific file state
+    page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=CDN_TIMEOUT)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=15000)
 
     page.evaluate("""
         async () => {

@@ -627,7 +627,8 @@ function buildExtensions(path, themeC, lspC) {
     const updateListener = EditorView.updateListener.of((update) => {
         if (!update.docChanged) return;
         docManager?.markDirty(path);
-        if (!lspClient) return;
+        // Only notify LSP for Python files
+        if (!lspClient || !path.endsWith('.py')) return;
         const prev = changeDebounceTimers.get(uri);
         if (prev) clearTimeout(prev);
         changeDebounceTimers.set(uri, setTimeout(() => {
@@ -689,6 +690,8 @@ function bindLSPToView(v) {
     if (!meta || !lspClient) return;
     // Guard: skip if LSP is already bound (avoids duplicate didOpen)
     if (meta.lspBound) return;
+    // Only type-check Python files
+    if (!meta.path.endsWith('.py')) return;
     const uri = `file:///workspace/${meta.path}`;
     const content = v.state.doc.toString();
     resetDocumentVersion(uri);
@@ -822,6 +825,10 @@ async function initializeEditor() {
         // etc.) keep working unchanged.
         view = docManager.activeView;
         if (path) documentUri = `file:///workspace/${path}`;
+        // Clear diagnostics status when switching to a non-Python file
+        if (path && !path.endsWith('.py')) {
+            updateDiagnosticsStatus([], pyrightVersion);
+        }
     });
 
     await docManager.openFile(initialFile);
@@ -1104,6 +1111,12 @@ function triggerTypeCheck() {
     if (!lspClient || !lspClient.connected) {
         console.warn('LSP client not connected. Cannot run type check.');
         alert('LSP client not connected. Make sure the Pyright server is running.');
+        return;
+    }
+
+    const activePath = docManager?.activeFile || documentUri.replace('file:///workspace/', '');
+    if (!activePath.endsWith('.py')) {
+        console.log('Skipping type check for non-Python file:', activePath);
         return;
     }
 

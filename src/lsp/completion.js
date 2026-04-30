@@ -5,83 +5,11 @@
  * autocomplete system, providing intelligent code completion from Pyright.
  */
 
-/**
- * LSP CompletionItemKind enum (subset we care about)
- */
-const CompletionItemKind = {
-    Text: 1,
-    Method: 2,
-    Function: 3,
-    Constructor: 4,
-    Field: 5,
-    Variable: 6,
-    Class: 7,
-    Interface: 8,
-    Module: 9,
-    Property: 10,
-    Unit: 11,
-    Value: 12,
-    Enum: 13,
-    Keyword: 14,
-    Snippet: 15,
-    Color: 16,
-    File: 17,
-    Reference: 18,
-    Folder: 19,
-    EnumMember: 20,
-    Constant: 21,
-    Struct: 22,
-    Event: 23,
-    Operator: 24,
-    TypeParameter: 25
-};
-
-/**
- * Convert LSP CompletionItemKind to CodeMirror completion type
- */
-function kindToType(kind) {
-    switch (kind) {
-        case CompletionItemKind.Method:
-        case CompletionItemKind.Function:
-        case CompletionItemKind.Constructor:
-            return 'function';
-        case CompletionItemKind.Field:
-        case CompletionItemKind.Property:
-            return 'property';
-        case CompletionItemKind.Variable:
-        case CompletionItemKind.Constant:
-            return 'variable';
-        case CompletionItemKind.Class:
-        case CompletionItemKind.Interface:
-        case CompletionItemKind.Struct:
-            return 'class';
-        case CompletionItemKind.Module:
-            return 'namespace';
-        case CompletionItemKind.Keyword:
-            return 'keyword';
-        case CompletionItemKind.Enum:
-        case CompletionItemKind.EnumMember:
-            return 'enum';
-        case CompletionItemKind.TypeParameter:
-            return 'type';
-        default:
-            return 'text';
-    }
-}
-
-/**
- * Convert LSP CompletionItem to CodeMirror completion option
- */
-function convertCompletionItem(item) {
-    return {
-        label: item.label,
-        type: kindToType(item.kind),
-        detail: item.detail || '',
-        info: item.documentation?.value || item.documentation || '',
-        apply: item.insertText || item.label,
-        boost: item.preselect ? 99 : undefined
-    };
-}
+import {
+    computeCompletionFrom,
+    convertCompletionItem,
+    dedupeAndSortCompletionOptions,
+} from './completion-core.mjs';
 
 /**
  * Create LSP completion source for CodeMirror
@@ -115,8 +43,7 @@ export function createCompletionSource(lspClient, documentUri) {
         // Determine the starting position for completion
         // For dotted access like "sys.arg", start from after the last dot
         // so CodeMirror filters completions against "arg" not "sys.arg"
-        const dotIndex = word.text.lastIndexOf('.');
-        const from = dotIndex >= 0 ? word.from + dotIndex + 1 : word.from;
+        const from = computeCompletionFrom(word);
 
         try {
             console.log('Sending textDocument/completion request to LSP...');
@@ -143,8 +70,8 @@ export function createCompletionSource(lspClient, documentUri) {
                 return null;
             }
 
-            // Convert LSP completion items to CodeMirror format
-            const options = items.map(convertCompletionItem);
+            // Convert, dedupe, and rank LSP completion options before returning.
+            const options = dedupeAndSortCompletionOptions(items.map(convertCompletionItem));
 
             return {
                 from,

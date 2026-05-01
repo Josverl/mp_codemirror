@@ -327,3 +327,77 @@ def test_non_python_file_produces_no_diagnostics(page, live_server):
     assert "Errors: 0" in diagnostics_text and "Warnings: 0" in diagnostics_text, (
         f"Expected zero errors/warnings for non-Python file, got: {diagnostics_text!r}"
     )
+
+
+@requires_lsp
+def test_status_bar_shows_workspace_totals_on_document_switch(page, live_server):
+    """
+    Status bar counts must reflect workspace-level totals, not just the active
+    file's diagnostics.  After receiving errors for file A and switching to a
+    clean file B, the error count must still be non-zero.
+    """
+    setup_url = f"{live_server}/tests/worker-transport-test.html?cb={time.time_ns()}"
+    verify_url = f"{live_server}/index.html?cb={time.time_ns()}"
+
+    # Prepare two files: one with an error, one clean
+    page.goto(setup_url, wait_until="domcontentloaded")
+    page.wait_for_load_state("load", timeout=10_000)
+
+    page.evaluate(r"""
+        async () => {
+            const mod = await import('../storage/opfs-project.js');
+            window.OPFSProject = mod.OPFSProject;
+            await window.OPFSProject.init();
+
+            const entries = await window.OPFSProject.listFiles();
+            const paths = entries
+                .map((entry) => entry.path)
+                .sort((left, right) => right.length - left.length);
+            for (const path of paths) {
+                await window.OPFSProject.deleteFile(path);
+            }
+
+            // main.py has a clear type error
+            await window.OPFSProject.writeFile('main.py', 'x: int = "not an int"\n');
+            // clean.py is error-free
+            await window.OPFSProject.writeFile('clean.py', 'x: int = 42\n');
+            window.OPFSProject.setLastActiveFile('main.py');
+        }
+    """)
+
+    page.goto(verify_url, wait_until="domcontentloaded")
+    page.wait_for_selector(".cm-editor", timeout=30_000)
+    page.wait_for_function("() => window.__lspReady === true || window.__lspFailed === true", timeout=CDN_TIMEOUT)
+    # Wait for Pyright to analyse main.py and publish diagnostics
+    time.sleep(LSP_ROUND_TRIP)
+
+    # Verify main.py shows errors
+    status_before = page.locator("#diagnostics-status").inner_text()
+    assert "Errors: 0" not in status_before or "Warnings: 0" not in status_before, (
+        f"main.py should have at least one error/warning before switch, got: {status_before!r}"
+    )
+
+    # Open clean.py in a new tab by clicking it in the file tree
+    page.wait_for_function(
+        "() => document.querySelector('.file-tree__list') !== null",
+        timeout=UI_TIMEOUT,
+    )
+    opened = page.evaluate("""
+        () => {
+            const rows = [...document.querySelectorAll('.file-tree__file')];
+            const clean = rows.find((r) => r.dataset.path === 'clean.py');
+            if (!clean) return false;
+            const row = clean.querySelector('.file-tree__row');
+            if (row) row.click();
+            return true;
+        }
+    """)
+    assert opened, "clean.py should be present in the file tree"
+    time.sleep(SHORT_SETTLE)
+
+    # The status bar must still show the workspace error count from main.py
+    status_after = page.locator("#diagnostics-status").inner_text()
+    assert "Errors: 0" not in status_after or "Warnings: 0" not in status_after, (
+        f"Status bar should still show main.py errors after switching to clean.py, "
+        f"but got: {status_after!r}"
+    )

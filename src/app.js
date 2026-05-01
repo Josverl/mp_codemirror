@@ -13,7 +13,7 @@ import { keymap } from '@codemirror/view';
 import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
 import { restoreFromUrl, initShareDropdown, initReportIssueButton } from './share.js';
-import { notifyDocumentChange, notifyDocumentOpen, updateDiagnosticsStatus, lintKeymapExtension } from './lsp/diagnostics.js';
+import { notifyDocumentChange, notifyDocumentOpen, updateDiagnosticsStatus, lintKeymapExtension, getWorkspaceDiagnostics } from './lsp/diagnostics.js';
 import { OPFSProject } from './storage/opfs-project.js';
 import { DocumentManager } from './editor/document-manager.js';
 import { TabBar } from './ui/tab-bar.js';
@@ -1234,6 +1234,7 @@ async function initializeEditor() {
         () => currentTypeshedPath === TYPESHED_PATH_MICROPYTHON ? 'micropython' : 'cpython',
         () => currentPythonVersion,
         () => collectShareFiles(),
+        () => docManager?.activeFile || OPFSProject.getLastActiveFile() || 'main.py',
     );
 
     // Initialize report issue button
@@ -1245,6 +1246,8 @@ async function initializeEditor() {
         () => currentTypeshedPath === TYPESHED_PATH_MICROPYTHON ? 'micropython' : 'cpython',
         () => currentPythonVersion,
         () => collectShareFiles(),
+        () => docManager?.activeFile || OPFSProject.getLastActiveFile() || 'main.py',
+        () => getWorkspaceDiagnostics(),
     );
 
     // Wire Export / Import buttons

@@ -12,7 +12,7 @@ The goal of this repo are to provide a simple tool that:
 **Built on:**
 - This App uses [*Codemirror 6* editor](https://codemirror.net/) with basic Python sypport
 - That has been extended using the [Language Server Protocol (LSP)](https://microsoft.github.io/language-server-protocol/overviews/lsp/overview/)
-- that connects to [**Pyright**](https://github.com/microsoft/pyright) running in a Web Worker. 
+- that connects to [Pyright](https://github.com/microsoft/pyright) running in a Web Worker. 
 - Pyright in turn uses [**MicroPython-stubs**](https://github.com/Josverl/micropython-stubs) (ESP32, RP2040, STM32) with live switching between different MCU families.
 
 **How it works:**
@@ -54,13 +54,12 @@ This app does not aim to provide a live connection to an physical or emulated bo
 
 Indeed I used AI 🔮 to create this. I have spend multiple years gradually and manually building the micropython-stubs and associated toolset, and I learned a great deal through that.  
 
-I had suggested this approach (CM6 + LSP + Stubs) a few times before - but it was not seen as an achievable goal.
+I have suggested this approach (CM6 + LSP + Stubs) a few times before - but it was not seen as an short term achievable goal.
 For me that was a hill to climb - and I failed in earlier (manual) attempts due to my lack of web dev skills combined with a lack of time.
+
 So that is where I "hired some AI Agents" to do that part of the work for me.
 
 As for the limited UX design - that is proably me tough.
-
-
 
 ## License
 

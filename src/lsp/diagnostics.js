@@ -10,6 +10,13 @@ import { keymap } from '@codemirror/view';
 import { Prec } from '@codemirror/state';
 
 /**
+ * Workspace-level diagnostics cache: maps fileUri → CodeMirror diagnostics[].
+ * Updated by createLSPDiagnostics whenever publishDiagnostics arrives.
+ * Used to compute aggregate workspace counts for the status bar.
+ */
+const _workspaceDiagnostics = new Map();
+
+/**
  * Lint keyboard navigation extension (F8 / Shift-F8).
  * Opens the lint panel and navigates to next/previous diagnostic.
  * Uses high precedence to override basicSetup's default lintKeymap
@@ -75,6 +82,31 @@ export function updateDiagnosticsStatus(diagnostics = [], pyrightVersion = "", s
 }
 
 /**
+ * Remove diagnostics for a URI from the workspace cache and optionally refresh
+ * the status bar. Call this when a file is closed.
+ * @param {string} fileUri
+ */
+export function removeWorkspaceDiagnosticsFor(fileUri) {
+    _workspaceDiagnostics.delete(fileUri);
+}
+
+/**
+ * Re-render the status bar using the current workspace-level diagnostics
+ * totals. Call this whenever the active document changes so the counts
+ * reflect all open files rather than just the file that last triggered an
+ * LSP notification.
+ * @param {string} [pyrightVersion]
+ * @param {string} [stubsLabel]
+ */
+export function refreshWorkspaceDiagnosticsStatus(pyrightVersion = "", stubsLabel = "") {
+    const all = [];
+    for (const diags of _workspaceDiagnostics.values()) {
+        all.push(...diags);
+    }
+    updateDiagnosticsStatus(all, pyrightVersion, stubsLabel);
+}
+
+/**
  * Read and normalize board text from the board selector.
  * Input option format is typically: "package — version".
  */
@@ -135,10 +167,19 @@ export function createLSPDiagnostics(client, fileUri, view, pyrightVersion = "",
                 // Use setDiagnostics to update the editor
                 view.dispatch(setDiagnostics(view.state, cmDiagnostics));
                 console.log('Dispatched setDiagnostics');
+
+                // Update the workspace cache for this file
+                if (cmDiagnostics.length === 0) {
+                    _workspaceDiagnostics.delete(fileUri);
+                } else {
+                    _workspaceDiagnostics.set(fileUri, cmDiagnostics);
+                }
+
+                // Show workspace-level totals so the count reflects all open files
                 const stubsLabel = typeof stubsStatusSource === 'function'
                     ? (stubsStatusSource() || '')
                     : (stubsStatusSource || '');
-                updateDiagnosticsStatus(cmDiagnostics, pyrightVersion, stubsLabel);
+                refreshWorkspaceDiagnosticsStatus(pyrightVersion, stubsLabel);
             }
         }
     });

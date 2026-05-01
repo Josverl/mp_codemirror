@@ -13,7 +13,7 @@ import { keymap } from '@codemirror/view';
 import { setDiagnostics } from '@codemirror/lint';
 import { createLSPClient, createLSPPlugin, switchBoard } from './lsp/client.js';
 import { restoreFromUrl, initShareDropdown, initReportIssueButton } from './share.js';
-import { notifyDocumentChange, notifyDocumentOpen, updateDiagnosticsStatus, lintKeymapExtension } from './lsp/diagnostics.js';
+import { notifyDocumentChange, notifyDocumentOpen, updateDiagnosticsStatus, lintKeymapExtension, removeWorkspaceDiagnosticsFor, refreshWorkspaceDiagnosticsStatus } from './lsp/diagnostics.js';
 import { OPFSProject } from './storage/opfs-project.js';
 import { DocumentManager } from './editor/document-manager.js';
 import { TabBar } from './ui/tab-bar.js';
@@ -1075,10 +1075,9 @@ async function initializeEditor() {
         // etc.) keep working unchanged.
         view = docManager.activeView;
         if (path) documentUri = `file:///workspace/${path}`;
-        // Clear diagnostics status when switching to a non-Python file
-        if (path && !path.endsWith('.py')) {
-            updateDiagnosticsStatus([], pyrightVersion, getSelectedStubsStatusLabel());
-        }
+        // Refresh the status bar so it always reflects workspace-level totals
+        // regardless of which file is now active (including non-Python files).
+        refreshWorkspaceDiagnosticsStatus(pyrightVersion, getSelectedStubsStatusLabel());
     });
 
     await docManager.openFile(initialFile);
@@ -1104,6 +1103,8 @@ async function initializeEditor() {
             clearPendingDidChange(path);
             await docManager.closeFile(path);
             forgetDocumentVersion(`file:///workspace/${path}`);
+            removeWorkspaceDiagnosticsFor(`file:///workspace/${path}`);
+            refreshWorkspaceDiagnosticsStatus(pyrightVersion, getSelectedStubsStatusLabel());
             refreshTabBar();
         },
     });
@@ -1127,8 +1128,10 @@ async function initializeEditor() {
                     docManager.discard(openPath);
                     await docManager.closeFile(openPath);
                     forgetDocumentVersion(`file:///workspace/${openPath}`);
+                    removeWorkspaceDiagnosticsFor(`file:///workspace/${openPath}`);
                 }
             }
+            refreshWorkspaceDiagnosticsStatus(pyrightVersion, getSelectedStubsStatusLabel());
             refreshTabBar();
         },
         onRename: async (oldPath, newPath) => {
@@ -1143,6 +1146,7 @@ async function initializeEditor() {
                 docManager.discard(oldPath);
                 await docManager.closeFile(oldPath);
                 forgetDocumentVersion(oldUri);
+                removeWorkspaceDiagnosticsFor(oldUri);
                 // Tell Pyright the old document is gone
                 if (lspClient) lspClient.notify('textDocument/didClose', { textDocument: { uri: oldUri } });
                 await OPFSProject.writeFile(newPath, content);

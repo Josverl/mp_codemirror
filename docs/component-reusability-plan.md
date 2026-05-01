@@ -188,7 +188,7 @@ function createHoverTooltip(
 
 ---
 
-### 2.3 `@mp-codemirror/pyright-worker` (built artefact)
+### 2.3 `@mp-codemirror/pyright-worker` (built artifact)
 
 This is the compiled `dist/pyright_worker.js` published as an npm package with a `main`/`exports`
 pointing at the `.js` file, so consumers can reference it from their bundler or CDN:
@@ -221,7 +221,7 @@ Publish `@mp-codemirror/lsp-client` and `@mp-codemirror/pyright-worker` to the p
 
 **Cons:**
 - Requires ongoing maintenance to keep versions aligned with Pyright upstream.
-- Pyright worker bundle is ~4 MB gzipped — within npm norms but large for a library.
+- Pyright worker bundle is ~4 MB uncompressed, ~1 MB gzipped — large but within npm norms; consumers who ship only this worker pay a one-time 1 MB download.
 
 **Minimum viable publishing setup:**
 
@@ -325,7 +325,7 @@ A single re-export file defines the published surface and makes tree-shaking tri
 // src/lsp/index.js  — proposed public API surface
 export { SimpleLSPClient } from './simple-client.js';
 export { WorkerTransport } from './worker-transport.js';
-export { createTransport } from './transport-factory.js';
+export { createTransport as createWorkerTransport } from './transport-factory.js';
 export { createLSPClient, createLSPPlugin, switchBoard, isLSPReady } from './client.js';
 export { createLSPDiagnostics, notifyDocumentOpen, notifyDocumentChange } from './diagnostics.js';
 export { createCompletionSource } from './completion.js';

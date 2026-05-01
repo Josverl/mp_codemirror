@@ -1,20 +1,54 @@
-# MicroPython-stubs Playground
+# MicroPython stubs Playground
 
-This site provides a *Codemirror 6* editor with full _LSP support via Pyright_ running in a Web Worker. 
-The Typechecker uses the included **MicroPython board-specific type stubs** (ESP32, RP2040, STM32) with live switching between different MCU families. 
-The App is deployed to GitHub Pages as static files — no active server needed, no code shared - all runs in the user's browser.
+This App/site provides shows that Type Checking for MicroPython can be used by anyone, and that no complex setup is needed.
 
-## Goals
+The goal of this repo are to provide a simple tool that: 
+- Help to spot some the code issue that may otherwise show up at runtime.
+- Allows for a simple sanity check - would this code work on a different port ?
+- Allows you to share code-snippets with a single or multiple files
+- Shows the usefulness of static typing for MicroPython, even in a browser.
+- Serve as a Proof of Concept for other web based MicroPython or Python editors IDEs to implement something similar.
 
-The goal of this repo is two-pronged:
-- A simple to use tool to show the usability of static typing for MicroPython
-- Serve as a Proof of Concept for other MicroPython editors to implement something similar.
+**Built on:**
+- This App uses [*Codemirror 6* editor](https://codemirror.net/) with basic Python sypport
+- That has been extended using the [Language Server Protocol (LSP)](https://microsoft.github.io/language-server-protocol/overviews/lsp/overview/)
+- that connects to [**Pyright**](https://github.com/microsoft/pyright) running in a Web Worker. 
+- Pyright in turn uses [**MicroPython-stubs**](https://github.com/Josverl/micropython-stubs) (ESP32, RP2040, STM32) with live switching between different MCU families.
+
+**How it works:**
+1. Type MicroPython code in the editor
+2. After 300ms of no typing, a `textDocument/didChange` notification is sent to Pyright
+3. Pyright analyzes your code and returns diagnostics
+4. Errors and warnings are displayed inline with visual markers
+5. Hover over imports, classes, variables etc to see the documentation and type information
+
+**Where does it run**
+The App is deployed to GitHub Pages as static files — no active server needed, no code shared (unles you choose to) - all runs in the user's browser.
 
 I have used Pyright as an LSP, but in principle that is replacable by any other type-checker that can be made to run in a web-worker. All Python type-chekers will be able to "understand" MicroPython, with just a little configuration. 
-Second you need a good set of **MicroPython stubs**, for the ports/boards that you want to support.  These can be installed/fetched from PyPI or the micropython-stubs repo.
 
-Non goals:
-- This app does not aim to provide a live connection to an physical or emulated board.
+**Can I use similar type checkingin my own IDE or setup, or CI**
+Yes you can. 
+There are extensions/add-ins for the most used IDEs, and as this is all standards based - you can just configure it yourself, using any combination of tooling that you prefer.
+To a degree this works even if you prefer to using Nano and rshell - you'll just need to run pyright from the prompt.
+There are setup instuctions in the MicroPython-stubs repo, but I would like to offer a simple setup-script to cover the common cases. That still needs to be written and tested though.
+
+**Non goals:**
+This app does not aim to provide a live connection to an physical or emulated board.There are several great apps that do this today. I hope and would support that some of them will look at this repo and integrate the code or concepts.
+
+## Features
+
+- ✅ Tablestakes CodeMirror functionality 
+   - ✅ All standard features
+   - ✅ Responsive design (though I am no UX designer 😁)
+- - ✅ **MicroPython** syntax highlighting
+- ✅ **LSP Integration** - Pyright running in a Web Worker (no server needed)
+- ✅ **Real-time Diagnostics** - Errors and warnings as you type (debounced 300ms)
+- ✅ **Type Checking** - Full **MicroPython** type analysis
+- ✅ **Board Selector** - Switch between ESP32, RP2040, STM32, CircuitPython stubs
+- ✅ **Multiple documents** and folders, persisted in your local browser state
+- ✅ **Share** - Create a shareable link with your code sample, and settings, to share anywhere
+- ✅ **Import and Export** single files or zipped folders
 
 ## AI Use
 
@@ -23,356 +57,10 @@ Indeed I used AI 🔮 to create this. I have spend multiple years gradually and 
 I had suggested this approach (CM6 + LSP + Stubs) a few times before - but it was not seen as an achievable goal.
 For me that was a hill to climb - and I failed in earlier (manual) attempts due to my lack of web dev skills combined with a lack of time.
 So that is where I "hired some AI Agents" to do that part of the work for me.
-As for the boring design - that is proably me tough.
 
-## Features
+As for the limited UX design - that is proably me tough.
 
-### Current 
-- ✅ Tablestakes CodeMirror functionality 
-   - ✅ Line numbers
-   - ✅ Dark/Light theme toggle
-   - ✅ Auto-indentation (4 spaces for Python)
-   - ✅ Bracket matching and auto-closing
-   - ✅ Code folding
-   - ✅ Multiple cursors/selections
-   - ✅ Search functionality (Ctrl/Cmd+F)
-   - ✅ Undo/Redo history
-   - ✅ Tab key support for indentation
-   - ✅ Responsive design (though the current layout is bad 😁)
-- ✅ **MicroPython** syntax highlighting
-- ✅ **LSP Integration** - Pyright running in a Web Worker (no server needed)
-- ✅ **Real-time Diagnostics** - Errors and warnings as you type (debounced 300ms)
-- ✅ **Type Checking** - Full **MicroPython** type analysis
-- ✅ **Document Versioning** - Automatic version tracking for LSP updates
-- ✅ **Board Selector** - Switch between ESP32, RP2040, STM32 stubs
 
-### Real-Time Diagnostics
-
-The editor provides **real-time feedback** on your MicroPython code:
-
-- **Instant Error Detection:** Syntax errors, undefined variables, and import issues are highlighted as you type
-- **Smart Debouncing:** Changes are sent to the LSP server after 300ms of inactivity to prevent overwhelming the server
-- **Visual Feedback:** Errors appear with red squiggly underlines directly in the editor
-- **Performance Optimized:** Document version tracking ensures efficient updates
-- **Automatic Updates:** Diagnostics refresh automatically when you fix errors
-
-**How it works:**
-1. Type Python code in the editor
-2. After 300ms of no typing, a `textDocument/didChange` notification is sent to Pyright
-3. Pyright analyzes your code and returns diagnostics
-4. Errors and warnings are displayed inline with visual markers
-
-**Keyboard Tip:** Keep typing without interruption - diagnostics will appear shortly after you pause.
-
-### LSP-Powered Autocompletion
-
-The editor provides **intelligent code completion** using Pyright's Language Server Protocol:
-
-- **Context-Aware Suggestions:** Completions for imports, stdlib modules, and MicroPython APIs
-- **Type-Based Icons:** Visual indicators for functions (ƒ), variables (𝑥), classes (○), and keywords (🔑)
-- **Attribute Access:** Smart completion after dots (e.g., `sys.` shows all sys module members)
-- **Automatic & Manual Trigger:** Completions appear as you type or via Ctrl+Space
-
-**Examples:**
-- Type `import o` → See available modules (os, opcode, operator, etc.)
-- Type `sys.` → See all sys module attributes (platform, argv, exit, etc.)
-- Type `"text".` → See all string methods (upper, lower, split, etc.)
-- Type `pin.` (MicroPython) → See Pin methods (on, off, toggle, IRQ_RISING, etc.)
-
-**Tested Coverage:**
-- ✅ Python 3.11 stdlib - 96+ completions for sys module
-- ✅ Import suggestions - 92 importable modules
-- ✅ String methods - 85 str methods
-- ✅ MicroPython - 54 machine.Pin members
-
-**Technical Details:** See [SPRINT4_SUMMARY.md](.ai_history/SPRINT4_SUMMARY.md) for the complete implementation journey.
-
-### LSP-Powered Hover Tooltips
-
-The editor displays **rich documentation on hover** using Pyright's type analysis:
-
-- **Type Information:** See variable types and class definitions instantly
-- **Function Signatures:** View parameters, return types, and descriptions
-- **Comprehensive Docstrings:** Full documentation from Python and MicroPython libraries
-- **External Links:** Clickable links to official MicroPython documentation
-- **Dual Theme Support:** Readable tooltips in both light and dark modes
-
-**Examples:**
-- Hover over `Pin` → See complete class documentation with all parameters
-- Hover over `machine` → See module description with link to docs.micropython.org
-- Hover over `led` variable → See Pin class type information
-- Hover over any function → See signature and docstring
-
-**What You'll See:**
-- **(class) Pin** - Class type with full constructor documentation
-- **(module) machine** - Module info with external documentation links
-- **(function) sleep_ms** - Function signature and usage notes
-- Type annotations, parameter descriptions, and usage examples
-
-**Technical Details:**
-- Uses CodeMirror's `hoverTooltip` extension
-- LSP `textDocument/hover` requests to Pyright
-- Markdown rendering with code block support
-- Max width 500px, max height 400px, scrollable for long docs
-- 98% opacity for excellent readability
-
-### Planned (Future)
-- 🔲 Go to definition
-- 🔲 Find references
-
-### Complete (Phase 3)
-- ✅ MicroPython type stubs (ESP32, RP2040, STM32)
-- ✅ Device-specific stubs switchable via board selector dropdown
-- ✅ Board switching with live re-analysis
-
-### Current (Phase 4)
-- Testing, CI, and code quality improvements
-- Pytest test tiers: unit, editor, worker, lsp
-
-## Project Structure
-
-```
-mp_codemirror/
-├── .github/
-│   ├── copilot-instructions.md  # Agent instructions
-│   └── workflows/
-│       ├── test.yml             # CI test workflow
-│       └── deploy.yml           # GitHub Pages deployment
-├── .vscode/
-│   └── tasks.json          # VSCode tasks for dev servers
-├── src/
-│   ├── lsp/                # LSP client implementation
-│   │   ├── client.js       # Main LSP client setup
-│   │   ├── worker-transport.js     # Web Worker transport
-│   │   ├── transport-factory.js    # Transport factory
-│   │   ├── diagnostics.js  # Diagnostics extension for CodeMirror
-│   │   ├── completion.js   # Autocompletion integration
-│   │   ├── hover.js        # Hover tooltips integration
-│   │   └── simple-client.js        # LSP protocol client wrapper
-│   ├── worker/             # Pyright Web Worker source
-│   │   └── pyright-worker.ts       # Worker entry point (bundled to dist/)
-│   ├── examples/           # Python example files
-│   │   ├── examples.json   # List of example files
-│   │   ├── blink_led.py    # LED blink example (default)
-│   │   ├── espnow.py       # ESP-NOW example
-│   │   ├── rp2_pio.py      # RP2040 PIO example
-│   │   └── temperature_sensor.py  # Temperature sensor example
-│   ├── index.html          # Main HTML page
-│   ├── styles.css          # Custom styling
-│   └── app.js              # Application logic and CodeMirror setup
-├── dist/
-│   └── pyright_worker.js   # Built Pyright worker (via webpack)
-├── assets/
-│   └── stubs-manifest.json # Board stubs manifest
-├── scripts/
-│   ├── pack-typeshed.mjs   # Pack typeshed for browser use
-│   └── pack-stubs.mjs      # Pack MicroPython stubs per board
-├── tests/
-│   ├── conftest.py         # Pytest configuration and fixtures
-│   ├── test_editor.py      # Editor UI tests (Playwright)
-│   ├── test_worker_transport.py  # Web Worker transport tests
-│   ├── test_lsp_features.py     # LSP feature tests
-│   ├── test_lsp_diagnostics.py  # Diagnostics tests
-│   └── README.md           # Testing documentation
-├── typings/                # MicroPython type stubs
-├── justfile                # Build and dev task runner
-├── webpack.config.cjs      # Webpack config for worker build
-└── README.md               # This file
-```
-
-## Getting Started
-
-### Local Development
-
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd mp_codemirror
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   git submodule update --init --recursive
-   npm install --ignore-scripts
-   uv sync
-   ```
-
-3. **Build the Pyright Web Worker:**
-   ```bash
-   just build
-   ```
-   This bundles Pyright, typeshed, and MicroPython stubs into `dist/pyright_worker.js`.
-
-4. **Start the HTTP server:**
-   ```bash
-   just http
-   # or: python -m http.server 8888
-   ```
-   No LSP bridge server is needed — Pyright runs in the browser via a Web Worker.
-
-5. **Open in browser:**
-   Navigate to `http://localhost:8888/src/`
-
-### GitHub Pages Deployment
-
-1. **Enable GitHub Pages:**
-   - Go to your repository settings
-   - Navigate to "Pages" section
-   - Select "Deploy from a branch"
-   - Choose `main` branch and `/src` folder
-   - Click "Save"
-
-2. **Access your editor:**
-   Your editor will be available at:
-   ```
-   https://<username>.github.io/<repository-name>/
-   ```
-
-## Usage
-
-### Basic Operations
-
-- **Write Code:** Simply start typing Python code in the editor
-- **Toggle Theme:** Click the 🌓 button to switch between dark and light themes
-- **Clear Editor:** Click "Clear" to remove all content
-- **Load Sample:** Click "Load Sample" to load example Python code from the `src/examples/` folder
-
-The editor loads `examples/blink_led.py` by default on startup. You can add more example files to the `examples/` folder and they will be available for loading.
-
-### Keyboard Shortcuts
-
-| Action | Windows/Linux | macOS |
-|--------|---------------|-------|
-| Save | Ctrl+S | Cmd+S |
-| Find | Ctrl+F | Cmd+F |
-| Replace | Ctrl+H | Cmd+Alt+F |
-| Undo | Ctrl+Z | Cmd+Z |
-| Redo | Ctrl+Y | Cmd+Shift+Z |
-| Toggle Comment | Ctrl+/ | Cmd+/ |
-| Indent | Tab | Tab |
-| Dedent | Shift+Tab | Shift+Tab |
-| Toggle Fold | Ctrl+Shift+[ | Cmd+Alt+[ |
-| Select All | Ctrl+A | Cmd+A |
-
-## Technical Details
-
-For architecture diagrams, integration guide, and detailed documentation see the [docs/](docs/) folder:
-
-- [Architecture](docs/architecture.md) — component diagrams, LSP communication flow, build pipeline
-- [Showcase](docs/showcase.md) — demo walkthrough, video script, micropython-stubs advantages, integration guide
-- [Quick Start](docs/quickstart.md) — get running in 4 steps
-- [Technical](docs/technical.md) — CDN dependency pinning details
-- [Contributing](docs/contributing.md) — development setup and guidelines
-
-### Architecture
-
-- **No Build Step for UI:** CodeMirror loaded via ES modules from CDN (esm.sh)
-- **Web Worker for LSP:** Pyright runs in a Web Worker (`dist/pyright_worker.js`), built via webpack
-- **Board Switching:** ESP32, RP2040, STM32 stubs, switchable via dropdown
-- **Static Deployment:** Full LSP features work on GitHub Pages — no server needed
-- **Module-based:** Modern ES6+ JavaScript with imports
-
-### Dependencies (via CDN)
-
-All dependencies are loaded from CDN, no npm installation required:
-
-- `codemirror@6.0.2` - Core editor
-- `@codemirror/view` - Editor view
-- `@codemirror/state` - Editor state management
-- `@codemirror/language` - Language support
-- `@codemirror/commands` - Editor commands
-- `@codemirror/search` - Search functionality
-- `@codemirror/autocomplete` - Autocompletion system
-- `@codemirror/lint` - Linting support
-- `@codemirror/lang-python` - Python language mode
-- `@lezer/highlight` - Syntax highlighting
-
-**Important:** To avoid version conflicts when using CodeMirror packages from CDN, we use the `?deps=` parameter to explicitly pin shared dependencies to the same versions across all packages. This prevents the "multiple instances of @codemirror/state" error that occurs when different packages load incompatible versions.
-
-See `src/index.html` for the complete import map with dependency pinning.
-
-### Browser Requirements
-
-- Chrome/Edge 89+
-- Firefox 89+
-- Safari 15+
-- Any browser with ES module support and import maps
-
-## Testing
-
-### Prerequisites
-
-```bash
-# Install Python dependencies
-uv sync
-
-# Install Playwright browsers
-playwright install chromium
-```
-
-### Running Tests
-
-```bash
-# Run fast completion unit tests (no browser/page load)
-npm run test:unit:completion
-
-# Run all tests
-pytest tests/ -v
-
-# Run by tier
-pytest tests/ -m unit -v          # Unit tests
-pytest tests/ -m editor -v        # Editor/UI tests (Playwright)
-pytest tests/ -m worker -v        # Web Worker tests
-pytest tests/ -m lsp -v           # LSP feature tests
-
-# Run with browser visible
-pytest tests/ --headed
-
-# Run specific test
-pytest tests/test_editor.py::test_page_loads -v
-```
-
-The test suite covers:
-- Editor initialization
-- Python syntax highlighting
-- Text editing operations
-- Theme switching
-- Button functionality
-- Responsive layout
-- No JavaScript errors
-
-## Development Guidelines
-
-### Code Style
-- Python code 
-    - ruff, typed 
-- JavaScript 
-    - Modern ES6+ JavaScript
-    - Use `const`/`let`, avoid `var`
-    - Prefer arrow functions
-    - Use async/await over callbacks
-    - Keep functions small and focused
-    - Add JSDoc comments for public APIs
-
-### Making Changes
-
-1. Test locally first
-2. Verify in multiple browsers if possible
-3. Check console for errors
-4. Test on mobile viewport
-5. Commit with clear messages
-
-### Future Extensions
-
-When adding new features:
-1. Keep static deployment in mind
-2. Document any new dependencies
-3. Update tests
-4. Update this README
-5. Consider LSP integration compatibility
-## Contributing
-
-See [docs/contributing.md](docs/contributing.md) for development setup, testing, and contribution guidelines.
 
 ## License
 
